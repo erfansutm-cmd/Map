@@ -120,23 +120,6 @@
     </div>
   </header>
 
-  <!-- Quick City Chips Bar -->
-  <div class="city-chips-bar">
-    <span class="chips-label">Popular:</span>
-    <button class="chip-btn active" data-city="isfahan">Isfahan</button>
-    <button class="chip-btn" data-city="tehran">Tehran</button>
-    <button class="chip-btn" data-city="shiraz">Shiraz</button>
-    <button class="chip-btn" data-city="mashhad">Mashhad</button>
-    <button class="chip-btn" data-city="tabriz">Tabriz</button>
-    <button class="chip-btn" data-city="karaj">Karaj</button>
-    <button class="chip-btn" data-city="ahvaz">Ahvaz</button>
-    <button class="chip-btn" data-city="qom">Qom</button>
-    <button class="chip-btn" data-city="rasht">Rasht</button>
-    <button class="chip-btn" data-city="kermanshah">Kermanshah</button>
-    <button class="chip-btn" data-city="dubai">Dubai</button>
-    <button class="chip-btn" data-city="istanbul">Istanbul</button>
-  </div>
-
   <!-- Interactive Day Selector Strip -->
   <div class="days-selector-bar">
     <div class="days-bar-title">
@@ -190,20 +173,20 @@
 
         <div class="kpi-card">
           <div class="kpi-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line></svg>
+            Total Orders
+          </div>
+          <div id="kpiTotalOrdersVal" class="kpi-val">0</div>
+          <div class="kpi-sub"><span id="kpiFastOrdersVal">0</span> on-time orders</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
             Mean Accept Time
           </div>
           <div id="kpiMeanDuration" class="kpi-val">0.0 min</div>
           <div class="kpi-sub"><span id="kpiP90Duration">P90: 0 min</span> &bull; <span id="kpiP50Duration">Med: 0 min</span></div>
-        </div>
-
-        <div class="kpi-card">
-          <div class="kpi-title">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>
-            Active Days
-          </div>
-          <div id="kpiDaysSelectedCount" class="kpi-val" style="color:#0f172a">0 / 0</div>
-          <div id="kpiDateRangeSpan" class="kpi-sub">Filtered timeline</div>
         </div>
       </div>
 
@@ -543,6 +526,10 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  window.MAP_API_KEY = "{{ map_api_key }}";
+  window.CARTO_TILE_URL = "{{ carto_tile_url }}";
+</script>
 <script src="/static/js/app.js"></script>
 </body>
 </html>

@@ -5,7 +5,6 @@ from pydantic import BaseModel
 # Automatically load .env file if available
 try:
     from dotenv import load_dotenv
-    # Look for .env in current directory or parent directory
     env_path = Path(__file__).resolve().parent.parent / ".env"
     if env_path.exists():
         load_dotenv(dotenv_path=env_path)
@@ -33,6 +32,14 @@ class Settings(BaseModel):
     LOW_Q: float = float(os.getenv("LOW_Q", "0.05"))
     HIGH_Q: float = float(os.getenv("HIGH_Q", "0.95"))
     
+    # Map background API key from previous file
+    MAP_API_KEY: str = os.getenv("MAP_API_KEY", os.getenv("CARTO_API_KEY", "cb1_5558_1_345367a66619045ea57fcdba"))
+    TILE_URL: str = os.getenv(
+        "TILE_URL",
+        "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key={key}",
+    )
+    TILE_ATTRIBUTION: str = "&copy; OpenStreetMap contributors &copy; CARTO"
+
     # ClickHouse Settings
     CLICKHOUSE_HOST: str = os.getenv("CLICKHOUSE_HOST", "")
     CLICKHOUSE_PORT: int = int(os.getenv("CLICKHOUSE_PORT", "8123"))

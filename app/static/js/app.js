@@ -31,10 +31,11 @@ const state = {
   singleSelectedHex: null,    // Single selected cell
 };
 
-// Basemap Tile Providers (Tested & Reliable - No API key expiration)
+// Basemap Tile Providers (Tested & Reliable - using Carto API Key from previous file)
+const mapApiKey = window.MAP_API_KEY || 'cb1_5558_1_345367a66619045ea57fcdba';
 const BASEMAP_PROVIDERS = {
   voyager: {
-    url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    url: window.CARTO_TILE_URL || `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${mapApiKey}`,
     options: { maxZoom: 20, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
   },
   positron: {
@@ -161,16 +162,6 @@ function setupEventListeners() {
     });
   });
 
-  // Preset city chips
-  document.querySelectorAll('.chip-btn').forEach(chip => {
-    chip.addEventListener('click', (e) => {
-      const city = e.currentTarget.dataset.city;
-      document.getElementById('cityInput').value = city;
-      state.selectedDates = [];
-      loadCityData(city);
-    });
-  });
-
   // Day preset buttons
   document.getElementById('btnSelectAllDays').addEventListener('click', selectAllDays);
   document.getElementById('btnSelectWeekdays').addEventListener('click', selectWeekdays);
@@ -261,10 +252,6 @@ async function loadCityData(city) {
   showLoading(true, `Analyzing ${city.toUpperCase()} Fleet HA${state.threshold}% SLA...`);
   state.city = city;
 
-  document.querySelectorAll('.chip-btn').forEach(chip => {
-    chip.classList.toggle('active', chip.dataset.city.toLowerCase() === city.toLowerCase());
-  });
-
   try {
     const params = new URLSearchParams({
       city: city,
@@ -328,21 +315,25 @@ function updateKpis(kpis, city, dataSource) {
   document.getElementById('kpiSlaSlowBar').style.width = `${slowPct}%`;
   document.getElementById('kpiSlaFastBar').style.width = `${100 - slowPct}%`;
 
+  // Total Delivered Orders card
+  const totalOrdersVal = document.getElementById('kpiTotalOrdersVal');
+  if (totalOrdersVal) {
+    totalOrdersVal.textContent = kpis.total_orders.toLocaleString();
+  }
+  const fastOrdersVal = document.getElementById('kpiFastOrdersVal');
+  if (fastOrdersVal) {
+    fastOrdersVal.textContent = kpis.total_fast.toLocaleString();
+  }
+
   // Duration metrics (minutes)
   document.getElementById('kpiMeanDuration').textContent = `${kpis.overall_mean_duration.toFixed(1)} min`;
   document.getElementById('kpiP90Duration').textContent = `P90: ${kpis.p90_duration || 0} min`;
   document.getElementById('kpiP50Duration').textContent = `Med: ${kpis.p50_duration || 0} min`;
 
-  // Days selected
-  const daysCount = state.selectedDates.length;
-  const totalDays = state.allDates.length || daysCount;
-  document.getElementById('kpiDaysSelectedCount').textContent = `${daysCount} / ${totalDays} Days`;
-  document.getElementById('kpiDateRangeSpan').textContent = `${state.startDate.substring(5)} to ${state.endDate.substring(5)}`;
-
   // DataSource Badge
   const sourceBadge = document.getElementById('dataSourceBadge');
   if (sourceBadge) {
-    sourceBadge.textContent = dataSource.includes('ClickHouse') ? 'ClickHouse Live' : 'High-Fidelity Engine';
+    sourceBadge.textContent = dataSource.includes('ClickHouse') ? 'ClickHouse Live' : (dataSource.includes('Cached') ? 'Cached Query' : 'High-Fidelity Engine');
     sourceBadge.title = dataSource;
   }
 }

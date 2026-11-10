@@ -1,7 +1,7 @@
 """
 FastAPI Server & REST API.
 Serves interactive dashboard, H3 hexagon analysis endpoints, and standalone exports.
-Supports day-level filtering, multi-cell merge metrics, and dual color metrics (HA30 vs Mean).
+Supports single-execution query caching, day-level filtering, and API key tile configuration.
 """
 import os
 from typing import Optional, List
@@ -19,7 +19,7 @@ from app.export_html import build_standalone_html
 app = FastAPI(
     title="Fleet HexMap Analytics",
     description="H3 Hexagon Map & HA30 SLA Performance Engine",
-    version="2.1.0",
+    version="2.2.0",
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -30,13 +30,15 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 @app.get("/", response_class=HTMLResponse)
 async def index_view(request: Request):
     """Render the primary dashboard view."""
+    carto_tile_url = settings.TILE_URL.replace("{key}", settings.MAP_API_KEY)
     return templates.TemplateResponse(
         request=request,
         name="index.html",
         context={
             "default_city": settings.DEFAULT_CITY,
             "default_threshold": settings.DEFAULT_THRESHOLD,
-            "popular_cities": get_popular_cities(),
+            "map_api_key": settings.MAP_API_KEY,
+            "carto_tile_url": carto_tile_url,
         },
     )
 
@@ -59,12 +61,12 @@ async def get_city_data(
     res_min: int = Query(default=settings.RES_MIN, ge=4, le=10),
     res_max: int = Query(default=settings.RES_MAX, ge=6, le=12),
     dates: Optional[str] = Query(default=None, description="Comma-separated list of selected dates YYYY-MM-DD"),
+    force_refresh: bool = Query(default=False),
     force_simulated: bool = Query(default=False),
 ):
     """
     Fetch and analyze orders for a given city and selected days.
-    Computes H3 hexagons at resolutions 6-10 for both Source and Destination layers,
-    providing HA30% and Mean Duration color metrics, citywide stats, and daily breakdown.
+    Executes the ClickHouse query ONCE for the date range, then serves day filters from cache.
     """
     try:
         selected_dates = [d.strip() for d in dates.split(",") if d.strip()] if dates else None
@@ -77,6 +79,7 @@ async def get_city_data(
             end_date=end_date,
             threshold=threshold,
             selected_dates=selected_dates,
+            force_refresh=force_refresh,
             force_simulated=force_simulated,
         )
 
@@ -97,6 +100,8 @@ async def get_city_data(
         analysis["daily_stats"] = daily_breakdown
         analysis["all_dates"] = all_dates
         analysis["selected_dates"] = selected_dates if selected_dates is not None else all_dates
+        analysis["map_api_key"] = settings.MAP_API_KEY
+        analysis["tile_url"] = settings.TILE_URL.replace("{key}", settings.MAP_API_KEY)
 
         return analysis
     except Exception as e:
@@ -114,7 +119,7 @@ async def export_html(
     min_orders: int = Query(default=settings.DEFAULT_MIN_ORDERS),
     dates: Optional[str] = Query(default=None),
 ):
-    """Export self-contained standalone HTML hover map for offline distribution."""
+    """Export self-contained standalone HTML hover map with previous file's API key."""
     selected_dates = [d.strip() for d in dates.split(",") if d.strip()] if dates else None
     df, _, _, _ = fetch_orders(
         city=city,
@@ -181,4 +186,4 @@ async def upload_csv_data(
 @app.get("/health")
 async def healthcheck():
     """Healthcheck endpoint for Docker / orchestration."""
-    return {"status": "ok", "app": "Fleet HexMap", "version": "2.1.0"}
+    return {"status": "ok", "app": "Fleet HexMap", "version": "2.2.0"}
