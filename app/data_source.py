@@ -1,13 +1,8 @@
 """
 Data Source abstraction layer.
-Connects to ClickHouse (if configured via connect.py or environment variables),
-or generates realistic high-fidelity order distribution for any requested city,
-or loads custom uploaded CSV files.
-
-Optimized for high-performance fleet analytics:
-- Executes database query ONCE for the date range
-- Caches and partitions data per day in-memory
-- Instantaneous filtering when selecting/deselecting days without re-querying ClickHouse
+Directly connects to ClickHouse (fact_ka) with single-execution query caching,
+or parses custom uploaded CSV files.
+Mock data generation has been completely removed.
 """
 import io
 import math
@@ -15,11 +10,10 @@ import os
 import sys
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, Any, List
-import numpy as np
 import pandas as pd
 
 from app.config import settings
-from app.cities import get_city_info, normalize_city_name
+from app.cities import normalize_city_name
 
 # Global in-memory cache for executed queries to avoid re-running slow ClickHouse queries
 QUERY_CACHE: Dict[str, pd.DataFrame] = {}
@@ -40,11 +34,6 @@ def try_get_clickhouse_client():
                 print(f"Failed to load connect.py from {path}: {e}")
 
     if settings.CLICKHOUSE_HOST:
-        # Check if password is a masked placeholder or not active yet
-        if settings.CLICKHOUSE_PASSWORD in ("**************", "your_password_here", "placeholder", ""):
-            print(f"ClickHouse host configured ({settings.CLICKHOUSE_HOST}), but credentials are marked for future use / inactive.")
-            return None, None
-
         try:
             import clickhouse_connect
             client = clickhouse_connect.get_client(
@@ -54,13 +43,14 @@ def try_get_clickhouse_client():
                 password=settings.CLICKHOUSE_PASSWORD,
                 database=settings.CLICKHOUSE_DATABASE,
                 secure=settings.CLICKHOUSE_SECURE,
-                connect_timeout=3,
+                connect_timeout=4,
             )
             return client, "clickhouse_connect"
         except Exception as e:
-            print(f"ClickHouse connection failed ({settings.CLICKHOUSE_HOST}): {e}")
+            print(f"ClickHouse connection failed ({settings.CLICKHOUSE_HOST}:{settings.CLICKHOUSE_PORT}): {e}")
+            return None, str(e)
 
-    return None, None
+    return None, "No ClickHouse host configured"
 
 
 def get_dates_between(start_date: str, end_date: str) -> List[str]:
@@ -76,106 +66,14 @@ def get_dates_between(start_date: str, end_date: str) -> List[str]:
         return [start_date]
 
 
-def generate_realistic_orders(
-    city: str,
-    status: str = "DELIVERED",
-    customer_id: int = 2,
-    start_date: str = "2026-10-22",
-    end_date: str = "2026-11-05",
-    threshold: int = 30,
-    n_orders: int = 3500,
-) -> pd.DataFrame:
-    """
-    Generate realistic high-fidelity order distribution for any given city.
-    Produces spatially clustered pickup & dropoff coordinates with realistic
-    create_to_accept_contractual durations (in minutes) and daily partitions.
-    """
-    city_info = get_city_info(city)
-    center_lat = city_info["lat"]
-    center_lng = city_info["lng"]
-    radius_km = city_info.get("radius_km", 14)
-
-    deg_lat_km = 1.0 / 111.0
-    deg_lng_km = 1.0 / (111.0 * math.cos(math.radians(center_lat)))
-
-    seed_str = f"{city_info['key']}_{customer_id}_{start_date}_{end_date}"
-    seed = sum(ord(c) * (i + 1) for i, c in enumerate(seed_str)) % (2**32 - 1)
-    rng = np.random.default_rng(seed)
-
-    # 4-6 pickup commercial cluster centers in the city
-    n_clusters = rng.integers(4, 7)
-    cluster_centers = []
-    for _ in range(n_clusters):
-        c_lat = center_lat + rng.normal(0, radius_km * 0.4 * deg_lat_km)
-        c_lng = center_lng + rng.normal(0, radius_km * 0.4 * deg_lng_km)
-        weight = rng.uniform(0.1, 0.4)
-        cluster_centers.append((c_lat, c_lng, weight))
-
-    total_w = sum(c[2] for c in cluster_centers)
-    weights = [c[2] / total_w for c in cluster_centers]
-    cluster_indices = rng.choice(len(cluster_centers), size=n_orders, p=weights)
-
-    s_lats = np.zeros(n_orders)
-    s_lngs = np.zeros(n_orders)
-    for idx, (c_lat, c_lng, _) in enumerate(cluster_centers):
-        mask = cluster_indices == idx
-        count = int(np.sum(mask))
-        if count > 0:
-            s_lats[mask] = c_lat + rng.normal(0, radius_km * 0.12 * deg_lat_km, count)
-            s_lngs[mask] = c_lng + rng.normal(0, radius_km * 0.12 * deg_lng_km, count)
-
-    # Destinations: trip distance 1km to 8km
-    trip_distance_km = rng.gamma(shape=2.5, scale=1.5, size=n_orders)
-    trip_angles = rng.uniform(0, 2 * math.pi, n_orders)
-
-    d_lats = s_lats + trip_distance_km * np.sin(trip_angles) * deg_lat_km
-    d_lngs = s_lngs + trip_distance_km * np.cos(trip_angles) * deg_lng_km
-
-    dist_to_center_km = np.sqrt(
-        ((s_lats - center_lat) / deg_lat_km) ** 2 + ((s_lngs - center_lng) / deg_lng_km) ** 2
-    )
-
-    congestion_factor = np.exp(-((dist_to_center_km) / (radius_km * 0.45)) ** 2)
-    slowdown = congestion_factor * 16.0
-
-    # Lognormal distribution in minutes (median ~18-24 min)
-    base_mu = np.log(14.0 + slowdown)
-    base_sigma = 0.55
-    durations = rng.lognormal(mean=base_mu, sigma=base_sigma, size=n_orders)
-    durations = np.clip(durations, 2.0, 180.0)
-
-    # Missing duration rate ~1.5%
-    missing_mask = rng.uniform(0, 1, n_orders) < 0.015
-    durations[missing_mask] = np.nan
-
-    # Assign dates
-    dates_list = get_dates_between(start_date, end_date)
-    day_weights = np.array([1.0 + 0.3 * math.sin(i * 1.2) for i in range(len(dates_list))])
-    day_weights = day_weights / day_weights.sum()
-    order_dates = rng.choice(dates_list, size=n_orders, p=day_weights)
-
-    order_ids = [f"ORD-{city[:3].upper()}-{100000 + i}" for i in range(n_orders)]
-
-    df = pd.DataFrame({
-        "order_id": order_ids,
-        "source_latitude": np.round(s_lats, 6),
-        "source_longitude": np.round(s_lngs, 6),
-        "destination_latitude": np.round(d_lats, 6),
-        "destination_longitude": np.round(d_lngs, 6),
-        "create_to_accept_contractual": durations,
-        "created_date": order_dates,
-    })
-    return df
-
-
 def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: int) -> List[Dict[str, Any]]:
     """Compute daily HA30, orders, and duration statistics for each date in the period."""
     if len(df) == 0:
         return []
 
     day_name_map = {0: "Mon", 1: "Tue", 2: "Wed", 3: "Thu", 4: "Fri", 5: "Sat", 6: "Sun"}
-
     daily_stats = []
+
     if "created_date" not in df.columns:
         return []
 
@@ -186,13 +84,12 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
         total = int(g["order_id"].nunique())
         v = g["create_to_accept_contractual"].dropna()
         with_val = int(len(v))
-        slow = int((v >= threshold).sum())
-        pct = round(slow / with_val * 100, 1) if with_val > 0 else 0.0
+        ha30_count = int((v >= threshold).sum())
+        pct = round(ha30_count / with_val * 100, 1) if with_val > 0 else 0.0
         mean = round(float(v.mean()), 1) if with_val > 0 else 0.0
         agg_dict[d_key] = {
             "orders": total,
-            "slow": slow,
-            "fast": with_val - slow,
+            "ha30_count": ha30_count,
             "with_value": with_val,
             "pct": pct,
             "mean": mean,
@@ -207,14 +104,13 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             day_name = ""
             short_label = d_str
 
-        info = agg_dict.get(d_str, {"orders": 0, "slow": 0, "fast": 0, "with_value": 0, "pct": 0.0, "mean": 0.0})
+        info = agg_dict.get(d_str, {"orders": 0, "ha30_count": 0, "with_value": 0, "pct": 0.0, "mean": 0.0})
         daily_stats.append({
             "date": d_str,
             "day_name": day_name,
             "label": f"{day_name} {short_label}",
             "orders": info["orders"],
-            "slow": info["slow"],
-            "fast": info["fast"],
+            "ha30_count": info["ha30_count"],
             "pct": info["pct"],
             "mean": info["mean"],
         })
@@ -231,31 +127,31 @@ def fetch_orders(
     threshold: int = 30,
     selected_dates: Optional[List[str]] = None,
     force_refresh: bool = False,
-    force_simulated: bool = False,
 ) -> Tuple[pd.DataFrame, str, List[Dict[str, Any]], List[str]]:
     """
-    Fetch orders for the requested city and date range.
-    EXECUTES QUERY ONCE and caches the result per day in-memory.
-    Subsequent calls with different selected_dates filter from cache in 0ms without hitting ClickHouse.
+    Fetch orders directly from ClickHouse (no mock data).
+    Executes query once for the date range and caches in-memory per day.
     """
     clean_city = normalize_city_name(city)
     all_dates = get_dates_between(start_date, end_date)
     cache_key = f"{clean_city}_{status}_{customer_id}_{start_date}_{end_date}"
 
-    # 1. Check in-memory query cache to avoid re-executing slow queries
-    raw_df = None
-    data_source_label = ""
-
+    # 1. Check in-memory query cache
     if not force_refresh and cache_key in QUERY_CACHE:
         raw_df = QUERY_CACHE[cache_key]
         data_source_label = f"Cached In-Memory ({len(raw_df)} orders)"
     else:
-        # Run query once
-        if not force_simulated:
-            client, client_type = try_get_clickhouse_client()
-            if client is not None:
-                # Query matches previous file, with created_date included for day saving
-                sql = f"""
+        client, client_desc = try_get_clickhouse_client()
+        if client is None:
+            err_msg = (
+                f"ClickHouse connection error ({client_desc}). "
+                f"Host: {settings.CLICKHOUSE_HOST}:{settings.CLICKHOUSE_PORT}, User: {settings.CLICKHOUSE_USER}. "
+                "Please verify ClickHouse credentials in .env or upload an orders CSV."
+            )
+            raise RuntimeError(err_msg)
+
+        # Query identical to previous file, with created_date for daily grouping
+        sql = f"""
 SELECT
     order_id,
     source_latitude,
@@ -272,26 +168,20 @@ WHERE city = '{clean_city}'
   AND created_date <= toDate('{end_date}')
 LIMIT 1 BY order_id
 """
-                try:
-                    print(f"Executing ClickHouse query ONCE for city '{clean_city}' ({start_date} to {end_date})...")
-                    if hasattr(client, "query_df"):
-                        raw_df = client.query_df(sql)
-                    else:
-                        result = client.query(sql)
-                        raw_df = pd.DataFrame(result.result_rows, columns=result.column_names)
+        print(f"Executing ClickHouse query ONCE for {clean_city} ({start_date} to {end_date})...")
+        try:
+            if hasattr(client, "query_df"):
+                raw_df = client.query_df(sql)
+            else:
+                result = client.query(sql)
+                raw_df = pd.DataFrame(result.result_rows, columns=result.column_names)
 
-                    if len(raw_df) > 0:
-                        # Ensure created_date is clean string YYYY-MM-DD
-                        if "created_date" in raw_df.columns:
-                            raw_df["created_date"] = raw_df["created_date"].astype(str).str[:10]
-                        data_source_label = f"ClickHouse Live ({len(raw_df)} orders via {client_type})"
-                    else:
-                        raw_df = None
-                except Exception as e:
-                    print(f"ClickHouse query error: {e}. Trying fallback exact query...")
-                    try:
-                        # Fallback exact 6 columns from previous file
-                        sql_fallback = f"""
+            if len(raw_df) > 0 and "created_date" in raw_df.columns:
+                raw_df["created_date"] = raw_df["created_date"].astype(str).str[:10]
+        except Exception as e:
+            print(f"ClickHouse query failed with created_date: {e}. Trying fallback exact query...")
+            # Fallback to exact 6 columns
+            sql_fallback = f"""
 SELECT
     order_id,
     source_latitude,
@@ -307,39 +197,22 @@ WHERE city = '{clean_city}'
   AND created_date <= toDate('{end_date}')
 LIMIT 1 BY order_id
 """
-                        if hasattr(client, "query_df"):
-                            raw_df = client.query_df(sql_fallback)
-                        else:
-                            result = client.query(sql_fallback)
-                            raw_df = pd.DataFrame(result.result_rows, columns=result.column_names)
+            if hasattr(client, "query_df"):
+                raw_df = client.query_df(sql_fallback)
+            else:
+                result = client.query(sql_fallback)
+                raw_df = pd.DataFrame(result.result_rows, columns=result.column_names)
 
-                        if len(raw_df) > 0:
-                            # Assign evenly across dates
-                            dates_arr = np.random.choice(all_dates, size=len(raw_df))
-                            raw_df["created_date"] = dates_arr
-                            data_source_label = f"ClickHouse Live ({len(raw_df)} orders via {client_type})"
-                    except Exception as e2:
-                        print(f"ClickHouse fallback failed: {e2}")
-                        raw_df = None
+            if len(raw_df) > 0 and "created_date" not in raw_df.columns:
+                raw_df["created_date"] = end_date
 
-        if raw_df is None:
-            raw_df = generate_realistic_orders(
-                city=clean_city,
-                status=status,
-                customer_id=customer_id,
-                start_date=start_date,
-                end_date=end_date,
-                threshold=threshold,
-            )
-            data_source_label = "High-Fidelity Dataset Engine (Single Execution)"
-
-        # Save in query cache
+        data_source_label = f"ClickHouse Live ({len(raw_df)} orders via {client_desc})"
         QUERY_CACHE[cache_key] = raw_df
 
-    # Compute daily breakdown across all dates
+    # Compute daily breakdown
     daily_breakdown = compute_daily_breakdown(raw_df, all_dates, threshold)
 
-    # Filter by selected dates in-memory without re-executing query
+    # Filter by selected dates in-memory without re-executing SQL
     if selected_dates and len(selected_dates) > 0 and len(selected_dates) < len(all_dates):
         filtered_df = raw_df[raw_df["created_date"].isin(selected_dates)].copy()
     else:

@@ -62,7 +62,6 @@ async def get_city_data(
     res_max: int = Query(default=settings.RES_MAX, ge=6, le=12),
     dates: Optional[str] = Query(default=None, description="Comma-separated list of selected dates YYYY-MM-DD"),
     force_refresh: bool = Query(default=False),
-    force_simulated: bool = Query(default=False),
 ):
     """
     Fetch and analyze orders for a given city and selected days.
@@ -80,7 +79,6 @@ async def get_city_data(
             threshold=threshold,
             selected_dates=selected_dates,
             force_refresh=force_refresh,
-            force_simulated=force_simulated,
         )
 
         analysis = analyze_city_orders(

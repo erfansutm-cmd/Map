@@ -250,9 +250,9 @@ var items = [];
 var selectedHexes = new Map();
 
 var TILE_PROVIDERS = {
-  voyager: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  positron: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  dark: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  voyager: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_5558_1_345367a66619045ea57fcdba',
+  positron: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png?key=cb1_5558_1_345367a66619045ea57fcdba',
+  dark: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=cb1_5558_1_345367a66619045ea57fcdba',
   osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 };
 
@@ -278,27 +278,28 @@ function getStatusBadge(status) {
 }
 
 function tooltipHtml(h) {
-  var breachText = '<b>HA' + THRESHOLD + '%: ' + h.pct.toFixed(1) + '%</b> (' + h.slow + ' slow of ' + h.with_value + ')';
+  var breachText = '<b>HA' + THRESHOLD + '%: ' + h.pct.toFixed(1) + '%</b>';
   var ordText = 'Total Orders: <b>' + h.orders + '</b>';
+  var haCountText = 'HA' + THRESHOLD + ' Orders Count: <b>' + h.slow + '</b> (' + h.slow + ' of ' + h.with_value + ')';
+  var haDesc = '<span style="font-size:10px;color:#94a3b8">(create to accept time &ge; ' + THRESHOLD + ' min)</span>';
   var meanText = 'Mean Duration: <b>' + h.mean.toFixed(1) + ' min</b>';
   var idText = '<span style="font-size:10px;color:#94a3b8">Hex: ' + h.hex + '</span>';
   return '<div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.4">' +
-         breachText + '<br>' + ordText + '<br>' + meanText + '<br>' + idText + '</div>';
+         breachText + '<br>' + ordText + '<br>' + haCountText + '<br>' + haDesc + '<br>' + meanText + '<br>' + idText + '</div>';
 }
 
 function openInspector(h) {
   var el = document.getElementById('inspector');
   var content = document.getElementById('inspectorContent');
   document.getElementById('inspHeadTitle').textContent = 'Hexagon Inspection';
-  var fast = h.with_value - h.slow;
   var statusBadge = getStatusBadge(h.status);
 
   content.innerHTML =
     '<div style="margin-bottom:8px">' + statusBadge + '</div>' +
-    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + '% Breach Rate</span><span class="metric-val" style="color:#e11d48">' + h.pct.toFixed(1) + '%</span></div>' +
+    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + '%</span><span class="metric-val" style="color:#e11d48">' + h.pct.toFixed(1) + '%</span></div>' +
     '<div class="metric-row"><span class="metric-label">Total Orders</span><span class="metric-val">' + h.orders + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Slow Orders (&ge;' + THRESHOLD + ' min)</span><span class="metric-val">' + h.slow + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Fast Orders (&lt;' + THRESHOLD + ' min)</span><span class="metric-val">' + fast + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + ' Orders Count</span><span class="metric-val" style="color:#e11d48">' + h.slow + ' (' + h.slow + ' of ' + h.with_value + ')</span></div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:6px">(create to accept time &ge; ' + THRESHOLD + ' min)</div>' +
     '<div class="metric-row"><span class="metric-label">Mean Duration</span><span class="metric-val">' + h.mean.toFixed(1) + ' min</span></div>' +
     '<div class="metric-row"><span class="metric-label">H3 Hex ID</span><span class="metric-val" style="font-size:10px">' + h.hex + '</span></div>' +
     '<div class="metric-row"><span class="metric-label">Coordinates</span><span class="metric-val" style="font-size:10px">' + h.center[0] + ', ' + h.center[1] + '</span></div>';
@@ -325,14 +326,13 @@ function renderMergedSelection() {
 
   var mergedPct = totalWithValue > 0 ? (totalSlow / totalWithValue * 100) : 0;
   var mergedMean = totalWithValue > 0 ? (vsum / totalWithValue) : 0;
-  var fast = totalWithValue - totalSlow;
 
   content.innerHTML =
     '<div style="margin-bottom:8px"><span class="badge badge-warning">MERGED REGION</span></div>' +
     '<div class="metric-row"><span class="metric-label">Combined HA' + THRESHOLD + '%</span><span class="metric-val" style="color:#e11d48">' + mergedPct.toFixed(1) + '%</span></div>' +
     '<div class="metric-row"><span class="metric-label">Combined Orders</span><span class="metric-val">' + totalOrders + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Slow Orders</span><span class="metric-val">' + totalSlow + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Fast Orders</span><span class="metric-val">' + fast + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + ' Orders Count</span><span class="metric-val" style="color:#e11d48">' + totalSlow + ' (' + totalSlow + ' of ' + totalWithValue + ')</span></div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-bottom:6px">(create to accept time &ge; ' + THRESHOLD + ' min)</div>' +
     '<div class="metric-row"><span class="metric-label">Weighted Mean</span><span class="metric-val">' + mergedMean.toFixed(1) + ' min</span></div>' +
     '<button onclick="clearHexSelection()" style="width:100%;margin-top:10px;padding:6px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-weight:600">Clear Selection</button>';
   el.classList.add('open');

@@ -52,7 +52,8 @@ def main():
     )
 
     kpis = analysis["kpis"]
-    print(f"Overall HA{args.threshold}%: {kpis['overall_ha_pct']}% slow ({kpis['total_slow']} of {kpis['total_orders']})")
+    ha_count = kpis.get("ha30_count", kpis.get("total_slow", 0))
+    print(f"Overall HA{args.threshold}%: {kpis['overall_ha_pct']}% ({ha_count} HA{args.threshold} orders of {kpis['total_orders']})")
     print(f"Average accept duration: {kpis['overall_mean_duration']} min")
 
     print(f"Writing standalone HTML to {out_file}...")

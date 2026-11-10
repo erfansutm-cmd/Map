@@ -158,12 +158,10 @@
           </div>
           <div style="display:flex;align-items:baseline;gap:6px">
             <span id="kpiHaPct" class="kpi-val highlight-breach">0.0%</span>
-            <span id="kpiSlowRatio" style="font-size:10px;color:#64748b">0 / 0</span>
+            <span id="kpiSlowRatio" style="font-size:11px;color:#64748b">0 / 0</span>
           </div>
-          <!-- Proportional SLA Bar -->
-          <div class="kpi-sla-track">
-            <div id="kpiSlaSlowBar" class="kpi-sla-slow" style="width:30%" title="Slow Orders"></div>
-            <div id="kpiSlaFastBar" class="kpi-sla-fast" style="width:70%" title="On-Time Orders"></div>
+          <div style="font-size:10px;color:#64748b;margin:3px 0">
+            HA30 count: <b id="kpiHaOrdersCount" style="color:#dc2626">0</b> (create to accept &ge; <span id="kpiCardThreshold">30</span> min)
           </div>
           <div class="kpi-sub" style="display:flex;justify-content:space-between">
             <span id="cityTotalOrdersLabel">0 Delivered</span>
@@ -177,7 +175,7 @@
             Total Orders
           </div>
           <div id="kpiTotalOrdersVal" class="kpi-val">0</div>
-          <div class="kpi-sub"><span id="kpiFastOrdersVal">0</span> on-time orders</div>
+          <div class="kpi-sub">Total delivered orders</div>
         </div>
 
         <div class="kpi-card">
@@ -304,27 +302,22 @@
 
         <div class="stat-grid">
           <div class="stat-box">
-            <div class="stat-box-label">HA30% Breach</div>
+            <div class="stat-box-label">HA30%</div>
             <div id="inspHaPct" class="stat-box-val">0.0%</div>
           </div>
           <div class="stat-box">
             <div class="stat-box-label">Total Orders</div>
             <div id="inspTotalOrders" class="stat-box-val">0</div>
           </div>
-          <div class="stat-box">
-            <div class="stat-box-label">Slow Orders</div>
-            <div id="inspSlowOrders" class="stat-box-val" style="color:#dc2626">0</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-box-label">Fast Orders</div>
-            <div id="inspFastOrders" class="stat-box-val" style="color:#16a34a">0</div>
-          </div>
         </div>
 
-        <div style="font-size:10.5px;font-weight:600;color:#64748b;margin-bottom:2px">Order SLA Breakdown</div>
-        <div class="progress-bar-container">
-          <div id="inspBarSlow" class="progress-bar-slow" style="width:30%" title="Slow Orders"></div>
-          <div id="inspBarFast" class="progress-bar-fast" style="width:70%" title="On-Time Orders"></div>
+        <div class="stat-box" style="margin-bottom:8px">
+          <div class="stat-box-label">HA30 Orders Count</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span id="inspSlowOrders" class="stat-box-val" style="color:#dc2626">0</span>
+            <span id="inspHaRatio" style="font-size:11px;color:#64748b">0 of 0</span>
+          </div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">create to accept time &ge; <span class="inspThresholdText">30</span> min</div>
         </div>
 
         <div class="stat-box" style="margin-bottom:8px">
@@ -364,20 +357,15 @@
             <div class="stat-box-label">Combined Orders</div>
             <div id="mergedTotalOrders" class="stat-box-val">0</div>
           </div>
-          <div class="stat-box">
-            <div class="stat-box-label">Combined Slow</div>
-            <div id="mergedSlowOrders" class="stat-box-val" style="color:#dc2626">0</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-box-label">Combined Fast</div>
-            <div id="mergedFastOrders" class="stat-box-val" style="color:#16a34a">0</div>
-          </div>
         </div>
 
-        <div style="font-size:10.5px;font-weight:600;color:#64748b;margin-bottom:2px">Merged SLA Breakdown</div>
-        <div class="progress-bar-container">
-          <div id="mergedBarSlow" class="progress-bar-slow" style="width:30%" title="Slow Orders"></div>
-          <div id="mergedBarFast" class="progress-bar-fast" style="width:70%" title="On-Time Orders"></div>
+        <div class="stat-box" style="margin-bottom:8px">
+          <div class="stat-box-label">HA30 Orders Count</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span id="mergedSlowOrders" class="stat-box-val" style="color:#dc2626">0</span>
+            <span id="mergedHaRatio" style="font-size:11px;color:#64748b">0 of 0</span>
+          </div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">create to accept time &ge; <span class="inspThresholdText">30</span> min</div>
         </div>
 
         <div class="stat-box" style="margin-bottom:8px">
@@ -419,20 +407,16 @@
 
     <div class="stat-grid" style="margin-bottom:14px">
       <div class="stat-box">
-        <div class="stat-box-label">Citywide HA30 Breach Rate</div>
+        <div class="stat-box-label">Citywide HA30%</div>
         <div id="modalCityHaPct" class="stat-box-val" style="font-size:20px;color:#dc2626">0.0%</div>
       </div>
       <div class="stat-box">
         <div class="stat-box-label">Total Delivered Orders</div>
         <div id="modalCityTotalOrders" class="stat-box-val" style="font-size:20px">0</div>
       </div>
-      <div class="stat-box">
-        <div class="stat-box-label">Slow Orders (&ge;30s)</div>
+      <div class="stat-box" style="grid-column: span 2">
+        <div class="stat-box-label">HA30 Orders Count (create to accept time &ge; 30 min)</div>
         <div id="modalCitySlowOrders" class="stat-box-val" style="color:#dc2626">0</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-box-label">On-Time Orders (&lt;30s)</div>
-        <div id="modalCityFastOrders" class="stat-box-val" style="color:#16a34a">0</div>
       </div>
     </div>
 
@@ -463,7 +447,7 @@
           <tr>
             <th style="padding:6px 8px">Date</th>
             <th style="padding:6px 8px">Orders</th>
-            <th style="padding:6px 8px">Slow (&ge;30s)</th>
+            <th style="padding:6px 8px">HA30 Orders (&ge;30 min)</th>
             <th style="padding:6px 8px">HA30%</th>
             <th style="padding:6px 8px">Mean</th>
           </tr>

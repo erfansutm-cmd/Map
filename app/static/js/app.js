@@ -307,22 +307,22 @@ function updateKpis(kpis, city, dataSource) {
   badgeEl.textContent = kpis.sla_health || 'SLA';
   badgeEl.className = 'badge ' + (kpis.overall_ha_pct > 30 ? 'badge-critical' : kpis.overall_ha_pct > 20 ? 'badge-warning' : 'badge-optimal');
 
-  document.getElementById('kpiSlowRatio').textContent = `${kpis.total_slow.toLocaleString()} slow / ${kpis.total_orders.toLocaleString()}`;
+  document.getElementById('kpiSlowRatio').textContent = `${(kpis.ha30_count || kpis.total_slow || 0).toLocaleString()} of ${kpis.total_orders.toLocaleString()}`;
   document.getElementById('cityTotalOrdersLabel').textContent = `${kpis.total_orders.toLocaleString()} Delivered`;
 
-  // SLA Progress Track
-  const slowPct = kpis.total_orders > 0 ? (kpis.total_slow / kpis.total_orders * 100) : 0;
-  document.getElementById('kpiSlaSlowBar').style.width = `${slowPct}%`;
-  document.getElementById('kpiSlaFastBar').style.width = `${100 - slowPct}%`;
+  const haOrdersCountEl = document.getElementById('kpiHaOrdersCount');
+  if (haOrdersCountEl) {
+    haOrdersCountEl.textContent = (kpis.ha30_count || kpis.total_slow || 0).toLocaleString();
+  }
+  const kpiCardThreshold = document.getElementById('kpiCardThreshold');
+  if (kpiCardThreshold) {
+    kpiCardThreshold.textContent = state.threshold;
+  }
 
   // Total Delivered Orders card
   const totalOrdersVal = document.getElementById('kpiTotalOrdersVal');
   if (totalOrdersVal) {
     totalOrdersVal.textContent = kpis.total_orders.toLocaleString();
-  }
-  const fastOrdersVal = document.getElementById('kpiFastOrdersVal');
-  if (fastOrdersVal) {
-    fastOrdersVal.textContent = kpis.total_fast.toLocaleString();
   }
 
   // Duration metrics (minutes)
@@ -515,10 +515,11 @@ function createTooltipContent(h) {
         <span style="color:#64748b">Total Orders:</span>
         <b style="color:#0f172a">${h.orders}</b>
       </div>
-      <div style="display:flex;justify-content:space-between">
-        <span style="color:#64748b">Slow (&ge;${state.threshold} min):</span>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="color:#64748b">HA${state.threshold} Orders Count:</span>
         <b style="color:#dc2626">${h.slow}</b>
       </div>
+      <div style="font-size:9.5px;color:#94a3b8;margin-bottom:2px">(create to accept time &ge; ${state.threshold} min)</div>
       <div style="margin-top:4px;font-size:9.5px;color:#94a3b8">Hex: ${h.hex}</div>
     </div>
   `;
@@ -538,9 +539,6 @@ function selectSingleHexagon(h, polygon) {
   document.getElementById('mergedSelectionPanel').classList.remove('active');
 
   const totalWithVal = h.with_value || h.orders;
-  const fast = totalWithVal - h.slow;
-  const slowPct = totalWithVal > 0 ? (h.slow / totalWithVal * 100) : 0;
-  const fastPct = totalWithVal > 0 ? (fast / totalWithVal * 100) : 0;
 
   document.getElementById('inspHexId').textContent = h.hex;
   document.getElementById('inspStatusBadge').className = `badge badge-${h.status}`;
@@ -548,13 +546,18 @@ function selectSingleHexagon(h, polygon) {
   document.getElementById('inspHaPct').textContent = `${h.pct.toFixed(1)}%`;
   document.getElementById('inspHaPct').style.color = h.pct > 25 ? '#dc2626' : '#16a34a';
   document.getElementById('inspTotalOrders').textContent = h.orders;
-  document.getElementById('inspSlowOrders').textContent = h.slow;
-  document.getElementById('inspFastOrders').textContent = fast;
+
+  const slowEl = document.getElementById('inspSlowOrders');
+  if (slowEl) slowEl.textContent = h.slow;
+  const ratioEl = document.getElementById('inspHaRatio');
+  if (ratioEl) ratioEl.textContent = `${h.slow} of ${totalWithVal} orders`;
+
+  document.querySelectorAll('.inspThresholdText').forEach(el => {
+    el.textContent = state.threshold;
+  });
+
   document.getElementById('inspMeanDuration').textContent = `${h.mean.toFixed(1)} min`;
   document.getElementById('inspCoords').textContent = `${h.center[0]}, ${h.center[1]}`;
-
-  document.getElementById('inspBarSlow').style.width = `${slowPct}%`;
-  document.getElementById('inspBarFast').style.width = `${fastPct}%`;
 
   inspector.classList.add('active');
 }
@@ -607,7 +610,6 @@ function renderMergedSelection() {
 
   const mergedPct = totalWithValue > 0 ? (totalSlow / totalWithValue * 100) : 0;
   const mergedMean = totalWithValue > 0 ? (vsum / totalWithValue) : 0;
-  const fastOrders = totalWithValue - totalSlow;
   const cityAverage = state.data && state.data.kpis ? state.data.kpis.overall_ha_pct : 0;
   const delta = mergedPct - cityAverage;
 
@@ -620,13 +622,13 @@ function renderMergedSelection() {
   deltaBadge.style.color = delta > 0 ? '#dc2626' : '#16a34a';
 
   document.getElementById('mergedTotalOrders').textContent = totalOrders.toLocaleString();
-  document.getElementById('mergedSlowOrders').textContent = totalSlow.toLocaleString();
-  document.getElementById('mergedFastOrders').textContent = fastOrders.toLocaleString();
-  document.getElementById('mergedMeanDuration').textContent = `${mergedMean.toFixed(1)} min`;
 
-  const slowPct = totalWithValue > 0 ? (totalSlow / totalWithValue * 100) : 0;
-  document.getElementById('mergedBarSlow').style.width = `${slowPct}%`;
-  document.getElementById('mergedBarFast').style.width = `${100 - slowPct}%`;
+  const mergedSlowEl = document.getElementById('mergedSlowOrders');
+  if (mergedSlowEl) mergedSlowEl.textContent = totalSlow.toLocaleString();
+  const mergedRatioEl = document.getElementById('mergedHaRatio');
+  if (mergedRatioEl) mergedRatioEl.textContent = `${totalSlow.toLocaleString()} of ${totalWithValue.toLocaleString()} orders`;
+
+  document.getElementById('mergedMeanDuration').textContent = `${mergedMean.toFixed(1)} min`;
 
   // Render chip tags for selected cells
   const chipsContainer = document.getElementById('mergedCellsList');
@@ -825,7 +827,7 @@ function renderBottlenecks(bottlenecks) {
     <div class="bottleneck-item" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
       <div>
         <div class="b-name">#${i + 1} Zone: ${b.hex.substring(0, 8)}...</div>
-        <div class="b-sub">${b.orders} orders &bull; ${b.slow} slow &bull; ${b.mean} min avg</div>
+        <div class="b-sub">${b.orders} orders &bull; ${b.slow} HA30 count &bull; ${b.mean} min avg</div>
       </div>
       <div class="b-badge">${b.pct.toFixed(1)}%</div>
     </div>
@@ -851,8 +853,10 @@ function openCityModal() {
 
   document.getElementById('modalCityHaPct').textContent = `${kpis.overall_ha_pct.toFixed(1)}%`;
   document.getElementById('modalCityTotalOrders').textContent = kpis.total_orders.toLocaleString();
-  document.getElementById('modalCitySlowOrders').textContent = kpis.total_slow.toLocaleString();
-  document.getElementById('modalCityFastOrders').textContent = kpis.total_fast.toLocaleString();
+  const modalSlow = document.getElementById('modalCitySlowOrders');
+  if (modalSlow) {
+    modalSlow.textContent = `${(kpis.ha30_count || kpis.total_slow || 0).toLocaleString()} (of ${kpis.total_orders.toLocaleString()})`;
+  }
 
   document.getElementById('modalCityP50').textContent = `${kpis.p50_duration || 0} min`;
   document.getElementById('modalCityMean').textContent = `${kpis.overall_mean_duration.toFixed(1)} min`;
@@ -870,9 +874,9 @@ function openCityModal() {
         <tr style="${rowStyle};border-bottom:1px solid #f1f5f9">
           <td style="padding:5px 8px;font-weight:600">${d.label} ${isSelected ? '' : '<span style="font-size:9px;color:#94a3b8">(excluded)</span>'}</td>
           <td style="padding:5px 8px">${d.orders.toLocaleString()}</td>
-          <td style="padding:5px 8px;color:#dc2626">${d.slow.toLocaleString()}</td>
+          <td style="padding:5px 8px;color:#dc2626">${(d.ha30_count !== undefined ? d.ha30_count : (d.slow || 0)).toLocaleString()}</td>
           <td style="padding:5px 8px;font-weight:700;color:${color}">${d.pct.toFixed(1)}%</td>
-          <td style="padding:5px 8px">${d.mean.toFixed(1)}s</td>
+          <td style="padding:5px 8px">${d.mean.toFixed(1)} min</td>
         </tr>
       `;
     }).join('');
@@ -910,7 +914,7 @@ function exportCsvData() {
   if (!layerData || !layerData.hexes) return;
 
   const rows = [
-    ['hex', 'latitude', 'longitude', 'orders', 'slow', 'fast', 'pct_slow', 'mean_duration', 'reliable', 'status']
+    ['hex', 'latitude', 'longitude', 'orders', 'ha30_orders_count', 'ha30_pct', 'mean_duration_min', 'reliable', 'status']
   ];
 
   layerData.hexes.forEach(h => {
@@ -919,8 +923,7 @@ function exportCsvData() {
       h.center[0],
       h.center[1],
       h.orders,
-      h.slow,
-      h.fast,
+      h.ha30_count !== undefined ? h.ha30_count : h.slow,
       h.pct,
       h.mean,
       h.reliable,
