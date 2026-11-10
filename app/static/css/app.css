@@ -103,15 +103,16 @@ html, body {
 .city-search-container {
   display: flex;
   align-items: center;
-  gap: 6px;
   flex: 1;
-  max-width: 320px;
-  margin: 0 16px;
+  max-width: 290px;
+  margin: 0 14px;
 }
 
 .search-input-wrapper {
   position: relative;
-  flex: 1;
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .search-icon {
@@ -130,10 +131,10 @@ html, body {
   height: 32px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--radius-sm);
-  padding: 0 10px 0 32px;
+  border-radius: 16px;
+  padding: 0 32px 0 30px;
   color: #fff;
-  font-size: 12.5px;
+  font-size: 12px;
   font-family: inherit;
   transition: all 0.2s;
 }
@@ -149,24 +150,27 @@ html, body {
   color: rgba(255, 255, 255, 0.45);
 }
 
-.btn-search {
-  height: 32px;
-  padding: 0 12px;
+.btn-search-inline {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
   background: #2563eb;
   color: #fff;
   border: none;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 4px;
-  transition: all 0.2s;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
 }
 
-.btn-search:hover {
+.btn-search-inline:hover {
   background: #1d4ed8;
+  transform: translateY(-50%) scale(1.05);
 }
 
 /* Clean Header Actions */
@@ -212,10 +216,10 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  overflow-x: auto;
+  overflow: visible !important;
   flex-shrink: 0;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.2) transparent;
+  position: relative;
+  z-index: 1100;
 }
 
 /* Calendar Trigger & Popover */
@@ -249,15 +253,15 @@ html, body {
 
 .calendar-popover {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   left: 0;
-  width: 310px;
+  width: 320px;
   background: #1e293b;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-  padding: 12px;
-  z-index: 1200;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+  padding: 14px;
+  z-index: 2500;
   display: none;
   flex-direction: column;
   gap: 10px;
@@ -403,6 +407,10 @@ html, body {
   align-items: center;
   gap: 5px;
   overflow-x: auto;
+  flex: 1;
+  min-width: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
 }
 
 .day-pill {
@@ -1013,7 +1021,7 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-/* Hexagon Map Labels - SMALLER, ZERO WHITE BACKGROUND, FITS CELL */
+/* Hexagon Map Labels - DYNAMICALLY SCALED & CENTERED IN MIDDLE OF CELL */
 .leaflet-hex-label {
   font-family: var(--font-family);
   background: transparent !important;
@@ -1029,10 +1037,12 @@ html, body {
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  line-height: 1 !important;
 }
 
 .leaflet-hex-label .lbl-main-orders {
-  font-size: 10px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1;
@@ -1046,7 +1056,6 @@ html, body {
 }
 
 .leaflet-hex-label .lbl-sub-metric {
-  font-size: 8px;
   font-weight: 700;
   color: #1e293b;
   line-height: 1;
@@ -1062,7 +1071,7 @@ html, body {
 
 /* Badges */
 .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
-.badge-optimal { background: #dcfce7; color: #166534; }
+.badge-healthy { background: #dcfce7; color: #166534; }
 .badge-acceptable { background: #fef9c3; color: #854d0e; }
 .badge-warning { background: #fee2e2; color: #991b1b; }
 .badge-critical { background: #fecaca; color: #7f1d1d; }

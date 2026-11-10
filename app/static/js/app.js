@@ -130,9 +130,10 @@ function initMap() {
       let targetRes = Math.min(10, Math.max(6, Math.round(zoom - 5)));
       if (targetRes !== state.currentRes) {
         setResolution(targetRes);
+        return;
       }
     }
-    updateLabelsVisibility();
+    renderLabels();
   });
 
   setTimeout(() => {
@@ -144,6 +145,16 @@ function setupEventListeners() {
   // City search submit
   document.getElementById('searchForm').addEventListener('submit', (e) => {
     e.preventDefault();
+    const city = document.getElementById('cityInput').value.trim();
+    if (city) {
+      const isNewCity = !state.city || (city.toLowerCase() !== state.city.toLowerCase());
+      state.selectedDates = [];
+      loadCityData(city, isNewCity);
+    }
+  });
+
+  // City input datalist change
+  document.getElementById('cityInput').addEventListener('change', () => {
     const city = document.getElementById('cityInput').value.trim();
     if (city) {
       const isNewCity = !state.city || (city.toLowerCase() !== state.city.toLowerCase());
@@ -260,11 +271,22 @@ function setupEventListeners() {
       }
     });
 
+    // Prevent clicks inside popover from closing it
+    popover.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
     if (btnClosePopover) {
-      btnClosePopover.addEventListener('click', () => popover.classList.remove('open'));
+      btnClosePopover.addEventListener('click', (e) => {
+        e.stopPropagation();
+        popover.classList.remove('open');
+      });
     }
     if (btnCancelPopover) {
-      btnCancelPopover.addEventListener('click', () => popover.classList.remove('open'));
+      btnCancelPopover.addEventListener('click', (e) => {
+        e.stopPropagation();
+        popover.classList.remove('open');
+      });
     }
 
     // Close when clicking outside
@@ -276,7 +298,8 @@ function setupEventListeners() {
 
     // Preset chips in popover
     document.querySelectorAll('.btn-preset-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
         const sDate = chip.dataset.start;
         const eDate = chip.dataset.end;
         if (sDate && eDate) {
@@ -290,7 +313,8 @@ function setupEventListeners() {
 
     // Apply button in popover
     if (btnApplyPeriod) {
-      btnApplyPeriod.addEventListener('click', () => {
+      btnApplyPeriod.addEventListener('click', (e) => {
+        e.stopPropagation();
         const sDate = document.getElementById('popoverStartDate').value;
         const eDate = document.getElementById('popoverEndDate').value;
         if (!sDate || !eDate) {
@@ -562,8 +586,19 @@ function updateKpis(kpis, city, dataSource) {
   haEl.className = 'kpi-val ' + (kpis.overall_ha_pct > 25 ? 'highlight-breach' : 'highlight-success');
 
   const badgeEl = document.getElementById('citySlaBadge');
-  badgeEl.textContent = kpis.sla_health || 'SLA';
-  badgeEl.className = 'badge ' + (kpis.overall_ha_pct > 30 ? 'badge-critical' : kpis.overall_ha_pct > 20 ? 'badge-warning' : 'badge-optimal');
+  if (badgeEl) {
+    if (kpis.overall_ha_pct > 30) {
+      badgeEl.textContent = 'CRITICAL BREACH';
+      badgeEl.className = 'badge badge-critical';
+      badgeEl.style.display = 'inline-block';
+    } else if (kpis.overall_ha_pct > 20) {
+      badgeEl.textContent = 'ELEVATED RISK';
+      badgeEl.className = 'badge badge-warning';
+      badgeEl.style.display = 'inline-block';
+    } else {
+      badgeEl.style.display = 'none';
+    }
+  }
 
   document.getElementById('kpiSlowRatio').textContent = `${(kpis.ha30_count || kpis.total_slow || 0).toLocaleString()} of ${kpis.total_orders.toLocaleString()}`;
   document.getElementById('cityTotalOrdersLabel').textContent = `${kpis.total_orders.toLocaleString()} Delivered`;
@@ -729,14 +764,16 @@ function renderMapHexagons() {
 }
 
 function createTooltipContent(h) {
-  const statusLabels = {
-    optimal: '🟢 Optimal SLA (&lt;15%)',
-    acceptable: '🟡 Acceptable (15-25%)',
-    warning: '🟠 Elevated SLA Risk (25-35%)',
-    critical: '🔴 Critical SLA Breach (&gt;35%)',
-    low_sample: '⚪ Low Order Volume (&lt;5)'
-  };
-  const statusText = statusLabels[h.status] || '';
+  let statusBadgeHtml = '';
+  if (h.status === 'critical') {
+    statusBadgeHtml = '<div style="font-size:10.5px;color:#dc2626;font-weight:700;margin:3px 0 2px">🔴 Critical SLA Breach (&gt;35%)</div>';
+  } else if (h.status === 'warning') {
+    statusBadgeHtml = '<div style="font-size:10.5px;color:#f59e0b;font-weight:700;margin:3px 0 2px">🟠 Elevated SLA Risk (25-35%)</div>';
+  } else if (h.status === 'acceptable') {
+    statusBadgeHtml = '<div style="font-size:10.5px;color:#ca8a04;font-weight:600;margin:3px 0 2px">🟡 Acceptable SLA (15-25%)</div>';
+  } else if (h.status === 'low_sample') {
+    statusBadgeHtml = '<div style="font-size:10px;color:#94a3b8;margin:3px 0 2px">⚪ Low Order Volume (&lt;5)</div>';
+  }
 
   return `
     <div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.45;min-width:180px">
@@ -753,7 +790,7 @@ function createTooltipContent(h) {
         <span style="color:#64748b">Mean Duration:</span>
         <span style="color:#0f172a;font-weight:600">${h.mean.toFixed(1)} min</span>
       </div>
-      <div style="font-size:10.5px;color:#64748b;margin:4px 0 2px">${statusText}</div>
+      ${statusBadgeHtml}
       <div style="margin-top:4px;font-size:9.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:3px">Hex: ${h.hex}</div>
     </div>
   `;
@@ -775,8 +812,16 @@ function selectSingleHexagon(h, polygon) {
   const totalWithVal = h.with_value || h.orders;
 
   document.getElementById('inspHexId').textContent = h.hex;
-  document.getElementById('inspStatusBadge').className = `badge badge-${h.status}`;
-  document.getElementById('inspStatusBadge').textContent = h.status.replace('_', ' ').toUpperCase();
+  const inspBadge = document.getElementById('inspStatusBadge');
+  if (inspBadge) {
+    if (h.status === 'critical' || h.status === 'warning' || h.status === 'low_sample') {
+      inspBadge.style.display = 'inline-block';
+      inspBadge.className = `badge badge-${h.status}`;
+      inspBadge.textContent = h.status.replace('_', ' ').toUpperCase();
+    } else {
+      inspBadge.style.display = 'none';
+    }
+  }
   document.getElementById('inspHaPct').textContent = `${h.pct.toFixed(1)}%`;
   document.getElementById('inspHaPct').style.color = h.pct > 25 ? '#dc2626' : '#16a34a';
   document.getElementById('inspTotalOrders').textContent = h.orders;
@@ -919,10 +964,68 @@ function setColorMetric(metric) {
   renderLabels();
 }
 
-// Render labels on hexagons: SMALLER, TRANSPARENT (NO WHITE BACKGROUND), FITS CELL
+// Render labels on hexagons: dynamically sized and centered to fit inside each cell on every zoom & resolution
 function renderLabels() {
   labelLayerGroup.clearLayers();
-  if (!state.showLabels) return;
+  if (!state.showLabels || !state.polygons || state.polygons.length === 0) return;
+
+  // Measure exact pixel radius of a hexagon in the current viewport & resolution
+  const samplePoly = state.polygons[0];
+  let radiusPx = 25;
+  if (samplePoly && samplePoly.h && samplePoly.h.ring && samplePoly.h.ring.length > 0) {
+    try {
+      const ptCenter = map.latLngToLayerPoint(samplePoly.h.center);
+      const ptEdge = map.latLngToLayerPoint(samplePoly.h.ring[0]);
+      radiusPx = Math.hypot(ptEdge.x - ptCenter.x, ptEdge.y - ptCenter.y);
+    } catch (e) {
+      radiusPx = 25;
+    }
+  }
+
+  // If zoomed out so far that hexagons are tiny slivers (< 7px radius, < 14px diameter),
+  // hide labels so they do not overlap outside the cell
+  if (radiusPx < 7) {
+    return;
+  }
+
+  // Compute dynamic font sizes and bounding box scaled to hexagon radius
+  let fontOrdersPx, fontSubPx, boxWPx, boxHPx;
+
+  if (radiusPx < 11) {
+    // Zoomed out / fine resolution (14px - 22px diameter): micro compact, orders only
+    fontOrdersPx = 6.5;
+    fontSubPx = 5.5;
+    boxWPx = Math.max(16, Math.round(radiusPx * 1.6));
+    boxHPx = Math.max(10, Math.round(radiusPx * 1.2));
+  } else if (radiusPx < 18) {
+    // Small cells (22px - 36px diameter)
+    fontOrdersPx = 8;
+    fontSubPx = 6.5;
+    boxWPx = Math.round(radiusPx * 1.5);
+    boxHPx = Math.round(radiusPx * 1.15);
+  } else if (radiusPx < 28) {
+    // Medium cells (36px - 56px diameter)
+    fontOrdersPx = 9.5;
+    fontSubPx = 7.5;
+    boxWPx = Math.round(radiusPx * 1.4);
+    boxHPx = Math.round(radiusPx * 1.05);
+  } else if (radiusPx < 45) {
+    // Large cells (56px - 90px diameter)
+    fontOrdersPx = 11;
+    fontSubPx = 8.5;
+    boxWPx = Math.round(radiusPx * 1.3);
+    boxHPx = Math.round(radiusPx * 1.0);
+  } else {
+    // Extra large cells (> 90px diameter)
+    fontOrdersPx = Math.min(14, Math.round(radiusPx * 0.26));
+    fontSubPx = Math.min(10.5, Math.round(radiusPx * 0.19));
+    boxWPx = Math.round(radiusPx * 1.2);
+    boxHPx = Math.round(radiusPx * 0.9);
+  }
+
+  // Exact anchor at box midpoint ensures the text is centered precisely at hexagon centroid
+  const anchorX = boxWPx / 2;
+  const anchorY = boxHPx / 2;
 
   state.polygons.forEach(item => {
     const h = item.h;
@@ -930,23 +1033,23 @@ function renderLabels() {
     if (h.pct < state.minBreachFilter || h.orders < state.minOrdersFilter) return;
 
     let htmlContent;
-    if (state.cellLabelMode === 'orders_only') {
-      htmlContent = `<span class="lbl-main-orders">${h.orders.toLocaleString()}</span>`;
+    if (state.cellLabelMode === 'orders_only' || radiusPx < 11) {
+      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontOrdersPx}px">${h.orders.toLocaleString()}</span>`;
     } else {
       const metricText = state.colorMetric === 'ha'
         ? `${h.pct.toFixed(0)}%`
         : `${h.mean.toFixed(1)}m`;
       htmlContent = `
-        <span class="lbl-main-orders">${h.orders.toLocaleString()}</span>
-        <span class="lbl-sub-metric">${metricText}</span>
+        <span class="lbl-main-orders" style="font-size:${fontOrdersPx}px">${h.orders.toLocaleString()}</span>
+        <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${metricText}</span>
       `;
     }
 
     const icon = L.divIcon({
       className: 'leaflet-hex-label',
       html: htmlContent,
-      iconSize: [44, 20],
-      iconAnchor: [22, 10]
+      iconSize: [boxWPx, boxHPx],
+      iconAnchor: [anchorX, anchorY]
     });
     const marker = L.marker(h.center, { interactive: false, icon: icon });
     labelLayerGroup.addLayer(marker);

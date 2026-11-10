@@ -93,7 +93,7 @@ def rollup(base: pd.DataFrame, res: int, min_orders: int, res_max: int = 10) -> 
         if not row["reliable"]:
             return "low_sample"
         if row["pct_slow"] < 15.0:
-            return "optimal"
+            return "healthy"
         if row["pct_slow"] < 25.0:
             return "acceptable"
         if row["pct_slow"] < 35.0:
@@ -243,7 +243,7 @@ def analyze_city_orders(
 
     # Overall city status
     if overall_ha_pct < 15.0:
-        sla_health = "OPTIMAL"
+        sla_health = "HEALTHY"
     elif overall_ha_pct < 25.0:
         sla_health = "ACCEPTABLE"
     elif overall_ha_pct < 35.0:

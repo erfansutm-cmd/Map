@@ -25,7 +25,7 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 
 #map { width: 100%; height: 100%; }
 
-/* Hexagon labels - transparent, no white background */
+/* Hexagon labels - transparent, centered, dynamically scaled */
 .lbl {
   font-family: 'Inter', sans-serif;
   background: transparent !important;
@@ -35,9 +35,14 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
   pointer-events: none;
   text-align: center;
   white-space: nowrap;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 .lbl-ord {
-  font-size: 10px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1;
@@ -45,7 +50,6 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
   display: block;
 }
 .lbl-ha {
-  font-size: 8px;
   font-weight: 700;
   color: #1e293b;
   line-height: 1;
@@ -194,7 +198,6 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 .metric-label { color: #64748b; }
 .metric-val { font-weight: 700; color: #0f172a; }
 .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-.badge-optimal { background: #dcfce7; color: #166534; }
 .badge-acceptable { background: #fef9c3; color: #854d0e; }
 .badge-warning { background: #fee2e2; color: #991b1b; }
 .badge-critical { background: #fecaca; color: #7f1d1d; }
@@ -286,11 +289,11 @@ var labelGroup = L.layerGroup().addTo(map);
 function curLayer() { return DATA.layers[layerKey].res[res]; }
 
 function getStatusBadge(status) {
-  if (status === 'optimal') return '<span class="badge badge-optimal">Optimal (&lt;15%)</span>';
-  if (status === 'acceptable') return '<span class="badge badge-acceptable">Acceptable</span>';
-  if (status === 'warning') return '<span class="badge badge-warning">High Risk</span>';
   if (status === 'critical') return '<span class="badge badge-critical">Critical SLA Breach</span>';
-  return '<span class="badge badge-low">Low Sample (&lt;' + MIN_ORDERS + ')</span>';
+  if (status === 'warning') return '<span class="badge badge-warning">Elevated Risk</span>';
+  if (status === 'acceptable') return '<span class="badge badge-acceptable">Acceptable</span>';
+  if (status === 'low_sample' || status === 'low') return '<span class="badge badge-low">Low Sample (&lt;' + MIN_ORDERS + ')</span>';
+  return '';
 }
 
 function tooltipHtml(h) {
@@ -373,14 +376,37 @@ function labelHtml(h) {
 
 function updateLabels() {
   labelGroup.clearLayers();
-  var want = labelsOn && map.getZoom() >= (res + 4);
-  if (want) {
-    items.forEach(function(it) {
-      var icon = L.divIcon({className: 'lbl', html: labelHtml(it.h), iconSize: [80, 26], iconAnchor: [40, 13]});
-      var marker = L.marker(it.h.center, {interactive: false, icon: icon});
-      labelGroup.addLayer(marker);
-    });
+  if (!labelsOn || items.length === 0) return;
+
+  var radiusPx = 25;
+  if (items[0] && items[0].h && items[0].h.ring && items[0].h.ring.length > 0) {
+    try {
+      var ptCenter = map.latLngToLayerPoint(items[0].h.center);
+      var ptEdge = map.latLngToLayerPoint(items[0].h.ring[0]);
+      radiusPx = Math.hypot(ptEdge.x - ptCenter.x, ptEdge.y - ptCenter.y);
+    } catch(e) { radiusPx = 25; }
   }
+
+  if (radiusPx < 7) return;
+
+  var fOrd = radiusPx < 11 ? 6.5 : (radiusPx < 18 ? 8 : (radiusPx < 28 ? 9.5 : (radiusPx < 45 ? 11 : 13)));
+  var fSub = radiusPx < 11 ? 5.5 : (radiusPx < 18 ? 6.5 : (radiusPx < 28 ? 7.5 : (radiusPx < 45 ? 8.5 : 10)));
+  var boxW = radiusPx < 11 ? Math.max(16, Math.round(radiusPx * 1.6)) : Math.round(radiusPx * 1.4);
+  var boxH = radiusPx < 11 ? Math.max(10, Math.round(radiusPx * 1.2)) : Math.round(radiusPx * 1.05);
+
+  items.forEach(function(it) {
+    var v = colorMetric === 'ha' ? (it.h.pct.toFixed(0) + '%') : (it.h.mean.toFixed(1) + 'm');
+    var html = '<div class="lbl-ord" style="font-size:' + fOrd + 'px">' + it.h.orders + '</div>' +
+               (radiusPx >= 11 ? ('<div class="lbl-ha" style="font-size:' + fSub + 'px">' + v + '</div>') : '');
+    var icon = L.divIcon({
+      className: 'lbl',
+      html: html,
+      iconSize: [boxW, boxH],
+      iconAnchor: [boxW / 2, boxH / 2]
+    });
+    var marker = L.marker(it.h.center, {interactive: false, icon: icon});
+    labelGroup.addLayer(marker);
+  });
 }
 
 function renderMap() {
