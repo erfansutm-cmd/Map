@@ -3,6 +3,8 @@ Standalone HTML Generator.
 Expands and modernizes the original isfahan_hex_html.py script:
 - Removes the separate orders layer
 - Deeply enriches the HA30 layer with order metrics and better visualization
+- Adds toggle between HA30% and Mean Duration color metrics
+- Supports Shift+click multi-cell selection with merged analytics
 - Embeds high-contrast basemaps without broken Carto API keys
 - Provides a clean, modern interface with dark/light basemaps, opacity control, and hex inspector
 """
@@ -16,12 +18,11 @@ STANDALONE_TEMPLATE = r"""<!DOCTYPE html>
 <title>__TITLE__</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
 * { box-sizing: border-box; }
 html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f172a; }
 
-/* Map & Overlays */
 #map { width: 100%; height: 100%; }
 
 /* Hexagon labels */
@@ -30,31 +31,31 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
   color: #0f172a;
   text-align: center;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   padding: 3px 6px;
   border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
   pointer-events: none;
-  border: 1px solid rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.12);
 }
 .lbl-ha { font-weight: 700; color: #1e293b; }
 .lbl-ord { font-size: 9.5px; color: #64748b; }
 
 /* Control Panel */
 .panel {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
   padding: 14px 16px;
   border-radius: 10px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.85);
   font-size: 13px;
   color: #1e293b;
-  min-width: 250px;
+  min-width: 260px;
   max-width: 310px;
 }
-.panel h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: #0f172a; }
-.panel .subtitle { font-size: 11px; color: #64748b; margin-bottom: 12px; }
+.panel h3 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: #0f172a; }
+.panel .subtitle { font-size: 11px; color: #64748b; margin-bottom: 10px; }
 .panel hr { border: 0; border-top: 1px solid #e2e8f0; margin: 10px 0; }
 
 .section-title {
@@ -86,12 +87,16 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
   color: #0f172a;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
+.radio-btn.primary-active.active {
+  background: #2563eb;
+  color: #ffffff;
+}
 
 /* Resolution Stepper */
 .res-stepper { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
 .btn-step {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
@@ -104,12 +109,12 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 }
 .btn-step:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
 .btn-step:disabled { opacity: 0.4; cursor: not-allowed; }
-.res-disp { font-weight: 700; font-size: 14px; text-align: center; }
-.res-area { font-size: 11px; color: #64748b; text-align: center; }
+.res-disp { font-weight: 700; font-size: 13.5px; text-align: center; }
+.res-area { font-size: 10.5px; color: #64748b; text-align: center; }
 
 /* Sliders */
 .slider-row { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 6px 0; }
-.slider-row input[type="range"] { flex: 1; }
+.slider-row input[type="range"] { flex: 1; accent-color: #2563eb; }
 
 /* Legend Panel */
 .legend-panel {
@@ -125,12 +130,31 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 .bar-ha {
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(to right, #2ecc71, #f1c40f, #e74c3c);
+  background: linear-gradient(to right, #10b981 0%, #f59e0b 50%, #ef4444 100%);
   margin: 6px 0 4px;
 }
-.legend-ticks { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #475569; }
-.legend-note { font-size: 11px; color: #64748b; margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.legend-ticks { display: flex; justify-content: space-between; font-size: 10.5px; font-weight: 700; color: #475569; }
+.legend-note { font-size: 10.5px; color: #64748b; margin-top: 6px; display: flex; align-items: center; gap: 6px; }
 .dot-grey { width: 12px; height: 12px; background: #94a3b8; border-radius: 3px; display: inline-block; }
+
+/* Citywide Overview floating card */
+.citywide-badge {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  padding: 8px 18px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.16);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 12px;
+}
 
 /* Hexagon Inspector Card */
 .inspector {
@@ -144,7 +168,7 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.2);
   border: 1px solid rgba(226, 232, 240, 0.9);
-  width: 280px;
+  width: 290px;
   display: none;
   font-size: 12px;
 }
@@ -162,18 +186,52 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 .badge-warning { background: #fee2e2; color: #991b1b; }
 .badge-critical { background: #fecaca; color: #7f1d1d; }
 .badge-low { background: #f1f5f9; color: #475569; }
+
+.shift-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
+<!-- Top Citywide Overview -->
+<div class="citywide-badge">
+  <div>
+    <span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700">Citywide HA__THRESHOLD__%</span>
+    <div style="font-size:16px;font-weight:800;color:#dc2626">__OVERALL_HA__%</div>
+  </div>
+  <div>
+    <span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700">Total Orders</span>
+    <div style="font-size:16px;font-weight:800;color:#0f172a">__TOTAL_ORDERS__</div>
+  </div>
+  <div>
+    <span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700">Mean Duration</span>
+    <div style="font-size:16px;font-weight:800;color:#0f172a">__OVERALL_MEAN__s</div>
+  </div>
+</div>
+
 <!-- Hexagon Inspector -->
 <div id="inspector" class="inspector">
   <div class="inspector-head">
-    <span class="inspector-title">Hexagon Inspection</span>
+    <span class="inspector-title" id="inspHeadTitle">Hexagon Inspection</span>
     <button class="inspector-close" onclick="closeInspector()">&times;</button>
   </div>
   <div id="inspectorContent"></div>
+</div>
+
+<div class="shift-hint">
+  <b>Shift + Click</b> to select and merge multiple hexagon cells
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -181,16 +239,16 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 var DATA = __DATA__;
 var THRESHOLD = __THRESHOLD__;
 var MIN_ORDERS = __MINORD__;
-var LABEL_OFFSET = __LOFF__;
 
 var layerKey = 'source';
 var res = DATA.default;
+var colorMetric = 'ha'; // 'ha' or 'mean'
 var autoRes = false;
 var opacity = 0.65;
 var labelsOn = false;
 var items = [];
+var selectedHexes = new Map();
 
-// Clean tile providers (No API key expiration bugs)
 var TILE_PROVIDERS = {
   voyager: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
   positron: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
@@ -199,11 +257,11 @@ var TILE_PROVIDERS = {
 };
 
 var map = L.map('map', {zoomControl: false});
-L.control.zoom({position: 'topright'}).addTo(map);
+L.control.zoom({position: 'bottomleft'}).addTo(map);
 
 var currentTile = L.tileLayer(TILE_PROVIDERS.voyager, {
   maxZoom: 20,
-  attribution: '&copy; OpenStreetMap &copy; CARTO'
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
 }).addTo(map);
 
 var hexGroup = L.layerGroup().addTo(map);
@@ -211,7 +269,7 @@ var labelGroup = L.layerGroup().addTo(map);
 
 function curLayer() { return DATA.layers[layerKey].res[res]; }
 
-function getStatusBadge(status, pct) {
+function getStatusBadge(status) {
   if (status === 'optimal') return '<span class="badge badge-optimal">Optimal (&lt;15%)</span>';
   if (status === 'acceptable') return '<span class="badge badge-acceptable">Acceptable</span>';
   if (status === 'warning') return '<span class="badge badge-warning">High Risk</span>';
@@ -231,9 +289,10 @@ function tooltipHtml(h) {
 function openInspector(h) {
   var el = document.getElementById('inspector');
   var content = document.getElementById('inspectorContent');
+  document.getElementById('inspHeadTitle').textContent = 'Hexagon Inspection';
   var fast = h.with_value - h.slow;
-  var statusBadge = getStatusBadge(h.status, h.pct);
-  
+  var statusBadge = getStatusBadge(h.status);
+
   content.innerHTML =
     '<div style="margin-bottom:8px">' + statusBadge + '</div>' +
     '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + '% Breach Rate</span><span class="metric-val" style="color:#e11d48">' + h.pct.toFixed(1) + '%</span></div>' +
@@ -246,12 +305,53 @@ function openInspector(h) {
   el.classList.add('open');
 }
 
+function renderMergedSelection() {
+  var el = document.getElementById('inspector');
+  var content = document.getElementById('inspectorContent');
+  if (selectedHexes.size === 0) {
+    el.classList.remove('open');
+    return;
+  }
+
+  document.getElementById('inspHeadTitle').textContent = 'Merged Selection (' + selectedHexes.size + ' Cells)';
+  var totalOrders = 0, totalSlow = 0, totalWithValue = 0, vsum = 0;
+  selectedHexes.forEach(function(item) {
+    totalOrders += item.h.orders;
+    totalSlow += item.h.slow;
+    var w = item.h.with_value || item.h.orders;
+    totalWithValue += w;
+    vsum += item.h.mean * w;
+  });
+
+  var mergedPct = totalWithValue > 0 ? (totalSlow / totalWithValue * 100) : 0;
+  var mergedMean = totalWithValue > 0 ? (vsum / totalWithValue) : 0;
+  var fast = totalWithValue - totalSlow;
+
+  content.innerHTML =
+    '<div style="margin-bottom:8px"><span class="badge badge-warning">MERGED REGION</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Combined HA' + THRESHOLD + '%</span><span class="metric-val" style="color:#e11d48">' + mergedPct.toFixed(1) + '%</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Combined Orders</span><span class="metric-val">' + totalOrders + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Slow Orders</span><span class="metric-val">' + totalSlow + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Fast Orders</span><span class="metric-val">' + fast + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Weighted Mean</span><span class="metric-val">' + mergedMean.toFixed(1) + 's</span></div>' +
+    '<button onclick="clearHexSelection()" style="width:100%;margin-top:10px;padding:6px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-weight:600">Clear Selection</button>';
+  el.classList.add('open');
+}
+
+function clearHexSelection() {
+  selectedHexes.forEach(function(it) { it.p.setStyle({weight: 1.2, color: '#ffffff'}); });
+  selectedHexes.clear();
+  document.getElementById('inspector').classList.remove('open');
+}
+
 function closeInspector() {
+  clearHexSelection();
   document.getElementById('inspector').classList.remove('open');
 }
 
 function labelHtml(h) {
-  return '<div class="lbl-ha">HA' + THRESHOLD + ': ' + h.pct.toFixed(0) + '%</div><div class="lbl-ord">' + h.orders + ' orders</div>';
+  var v = colorMetric === 'ha' ? (h.pct.toFixed(0) + '%') : (h.mean.toFixed(1) + 's');
+  return '<div class="lbl-ha">' + v + '</div><div class="lbl-ord">' + h.orders + ' ord</div>';
 }
 
 function updateLabels() {
@@ -259,7 +359,7 @@ function updateLabels() {
   var want = labelsOn && map.getZoom() >= (res + 4);
   if (want) {
     items.forEach(function(it) {
-      var icon = L.divIcon({className: 'lbl', html: labelHtml(it.h), iconSize: [84, 28], iconAnchor: [42, 14]});
+      var icon = L.divIcon({className: 'lbl', html: labelHtml(it.h), iconSize: [80, 26], iconAnchor: [40, 13]});
       var marker = L.marker(it.h.center, {interactive: false, icon: icon});
       labelGroup.addLayer(marker);
     });
@@ -273,22 +373,40 @@ function renderMap() {
   if (!lData || !lData.hexes) return;
 
   lData.hexes.forEach(function(h) {
+    var isSel = selectedHexes.has(h.hex);
+    var fillColor = colorMetric === 'ha' ? h.color_ha : h.color_mean;
     var p = L.polygon(h.ring, {
-      color: '#ffffff',
-      weight: 1.2,
-      fillColor: h.color,
+      color: isSel ? '#06b6d4' : '#ffffff',
+      weight: isSel ? 3.5 : 1.2,
+      fillColor: fillColor,
       fillOpacity: opacity
     });
     p.bindTooltip(tooltipHtml(h), {sticky: true});
     p.on('mouseover', function() {
-      this.setStyle({weight: 2.8, color: '#0f172a'});
-      this.bringToFront();
+      if (!selectedHexes.has(h.hex)) {
+        this.setStyle({weight: 2.8, color: '#0f172a'});
+        this.bringToFront();
+      }
     });
     p.on('mouseout', function() {
-      this.setStyle({weight: 1.2, color: '#ffffff'});
+      var sel = selectedHexes.has(h.hex);
+      this.setStyle({weight: sel ? 3.5 : 1.2, color: sel ? '#06b6d4' : '#ffffff'});
     });
-    p.on('click', function() {
-      openInspector(h);
+    p.on('click', function(e) {
+      if (e.originalEvent && e.originalEvent.shiftKey) {
+        if (selectedHexes.has(h.hex)) {
+          selectedHexes.delete(h.hex);
+          this.setStyle({weight: 1.2, color: '#ffffff'});
+        } else {
+          selectedHexes.set(h.hex, {h: h, p: this});
+          this.setStyle({weight: 3.5, color: '#06b6d4'});
+          this.bringToFront();
+        }
+        renderMergedSelection();
+      } else {
+        clearHexSelection();
+        openInspector(h);
+      }
     });
     hexGroup.addLayer(p);
     items.push({h: h, p: p});
@@ -303,6 +421,7 @@ function setRes(r) {
   r = Math.max(DATA.min, Math.min(DATA.max, r));
   if (r === res) return;
   res = r;
+  clearHexSelection();
   renderMap();
 }
 
@@ -326,6 +445,11 @@ panelControl.onAdd = function() {
     '<div class="radio-group">' +
       '<button id="btnSrc" class="radio-btn active" onclick="setLayer(\'source\')">Pickup (Source)</button>' +
       '<button id="btnDest" class="radio-btn" onclick="setLayer(\'destination\')">Dropoff (Dest)</button>' +
+    '</div>' +
+    '<div class="section-title">Color Metric</div>' +
+    '<div class="radio-group">' +
+      '<button id="btnColHa" class="radio-btn primary-active active" onclick="setMetric(\'ha\')">HA' + THRESHOLD + '% Breach</button>' +
+      '<button id="btnColMean" class="radio-btn primary-active" onclick="setMetric(\'mean\')">Mean Duration</button>' +
     '</div>' +
     '<div class="section-title">Resolution (H3 Level)</div>' +
     '<div class="res-stepper">' +
@@ -373,14 +497,23 @@ function updateLegend() {
   var el = document.getElementById('legendContent');
   if (!el) return;
   var lData = curLayer();
-  var vmin = lData ? lData.scale.vmin : 0;
-  var vmax = lData ? lData.scale.vmax : 100;
-  el.innerHTML =
-    '<div style="font-weight:700;margin-bottom:2px">HA' + THRESHOLD + '% SLA Breach Rate</div>' +
-    '<div style="font-size:11px;color:#64748b">Orders exceeding ' + THRESHOLD + 's contractual accept</div>' +
-    '<div class="bar-ha"></div>' +
-    '<div class="legend-ticks"><span>' + vmin.toFixed(0) + '% (Best)</span><span>' + vmax.toFixed(0) + '% (Worst)</span></div>' +
-    '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
+  var s = lData ? lData.scale : {vmin: 0, vmax: 100, mmin: 10, mmax: 50};
+
+  if (colorMetric === 'ha') {
+    el.innerHTML =
+      '<div style="font-weight:700;margin-bottom:2px">HA' + THRESHOLD + '% SLA Breach Rate</div>' +
+      '<div style="font-size:10.5px;color:#64748b">Orders exceeding ' + THRESHOLD + 's contractual accept</div>' +
+      '<div class="bar-ha"></div>' +
+      '<div class="legend-ticks"><span>' + s.vmin.toFixed(0) + '% (Fast)</span><span>' + s.vmax.toFixed(0) + '% (Slow)</span></div>' +
+      '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
+  } else {
+    el.innerHTML =
+      '<div style="font-weight:700;margin-bottom:2px">Mean Accept Duration (seconds)</div>' +
+      '<div style="font-size:10.5px;color:#64748b">Average duration from creation to accept</div>' +
+      '<div class="bar-ha"></div>' +
+      '<div class="legend-ticks"><span>' + (s.mmin || 10).toFixed(0) + 's (Fast)</span><span>' + (s.mmax || 50).toFixed(0) + 's (Slow)</span></div>' +
+      '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
+  }
 }
 
 function updatePanel() {
@@ -398,7 +531,19 @@ window.setLayer = function(k) {
   layerKey = k;
   document.getElementById('btnSrc').classList.toggle('active', k === 'source');
   document.getElementById('btnDest').classList.toggle('active', k === 'destination');
+  clearHexSelection();
   renderMap();
+};
+
+window.setMetric = function(m) {
+  colorMetric = m;
+  document.getElementById('btnColHa').classList.toggle('active', m === 'ha');
+  document.getElementById('btnColMean').classList.toggle('active', m === 'mean');
+  items.forEach(function(it) {
+    it.p.setStyle({fillColor: colorMetric === 'ha' ? it.h.color_ha : it.h.color_mean});
+  });
+  updateLegend();
+  updateLabels();
 };
 
 window.toggleAuto = function(val) {
@@ -409,7 +554,11 @@ window.toggleAuto = function(val) {
 window.changeOpacity = function(val) {
   opacity = parseFloat(val);
   document.getElementById('opVal').textContent = Math.round(opacity * 100) + '%';
-  items.forEach(function(it) { it.p.setStyle({fillOpacity: opacity}); });
+  items.forEach(function(it) {
+    if (!selectedHexes.has(it.h.hex)) {
+      it.p.setStyle({fillOpacity: opacity});
+    }
+  });
 };
 
 window.toggleLabels = function(val) {
@@ -444,8 +593,12 @@ map.on('zoomend', function() {
 def build_standalone_html(data: dict, city: str, customer_id: int, start_date: str, end_date: str, threshold: int, min_orders: int) -> str:
     title = f"{city.title()} HA{threshold}% Hexagon Performance"
     page = STANDALONE_TEMPLATE
-    
-    # Format data for embedding
+
+    kpis = data.get("kpis", {})
+    overall_ha = kpis.get("overall_ha_pct", 0.0)
+    total_orders = kpis.get("total_orders", 0)
+    overall_mean = kpis.get("overall_mean_duration", 0.0)
+
     formatted_data = {
         "min": data["res_min"],
         "max": data["res_max"],
@@ -456,13 +609,15 @@ def build_standalone_html(data: dict, city: str, customer_id: int, start_date: s
             "destination": {"res": data["layers"]["destination"]["res"]},
         }
     }
-    
+
     replacements = {
         "__TITLE__": html.escape(title),
         "__DATA__": json.dumps(formatted_data, separators=(",", ":")),
         "__THRESHOLD__": str(threshold),
         "__MINORD__": str(min_orders),
-        "__LOFF__": "4",
+        "__OVERALL_HA__": str(overall_ha),
+        "__TOTAL_ORDERS__": f"{total_orders:,}",
+        "__OVERALL_MEAN__": str(overall_mean),
     }
     for k, v in replacements.items():
         page = page.replace(k, v)

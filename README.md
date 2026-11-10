@@ -2,21 +2,46 @@
 
 A modern, high-performance geospatial analytics product designed to analyze, visualize, and inspect on-demand courier and fleet delivery performance across cities using **Uber's H3 hexagonal spatial index**.
 
-This project expands and elevates the standalone `isfahan_hex_html.py` script into a full-featured web product with a responsive dashboard, multi-basemap engine, interactive city search, and deep SLA inspection tools.
+This project expands and elevates the standalone `isfahan_hex_html.py` script into a full-featured web product with a responsive dashboard, multi-basemap engine, interactive city search, day-level filtering, multi-cell zone merging, and dual color metrics.
 
 ---
 
 ## Key Enhancements & Features
 
-### 1. Dedicated HA30 SLA Focus
+### 1. Dedicated HA30 SLA Focus & Citywide Performance
 * **Orders layer removed**: Per user request, the redundant "orders layer" / "color by total orders" mode has been eliminated to keep the map focused on service-level agreement (SLA) health.
 * **Orders shown better in HA30**: Order volume is deeply integrated into the HA30 layer:
-  * **On-hex badges**: Shows breach percentage and order volume side-by-side (`24% · 142 ord`).
+  * **On-hex badges**: Shows breach percentage and order volume side-by-side (`28% · 142 ord`).
   * **Interactive Tooltips**: Instant view of total orders, slow orders (≥30s), fast orders (<30s), and average duration.
   * **Hexagon Inspector Card**: Click any hexagon to inspect exact order breakdown with progress bars, coordinates, and H3 cell ID.
   * **Low-Sample Indicator**: Hexagons with fewer than 5 orders are distinguished as low-sample (`< 5 orders`), preventing statistical distortion.
+* **Whole City HA30 Performance Overview**:
+  * Prominent **Citywide HA30 Card** on top of the map showing overall SLA breach rate (`%`), total delivered orders, slow vs on-time order counts, and SLA health badge (*Optimal*, *Acceptable*, *Elevated Risk*, *Critical Breach*).
+  * **Proportional SLA Track**: Visual progress bar showing citywide on-time vs breached order share.
+  * **Citywide Report Modal**: Click the citywide card or "Citywide HA30" button to inspect detailed duration distributions (Median P50, Mean, P90, P95) and the full daily SLA trend table.
 
-### 2. High-Fidelity Map Visualization
+### 2. Interactive Day Selector (Filter Specific Days)
+* **Select or Deselect Any Days**: An interactive day selector strip below the city chips displays every day in the time range with its order volume and breach rate badge.
+* **Instant Dynamic Filtering**: Toggle individual days on or off to analyze SLA health across specific dates.
+* **Quick Presets**: 1-click buttons for `All Days`, `Weekdays`, `Weekends`, and `Invert`.
+
+### 3. Shift + Click Multi-Cell Merged Analytics
+* **Merge Multiple Hexagons**: Hold <kbd>Shift</kbd> and click any number of hexagons on the map (or enable the "Multi-Select" toggle) to select multiple zones.
+* **Glowing Cyan Highlight**: Selected cells are highlighted with an unmistakable high-contrast cyan border.
+* **Merged Analytics Drawer**:
+  * **Combined HA30%**: Exact merged SLA breach rate across all selected cells.
+  * **Combined Order Counts**: Total combined orders, slow orders, and on-time orders.
+  * **Weighted Mean Duration**: Mathematically sound weighted average create-to-accept duration.
+  * **Comparison to City Average**: Live benchmark delta (e.g. `+3.4% vs City Avg`).
+  * **Selected Cells Chips**: Removable tags for each cell with 1-click `(×)` deselect and a `Zoom Selection` button.
+
+### 4. Toggle Colors by HA30% or Mean Duration
+* **Dual Hexagon Color Metric**: Toggle between:
+  * **HA30% Breach**: Colored by SLA failure percentage (Green = fast SLA, Yellow = moderate, Red = severe breach).
+  * **Mean Duration**: Colored by average create-to-accept duration in seconds (Green = fast <15s, Yellow = 15-30s, Red = >30s delay).
+* **Dynamic Legend**: Automatically updates the gradient bar and tick ranges between HA30 percentages and duration seconds.
+
+### 5. High-Fidelity Map Visualization ("See the Map Better")
 * **Multiple Basemaps**:
   * **CARTO Voyager** (default clean street map)
   * **CARTO Positron Light** (minimalist gray, maximum contrast for hexagons)
@@ -28,7 +53,7 @@ This project expands and elevates the standalone `isfahan_hex_html.py` script in
 * **Auto-Resolution Mode**: Dynamically follows your map zoom level as you zoom in and out.
 * **Pickup vs Dropoff**: Toggle between **Source (Pickup)** and **Destination (Dropoff)** hexagonal heatmaps with 1 click.
 
-### 3. City Search & Data Pipeline
+### 6. City Search & Data Pipeline
 * **Search any city**: Type any city name (e.g. *Isfahan*, *Tehran*, *Shiraz*, *Tabriz*, *Mashhad*, *Karaj*, *Ahvaz*, *Qom*, *Rasht*, *Kermanshah*, *Dubai*, *Istanbul*, *London*...) in the header search bar.
 * **Instant City Chips**: 1-click popular city quick selectors.
 * **Flexible Data Sources**:
@@ -36,11 +61,11 @@ This project expands and elevates the standalone `isfahan_hex_html.py` script in
   * **Built-in High-Fidelity Engine**: Realistic citywide courier simulation with spatial commercial clustering and congestion delay hotspots when offline or in demo mode.
   * **Custom CSV Upload**: Upload any custom delivery orders CSV (`source_latitude`, `source_longitude`, `destination_latitude`, `destination_longitude`, `create_to_accept_contractual`) to visualize your own fleet data instantly.
 
-### 4. Critical Bottlenecks & Operational Hotspots
+### 7. Critical Bottlenecks & Operational Hotspots
 * Automatically flags top operational bottlenecks (hexagons with high order volume combined with high SLA breach rates).
 * Click any bottleneck to fly directly to the hexagon on the map.
 
-### 5. Standalone Offline HTML Export
+### 8. Standalone Offline HTML Export
 * Export a 100% self-contained single-file HTML hover map for any city with a single click — perfect for offline sharing via Slack, email, or client reports.
 
 ---
@@ -111,37 +136,6 @@ python cli.py --city isfahan --threshold 30 --out isfahan_hexagons.html
 
 # Generate report for Tehran with custom threshold
 python cli.py --city tehran --threshold 25 --out tehran_hexagons.html
-```
-
----
-
-## Project Structure
-
-```
-Map/
-├── Dockerfile                  # Production container definition
-├── docker-compose.yml          # Docker Compose orchestration
-├── .dockerignore
-├── requirements.txt            # Python dependencies (FastAPI, H3, Pandas, ClickHouse)
-├── cli.py                      # Standalone CLI report generator
-├── app/
-│   ├── main.py                 # FastAPI application, routing, static mounting
-│   ├── config.py               # Application configuration and environment variables
-│   ├── cities.py               # Coordinates database and geocoding for Iranian & global cities
-│   ├── engine.py               # H3 hexagon multi-resolution rollups, SLA and percentile scaling
-│   ├── data_source.py          # ClickHouse client connector + high-fidelity simulation + CSV parser
-│   ├── export_html.py          # Standalone self-contained HTML builder
-│   ├── templates/
-│   │   └── index.html          # Modern dashboard UI template
-│   └── static/
-│       ├── css/
-│       │   └── app.css         # Clean modern styling & animations
-│       └── js/
-│           └── app.js          # Leaflet map controller, tooltips, and interactivity
-├── legacy/
-│   └── isfahan_hex_html.py     # Original user script preserved for reference
-└── tests/
-    └── test_engine.py          # Unit tests for H3 rollups and SLA calculations
 ```
 
 ---

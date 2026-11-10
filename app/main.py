@@ -1,9 +1,10 @@
 """
 FastAPI Server & REST API.
 Serves interactive dashboard, H3 hexagon analysis endpoints, and standalone exports.
+Supports day-level filtering, multi-cell merge metrics, and dual color metrics (HA30 vs Mean).
 """
 import os
-from typing import Optional
+from typing import Optional, List
 from fastapi import FastAPI, Request, Query, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -18,10 +19,9 @@ from app.export_html import build_standalone_html
 app = FastAPI(
     title="Fleet HexMap Analytics",
     description="H3 Hexagon Map & HA30 SLA Performance Engine",
-    version="2.0.0",
+    version="2.1.0",
 )
 
-# Static files and templates
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -58,20 +58,25 @@ async def get_city_data(
     min_orders: int = Query(default=settings.DEFAULT_MIN_ORDERS, ge=1, le=100),
     res_min: int = Query(default=settings.RES_MIN, ge=4, le=10),
     res_max: int = Query(default=settings.RES_MAX, ge=6, le=12),
+    dates: Optional[str] = Query(default=None, description="Comma-separated list of selected dates YYYY-MM-DD"),
     force_simulated: bool = Query(default=False),
 ):
     """
-    Fetch and analyze orders for a given city, computing H3 hexagons at all resolutions (6 to 10)
-    for both Source and Destination layers.
+    Fetch and analyze orders for a given city and selected days.
+    Computes H3 hexagons at resolutions 6-10 for both Source and Destination layers,
+    providing HA30% and Mean Duration color metrics, citywide stats, and daily breakdown.
     """
     try:
-        df, data_source = fetch_orders(
+        selected_dates = [d.strip() for d in dates.split(",") if d.strip()] if dates else None
+
+        df, data_source, daily_breakdown, all_dates = fetch_orders(
             city=city,
             status=status,
             customer_id=customer_id,
             start_date=start_date,
             end_date=end_date,
             threshold=threshold,
+            selected_dates=selected_dates,
             force_simulated=force_simulated,
         )
 
@@ -89,6 +94,9 @@ async def get_city_data(
         city_meta = get_city_info(city)
         analysis["city"] = city_meta
         analysis["data_source"] = data_source
+        analysis["daily_stats"] = daily_breakdown
+        analysis["all_dates"] = all_dates
+        analysis["selected_dates"] = selected_dates if selected_dates is not None else all_dates
 
         return analysis
     except Exception as e:
@@ -104,15 +112,18 @@ async def export_html(
     end_date: str = Query(default=settings.DEFAULT_END_DATE),
     threshold: int = Query(default=settings.DEFAULT_THRESHOLD),
     min_orders: int = Query(default=settings.DEFAULT_MIN_ORDERS),
+    dates: Optional[str] = Query(default=None),
 ):
     """Export self-contained standalone HTML hover map for offline distribution."""
-    df, _ = fetch_orders(
+    selected_dates = [d.strip() for d in dates.split(",") if d.strip()] if dates else None
+    df, _, _, _ = fetch_orders(
         city=city,
         status=status,
         customer_id=customer_id,
         start_date=start_date,
         end_date=end_date,
         threshold=threshold,
+        selected_dates=selected_dates,
     )
     analysis = analyze_city_orders(
         df=df,
@@ -159,6 +170,9 @@ async def upload_csv_data(
         )
         analysis["city"] = {"name": file.filename, "key": "custom_upload"}
         analysis["data_source"] = f"Custom CSV Upload ({len(df)} orders)"
+        analysis["daily_stats"] = []
+        analysis["all_dates"] = []
+        analysis["selected_dates"] = []
         return analysis
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -167,4 +181,4 @@ async def upload_csv_data(
 @app.get("/health")
 async def healthcheck():
     """Healthcheck endpoint for Docker / orchestration."""
-    return {"status": "ok", "app": "Fleet HexMap", "version": "2.0.0"}
+    return {"status": "ok", "app": "Fleet HexMap", "version": "2.1.0"}
