@@ -251,8 +251,7 @@ var selectedHexes = new Map();
 
 var TILE_PROVIDERS = {
   voyager: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_5558_1_345367a66619045ea57fcdba',
-  positron: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png?key=cb1_5558_1_345367a66619045ea57fcdba',
-  dark: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=cb1_5558_1_345367a66619045ea57fcdba',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 };
 
@@ -279,13 +278,14 @@ function getStatusBadge(status) {
 
 function tooltipHtml(h) {
   var breachText = '<b>HA' + THRESHOLD + '%: ' + h.pct.toFixed(1) + '%</b>';
-  var ordText = 'Total Orders: <b>' + h.orders + '</b>';
-  var haCountText = 'HA' + THRESHOLD + ' Orders Count: <b>' + h.slow + '</b> (' + h.slow + ' of ' + h.with_value + ')';
-  var haDesc = '<span style="font-size:10px;color:#94a3b8">(create to accept time &ge; ' + THRESHOLD + ' min)</span>';
-  var meanText = 'Mean Duration: <b>' + h.mean.toFixed(1) + ' min</b>';
-  var idText = '<span style="font-size:10px;color:#94a3b8">Hex: ' + h.hex + '</span>';
-  return '<div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.4">' +
-         breachText + '<br>' + ordText + '<br>' + haCountText + '<br>' + haDesc + '<br>' + meanText + '<br>' + idText + '</div>';
+  var ordText = '<span style="font-weight:normal;color:#475569">' + h.orders + ' orders</span>';
+  var headRow = '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">' + breachText + ordText + '</div>';
+  var haCountText = '<div style="display:flex;justify-content:space-between"><span style="color:#64748b">HA' + THRESHOLD + ' Orders Count:</span><span style="color:#dc2626;font-weight:700">' + h.slow + '</span></div>';
+  var haDesc = '<div style="font-size:9.5px;color:#94a3b8;margin-bottom:3px">(create to accept time &ge; ' + THRESHOLD + ' min)</div>';
+  var meanText = '<div style="display:flex;justify-content:space-between"><span style="color:#64748b">Mean Duration:</span><span style="color:#0f172a;font-weight:600">' + h.mean.toFixed(1) + ' min</span></div>';
+  var idText = '<div style="font-size:9.5px;color:#94a3b8;margin-top:3px;border-top:1px solid #e2e8f0;padding-top:2px">Hex: ' + h.hex + '</div>';
+  return '<div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.4;min-width:180px">' +
+         headRow + haCountText + haDesc + meanText + idText + '</div>';
 }
 
 function openInspector(h) {
@@ -474,8 +474,7 @@ panelControl.onAdd = function() {
     '<div class="section-title">Basemap</div>' +
     '<div class="radio-group">' +
       '<button class="radio-btn active" onclick="switchBase(this, \'voyager\')">Voyager</button>' +
-      '<button class="radio-btn" onclick="switchBase(this, \'positron\')">Light</button>' +
-      '<button class="radio-btn" onclick="switchBase(this, \'dark\')">Dark</button>' +
+      '<button class="radio-btn" onclick="switchBase(this, \'satellite\')">Satellite</button>' +
     '</div>';
   L.DomEvent.disableClickPropagation(div);
   L.DomEvent.disableScrollPropagation(div);

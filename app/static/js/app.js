@@ -592,25 +592,21 @@ function createTooltipContent(h) {
 
   return `
     <div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.45;min-width:180px">
-      <div style="font-weight:700;font-size:13px;color:#0f172a;display:flex;justify-content:space-between;${haHighlight}">
-        <span>HA${state.threshold}%: <b style="color:${h.pct > 25 ? '#dc2626' : '#16a34a'}">${h.pct.toFixed(1)}%</b></span>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;${haHighlight}">
+        <span style="font-size:13.5px;color:#0f172a"><b>HA${state.threshold}%: ${h.pct.toFixed(1)}%</b></span>
+        <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
       </div>
-      <div style="display:flex;justify-content:space-between;${meanHighlight};margin:2px 0">
-        <span style="color:#64748b">Mean Duration:</span>
-        <b style="color:#0f172a">${h.mean.toFixed(1)} min</b>
-      </div>
-      <div style="font-size:10.5px;color:#64748b;margin-bottom:4px">${statusText}</div>
-      <hr style="border:0;border-top:1px solid #e2e8f0;margin:4px 0">
-      <div style="display:flex;justify-content:space-between">
-        <span style="color:#64748b">Total Orders:</span>
-        <b style="color:#0f172a">${h.orders}</b>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
         <span style="color:#64748b">HA${state.threshold} Orders Count:</span>
         <b style="color:#dc2626">${h.slow}</b>
       </div>
-      <div style="font-size:9.5px;color:#94a3b8;margin-bottom:2px">(create to accept time &ge; ${state.threshold} min)</div>
-      <div style="margin-top:4px;font-size:9.5px;color:#94a3b8">Hex: ${h.hex}</div>
+      <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept time &ge; ${state.threshold} min)</div>
+      <div style="display:flex;justify-content:space-between;${meanHighlight};margin:2px 0">
+        <span style="color:#64748b">Mean Duration:</span>
+        <span style="color:#0f172a;font-weight:600">${h.mean.toFixed(1)} min</span>
+      </div>
+      <div style="font-size:10.5px;color:#64748b;margin:4px 0 2px">${statusText}</div>
+      <div style="margin-top:4px;font-size:9.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:3px">Hex: ${h.hex}</div>
     </div>
   `;
 }
