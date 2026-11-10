@@ -18,6 +18,7 @@ from app.cities import get_popular_cities, get_city_info
 from app.data_source import fetch_orders, parse_csv_orders, get_dates_between, compute_daily_breakdown
 from app.engine import analyze_city_orders
 from app.export_html import build_standalone_html
+from app.export_kml import build_kml_boundaries
 
 app = FastAPI(
     title="Fleet HexMap Analytics",
@@ -291,6 +292,54 @@ def export_html(
         content=html_content,
         media_type="text/html",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/export-kml")
+def export_kml_get(
+    cells: str = Query(default="", description="Comma-separated list of H3 cell IDs"),
+    filename: Optional[str] = Query(default=None, description="Custom filename for KML export"),
+):
+    """Export boundaries of selected H3 cells as an OGC KML 2.2 file."""
+    cell_list = [c.strip() for c in cells.split(",") if c.strip()]
+    if not cell_list:
+        raise HTTPException(status_code=400, detail="No cell IDs provided")
+
+    kml_content = build_kml_boundaries(cell_list)
+    out_filename = filename or f"selected_{len(cell_list)}_cells_boundaries.kml"
+    if not out_filename.endswith(".kml"):
+        out_filename += ".kml"
+
+    return Response(
+        content=kml_content,
+        media_type="application/vnd.google-earth.kml+xml; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{out_filename}"'},
+    )
+
+
+@app.post("/api/export-kml")
+def export_kml_post(payload: Dict[str, Any]):
+    """Export boundaries of selected H3 cells as an OGC KML 2.2 file (POST with JSON)."""
+    raw_cells = payload.get("cells", [])
+    if isinstance(raw_cells, str):
+        cell_list = [c.strip() for c in raw_cells.split(",") if c.strip()]
+    elif isinstance(raw_cells, list):
+        cell_list = [str(c).strip() for c in raw_cells if str(c).strip()]
+    else:
+        cell_list = []
+
+    if not cell_list:
+        raise HTTPException(status_code=400, detail="No cell IDs provided")
+
+    kml_content = build_kml_boundaries(cell_list)
+    out_filename = payload.get("filename") or f"selected_{len(cell_list)}_cells_boundaries.kml"
+    if not out_filename.endswith(".kml"):
+        out_filename += ".kml"
+
+    return Response(
+        content=kml_content,
+        media_type="application/vnd.google-earth.kml+xml; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{out_filename}"'},
     )
 
 

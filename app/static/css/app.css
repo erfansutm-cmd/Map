@@ -1518,3 +1518,43 @@ body.map-only-mode .btn-exit-map-only {
   .map-controls-panel { width: calc(100% - 24px); max-height: 220px; }
   .city-search-container { max-width: 180px; }
 }
+
+/* KML Export Toast & Buttons */
+.kml-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1200;
+  background: #064e3b;
+  color: #ecfdf5;
+  border: 1px solid #059669;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.kml-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.btn-kml-export {
+  transition: all 0.15s ease;
+}
+
+.btn-kml-export:hover {
+  background: #047857 !important;
+  border-color: #065f46 !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+

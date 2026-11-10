@@ -367,6 +367,20 @@ function setupEventListeners() {
   document.getElementById('btnClearSelection').addEventListener('click', clearHexSelection);
   document.getElementById('btnZoomToSelection').addEventListener('click', zoomToSelection);
 
+  // KML Export for selected cell boundaries
+  const btnKmlMerged = document.getElementById('btnExportKmlSelection');
+  if (btnKmlMerged) {
+    btnKmlMerged.addEventListener('click', () => exportSelectedCellsKml());
+  }
+  const btnKmlSingle = document.getElementById('btnExportKmlSingle');
+  if (btnKmlSingle) {
+    btnKmlSingle.addEventListener('click', () => exportSelectedCellsKml());
+  }
+  const btnKmlCtrl = document.getElementById('btnExportKmlFromControls');
+  if (btnKmlCtrl) {
+    btnKmlCtrl.addEventListener('click', () => exportSelectedCellsKml());
+  }
+
   // Citywide Report Modal
   document.getElementById('btnOpenCityModal').addEventListener('click', openCityModal);
   document.getElementById('kpiCardCityOverview').addEventListener('click', openCityModal);
@@ -1275,9 +1289,18 @@ function toggleMultiSelectHex(h, polygon) {
 
 function renderMergedSelection() {
   const panel = document.getElementById('mergedSelectionPanel');
+  const ctrlKml = document.getElementById('multiSelectControlsKml');
+  const ctrlCountText = document.getElementById('multiKmlCountText');
+
   if (state.selectedHexes.size === 0) {
     panel.classList.remove('active');
+    if (ctrlKml) ctrlKml.style.display = 'none';
     return;
+  }
+
+  if (ctrlKml && ctrlCountText) {
+    ctrlCountText.textContent = state.selectedHexes.size;
+    ctrlKml.style.display = 'block';
   }
 
   let totalOrders = 0;
@@ -1345,12 +1368,129 @@ function clearHexSelection() {
   });
   state.selectedHexes.clear();
   document.getElementById('mergedSelectionPanel').classList.remove('active');
+
+  const ctrlKml = document.getElementById('multiSelectControlsKml');
+  if (ctrlKml) ctrlKml.style.display = 'none';
 }
 
 function zoomToSelection() {
   if (state.selectedHexes.size === 0) return;
   const bounds = L.latLngBounds(Array.from(state.selectedHexes.values()).map(it => it.h.center));
   map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+}
+
+// Export Selected Cell Boundaries as KML
+function exportSelectedCellsKml() {
+  let hexItems = [];
+  if (state.selectedHexes && state.selectedHexes.size > 0) {
+    hexItems = Array.from(state.selectedHexes.values());
+  } else if (state.singleSelectedHex) {
+    hexItems = [state.singleSelectedHex];
+  }
+
+  if (hexItems.length === 0) {
+    alert('Please select one or more cells on the map to output as KML (hold Shift or enable Multi-Select mode).');
+    return;
+  }
+
+  const cityName = state.city ? state.city.toLowerCase() : 'fleet';
+  const count = hexItems.length;
+  const filename = `${cityName}_${count}_cells_boundaries.kml`;
+  const docTitle = `${state.city || 'Fleet'} Selected Cell Boundaries (${count} cell${count > 1 ? 's' : ''})`;
+
+  const kmlContent = generateKmlForHexes(hexItems, docTitle);
+  downloadKmlFile(kmlContent, filename);
+  showKmlToast(`Exported ${count} cell boundar${count > 1 ? 'ies' : 'y'} as KML (${filename})`);
+}
+
+function generateKmlForHexes(hexItems, docTitle) {
+  const placemarksXml = hexItems.map(item => {
+    const h = item.h || item;
+    const hexId = h.hex || 'unknown_cell';
+    const ring = h.ring;
+    if (!ring || ring.length < 3) return '';
+
+    // Convert [lat, lng] to "longitude,latitude,altitude" (KML requires lng,lat,alt)
+    const coordPairs = ring.map(pt => `${Number(pt[1]).toFixed(6)},${Number(pt[0]).toFixed(6)},0`);
+
+    // Ensure LinearRing is closed (first coordinate equals last coordinate)
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (Number(first[0]).toFixed(6) !== Number(last[0]).toFixed(6) ||
+        Number(first[1]).toFixed(6) !== Number(last[1]).toFixed(6)) {
+      coordPairs.push(`${Number(first[1]).toFixed(6)},${Number(first[0]).toFixed(6)},0`);
+    }
+
+    const coordsStr = coordPairs.join(' ');
+
+    return `    <Placemark>
+      <name>${escapeXml(hexId)}</name>
+      <styleUrl>#cellBoundary</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>${coordsStr}</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>`;
+  }).filter(Boolean).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(docTitle || 'Selected Cell Boundaries')}</name>
+    <description>H3 cell boundaries exported from Fleet HexMap</description>
+    <Style id="cellBoundary">
+      <LineStyle>
+        <color>ffd4b606</color>
+        <width>2.5</width>
+      </LineStyle>
+      <PolyStyle>
+        <fill>0</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+${placemarksXml}
+  </Document>
+</kml>`;
+}
+
+function escapeXml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function downloadKmlFile(content, filename) {
+  const blob = new Blob([content], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'selected_cells_boundaries.kml';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+let kmlToastTimer = null;
+function showKmlToast(message) {
+  const toast = document.getElementById('kmlToastNotification');
+  const msgEl = document.getElementById('kmlToastMessage');
+  if (!toast || !msgEl) return;
+
+  msgEl.textContent = message;
+  toast.classList.add('show');
+
+  if (kmlToastTimer) clearTimeout(kmlToastTimer);
+  kmlToastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3500);
 }
 
 // Color Metric Switcher (HA30 vs Mean Duration)
