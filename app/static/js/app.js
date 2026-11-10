@@ -17,7 +17,8 @@ const state = {
   currentRes: 8,              // H3 resolution 6-10
   autoRes: false,
   opacity: 0.65,
-  showLabels: false,
+  showLabels: true,
+  cellLabelMode: 'orders_ha', // 'orders_ha' or 'orders_only'
   multiSelectMode: false,
   colorMetric: 'ha',          // 'ha' (HA30% breach) or 'mean' (Mean duration)
   activeBasemap: 'voyager',
@@ -144,11 +145,40 @@ function setupEventListeners() {
     filterHexagons();
   });
 
-  // Show labels checkbox
-  document.getElementById('checkShowLabels').addEventListener('change', (e) => {
-    state.showLabels = e.target.checked;
-    renderLabels();
-  });
+  // Show labels checkbox and mode toggles
+  const checkLabels = document.getElementById('checkShowLabels');
+  if (checkLabels) {
+    checkLabels.checked = state.showLabels;
+    checkLabels.addEventListener('change', (e) => {
+      state.showLabels = e.target.checked;
+      renderLabels();
+    });
+  }
+
+  const btnLblOrdersOnly = document.getElementById('btnLabelOrdersOnly');
+  const btnLblOrdersHa = document.getElementById('btnLabelOrdersHa');
+  if (btnLblOrdersOnly && btnLblOrdersHa) {
+    btnLblOrdersOnly.addEventListener('click', () => {
+      state.cellLabelMode = 'orders_only';
+      btnLblOrdersOnly.classList.add('active');
+      btnLblOrdersHa.classList.remove('active');
+      if (!state.showLabels) {
+        state.showLabels = true;
+        if (checkLabels) checkLabels.checked = true;
+      }
+      renderLabels();
+    });
+    btnLblOrdersHa.addEventListener('click', () => {
+      state.cellLabelMode = 'orders_ha';
+      btnLblOrdersHa.classList.add('active');
+      btnLblOrdersOnly.classList.remove('active');
+      if (!state.showLabels) {
+        state.showLabels = true;
+        if (checkLabels) checkLabels.checked = true;
+      }
+      renderLabels();
+    });
+  }
 
   // Multi-select mode checkbox
   document.getElementById('checkMultiSelectMode').addEventListener('change', (e) => {
@@ -782,14 +812,24 @@ function renderLabels() {
     const h = item.h;
     if (h.pct < state.minBreachFilter) return;
 
-    let primaryVal = state.colorMetric === 'ha' ? `${h.pct.toFixed(0)}%` : `${h.mean.toFixed(1)} min`;
-    let subVal = `${h.orders} ord`;
+    let htmlContent;
+    if (state.cellLabelMode === 'orders_only') {
+      htmlContent = `<div class="lbl-main-orders"><b>${h.orders.toLocaleString()}</b> <span class="lbl-unit">orders</span></div>`;
+    } else {
+      const metricText = state.colorMetric === 'ha'
+        ? `${h.pct.toFixed(0)}% HA${state.threshold}`
+        : `${h.mean.toFixed(1)} min`;
+      htmlContent = `
+        <div class="lbl-main-orders"><b>${h.orders.toLocaleString()}</b> <span class="lbl-unit">orders</span></div>
+        <div class="lbl-sub-metric">${metricText}</div>
+      `;
+    }
 
     const icon = L.divIcon({
       className: 'leaflet-hex-label',
-      html: `<div>${primaryVal}</div><div class="lbl-orders">${subVal}</div>`,
-      iconSize: [60, 26],
-      iconAnchor: [30, 13]
+      html: htmlContent,
+      iconSize: [84, 32],
+      iconAnchor: [42, 16]
     });
     const marker = L.marker(h.center, { interactive: false, icon: icon });
     labelLayerGroup.addLayer(marker);

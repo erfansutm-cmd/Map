@@ -245,7 +245,7 @@ var res = DATA.default;
 var colorMetric = 'ha'; // 'ha' or 'mean'
 var autoRes = false;
 var opacity = 0.65;
-var labelsOn = false;
+var labelsOn = true;
 var items = [];
 var selectedHexes = new Map();
 
@@ -350,8 +350,8 @@ function closeInspector() {
 }
 
 function labelHtml(h) {
-  var v = colorMetric === 'ha' ? (h.pct.toFixed(0) + '%') : (h.mean.toFixed(1) + ' min');
-  return '<div class="lbl-ha">' + v + '</div><div class="lbl-ord">' + h.orders + ' ord</div>';
+  var v = colorMetric === 'ha' ? ('HA' + THRESHOLD + '%: ' + h.pct.toFixed(0) + '%') : (h.mean.toFixed(1) + ' min');
+  return '<div style="font-weight:800;font-size:11px;color:#0f172a">' + h.orders + ' orders</div><div style="font-size:9.5px;color:#64748b;font-weight:600">' + v + '</div>';
 }
 
 function updateLabels() {
@@ -468,7 +468,7 @@ panelControl.onAdd = function() {
       '<span id="opVal">65%</span>' +
     '</div>' +
     '<label style="display:flex;align-items:center;gap:6px;cursor:pointer">' +
-      '<input type="checkbox" id="lblToggle" onchange="toggleLabels(this.checked)"> Show Values on Hexagons' +
+      '<input type="checkbox" id="lblToggle" onchange="toggleLabels(this.checked)" checked> Write Order Numbers in Cells' +
     '</label>' +
     '<hr>' +
     '<div class="section-title">Basemap</div>' +

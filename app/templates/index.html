@@ -274,10 +274,16 @@
           <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="60" step="5" value="0">
         </div>
 
-        <label class="checkbox-label">
-          <input type="checkbox" id="checkShowLabels">
-          <span>Show values on hexagons</span>
-        </label>
+        <div style="margin:10px 0 6px">
+          <label class="checkbox-label" style="margin-bottom:6px">
+            <input type="checkbox" id="checkShowLabels" checked>
+            <span style="font-weight:600">Write number of orders in each cell</span>
+          </label>
+          <div class="pill-segmented" style="font-size:10px">
+            <button id="btnLabelOrdersOnly" class="pill-item">Orders Only</button>
+            <button id="btnLabelOrdersHa" class="pill-item active">Orders + HA30%</button>
+          </div>
+        </div>
 
         <label class="checkbox-label">
           <input type="checkbox" id="checkMultiSelectMode">

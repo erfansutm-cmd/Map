@@ -1095,23 +1095,37 @@ html, body {
 /* Hexagon Map Labels */
 .leaflet-hex-label {
   font-family: var(--font-family);
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: 11px;
   color: #0f172a;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(4px);
   padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
   white-space: nowrap;
   pointer-events: none;
   text-align: center;
+  line-height: 1.25;
 }
 
-.leaflet-hex-label .lbl-orders {
-  font-size: 9px;
+.leaflet-hex-label .lbl-main-orders {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.leaflet-hex-label .lbl-unit {
+  font-size: 9.5px;
   font-weight: 500;
+  color: #475569;
+}
+
+.leaflet-hex-label .lbl-sub-metric {
+  font-size: 9px;
+  font-weight: 600;
   color: #64748b;
+  margin-top: 1px;
 }
 
 /* Badges */
