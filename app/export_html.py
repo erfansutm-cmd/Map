@@ -572,12 +572,18 @@ window.switchBase = function(btn, type) {
   setTile(type);
 };
 
-// Initial Render
+// Initial Render (Zoom in close to city center, avoiding wide big-picture bounds from outlier dropoffs)
 renderMap();
 if (items.length) {
-  map.fitBounds(L.latLngBounds(items.map(function(it) { return it.h.center; })));
+  var cLats = items.map(function(it) { return it.h.center[0]; });
+  var cLngs = items.map(function(it) { return it.h.center[1]; });
+  cLats.sort(function(a,b){return a-b;});
+  cLngs.sort(function(a,b){return a-b;});
+  var medLat = cLats[Math.floor(cLats.length/2)];
+  var medLng = cLngs[Math.floor(cLngs.length/2)];
+  map.setView([medLat, medLng], 13.5);
 } else {
-  map.setView([32.65, 51.67], 12);
+  map.setView([32.65, 51.67], 13.5);
 }
 
 map.on('zoomend', function() {

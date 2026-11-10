@@ -65,14 +65,14 @@ let labelLayerGroup;
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   setupEventListeners();
-  loadCityData('isfahan');
+  loadCityData('isfahan', true);
 });
 
 function initMap() {
   map = L.map('map', {
     zoomControl: false,
     preferCanvas: true
-  }).setView([32.6546, 51.6680], 12);
+  }).setView([32.6546, 51.6680], 13.5);
 
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
@@ -98,8 +98,9 @@ function setupEventListeners() {
     e.preventDefault();
     const city = document.getElementById('cityInput').value.trim();
     if (city) {
+      const isNewCity = !state.city || (city.toLowerCase() !== state.city.toLowerCase());
       state.selectedDates = [];
-      loadCityData(city);
+      loadCityData(city, isNewCity);
     }
   });
 
@@ -271,11 +272,11 @@ function setupEventListeners() {
     state.endDate = document.getElementById('inputEndDate').value || '2026-11-05';
     state.selectedDates = [];
     document.getElementById('filterModal').classList.remove('open');
-    loadCityData(state.city);
+    loadCityData(state.city, false);
   });
 
-  // Fit bounds button
-  document.getElementById('btnFitBounds').addEventListener('click', fitMapToBounds);
+  // Center Map button (Zooms in to city core, avoiding distant outlier big-picture view)
+  document.getElementById('btnFitBounds').addEventListener('click', () => centerAndZoomMap(true));
 
   // Export buttons
   document.getElementById('btnExportHtml').addEventListener('click', exportStandaloneHtml);
@@ -309,7 +310,7 @@ function setupEventListeners() {
         renderMapHexagons();
         renderBottlenecks(data.bottlenecks);
         renderDaysSelector([], [], []);
-        fitMapToBounds();
+        centerAndZoomMap(true);
         updateLegend();
         updateResolutionUI();
       } catch (err) {
@@ -323,7 +324,7 @@ function setupEventListeners() {
 }
 
 // Fetch city data from API with optional dates filter
-async function loadCityData(city) {
+async function loadCityData(city, isNewCity = false) {
   showLoading(true, `Analyzing ${city.toUpperCase()} Fleet HA${state.threshold}% SLA...`);
   state.city = city;
 
@@ -365,7 +366,12 @@ async function loadCityData(city) {
     renderDaysSelector(state.dailyStats, state.allDates, state.selectedDates);
     renderMapHexagons();
     renderBottlenecks(data.bottlenecks);
-    fitMapToBounds();
+
+    // Center and zoom map ONLY on new city load or initial search; NEVER zoom out on update!
+    if (isNewCity) {
+      centerAndZoomMap(false);
+    }
+
     updateLegend();
     updateResolutionUI();
   } catch (err) {
@@ -468,12 +474,12 @@ function toggleDaySelection(dateStr) {
     set.add(dateStr);
   }
   state.selectedDates = Array.from(set).sort();
-  loadCityData(state.city);
+  loadCityData(state.city, false);
 }
 
 function selectAllDays() {
   state.selectedDates = [...state.allDates];
-  loadCityData(state.city);
+  loadCityData(state.city, false);
 }
 
 function selectWeekdays() {
@@ -482,7 +488,7 @@ function selectWeekdays() {
     .map(d => d.date);
   if (weekdays.length > 0) {
     state.selectedDates = weekdays;
-    loadCityData(state.city);
+    loadCityData(state.city, false);
   }
 }
 
@@ -492,7 +498,7 @@ function selectWeekends() {
     .map(d => d.date);
   if (weekends.length > 0) {
     state.selectedDates = weekends;
-    loadCityData(state.city);
+    loadCityData(state.city, false);
   }
 }
 
@@ -504,7 +510,7 @@ function invertDays() {
     return;
   }
   state.selectedDates = inverted;
-  loadCityData(state.city);
+  loadCityData(state.city, false);
 }
 
 // Render Hexagons for current layer and resolution
@@ -888,13 +894,42 @@ function switchBasemap(type) {
   tileLayer.bringToBack();
 }
 
-// Fit Map to current hexagons bounds
-function fitMapToBounds() {
-  if (state.polygons.length > 0) {
-    const bounds = L.latLngBounds(state.polygons.map(p => p.h.center));
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+// Center Map on city core and zoom in (avoids zooming out to a giant picture from distant outlier dropoffs)
+function centerAndZoomMap(animate = true) {
+  let center = [32.6546, 51.6680];
+  if (state.data && state.data.city && state.data.city.lat && state.data.city.lng) {
+    center = [state.data.city.lat, state.data.city.lng];
   } else if (state.data && state.data.center) {
-    map.setView(state.data.center, 12);
+    center = state.data.center;
+  }
+
+  // Zoomed-in level to inspect hexagons clearly without a wide "big picture"
+  const targetZoom = 13.5;
+
+  if (state.polygons.length > 0) {
+    // Filter to core urban polygons within 10km of city center
+    const coreCenters = state.polygons
+      .map(p => p.h.center)
+      .filter(c => {
+        const dLat = (c[0] - center[0]) * 111.0;
+        const dLng = (c[1] - center[1]) * 111.0 * Math.cos(center[0] * Math.PI / 180.0);
+        return (dLat * dLat + dLng * dLng) <= 100.0;
+      });
+
+    if (coreCenters.length >= 3) {
+      const bounds = L.latLngBounds(coreCenters);
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14.2, animate: animate });
+      if (map.getZoom() < 13) {
+        map.setZoom(13.2, { animate: false });
+      }
+      return;
+    }
+  }
+
+  if (animate) {
+    map.flyTo(center, targetZoom, { duration: 0.8 });
+  } else {
+    map.setView(center, targetZoom);
   }
 }
 
