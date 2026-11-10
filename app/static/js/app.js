@@ -393,6 +393,50 @@ function setupEventListeners() {
     loadCityData(state.city, false);
   });
 
+  // Map Only Mode toggle handlers
+  let mapOnlyMode = false;
+  function setMapOnlyMode(enabled) {
+    mapOnlyMode = enabled;
+    document.body.classList.toggle('map-only-mode', mapOnlyMode);
+
+    const labelEl = document.getElementById('btnMapOnlyLabel');
+    if (labelEl) {
+      labelEl.textContent = mapOnlyMode ? 'Show Controls' : 'Map Only';
+    }
+
+    const btnHeader = document.getElementById('btnToggleMapOnly');
+    if (btnHeader) {
+      btnHeader.classList.toggle('active', mapOnlyMode);
+    }
+
+    if (map) {
+      setTimeout(() => map.invalidateSize(), 240);
+    }
+  }
+
+  const btnMapOnly = document.getElementById('btnToggleMapOnly');
+  if (btnMapOnly) {
+    btnMapOnly.addEventListener('click', () => setMapOnlyMode(!mapOnlyMode));
+  }
+
+  const btnExitMapOnly = document.getElementById('btnExitMapOnly');
+  if (btnExitMapOnly) {
+    btnExitMapOnly.addEventListener('click', () => setMapOnlyMode(false));
+  }
+
+  const btnHideFromPanel = document.getElementById('btnHideControlsFromPanel');
+  if (btnHideFromPanel) {
+    btnHideFromPanel.addEventListener('click', () => setMapOnlyMode(true));
+  }
+
+  // Keyboard shortcut: 'm' or 'M' toggles Map Only mode
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'm' || e.key === 'M') {
+      setMapOnlyMode(!mapOnlyMode);
+    }
+  });
+
   // Center Map button
   document.getElementById('btnFitBounds').addEventListener('click', () => centerAndZoomMap(true));
 
@@ -920,7 +964,7 @@ function updateKpis(kpis, city, dataSource) {
   document.getElementById('kpiP50Duration').textContent = `Med: ${kpis.p50_duration || 0} min`;
 }
 
-// Render Interactive Day Selector Strip
+// Render Interactive Day Selector Strip with 1-float precision HA30 for each date
 function renderDaysSelector(dailyStats, allDates, selectedDates) {
   const container = document.getElementById('daysPillsContainer');
   if (!container) return;
@@ -935,11 +979,14 @@ function renderDaysSelector(dailyStats, allDates, selectedDates) {
   container.innerHTML = dailyStats.map(d => {
     const isSelected = selectedSet.has(d.date);
     const breachColor = d.pct > 35 ? '#ef4444' : d.pct > 20 ? '#f59e0b' : '#10b981';
+    const haPrecise = `${d.pct.toFixed(1)}%`;
     return `
-      <div class="day-pill ${isSelected ? 'active' : ''}" data-date="${d.date}" title="${d.label}: ${d.orders} orders, ${d.pct}% breach, ${d.mean} min avg">
+      <div class="day-pill ${isSelected ? 'active' : ''}" data-date="${d.date}" title="${d.label}: ${d.orders} orders, HA${state.threshold}: ${haPrecise}, ${d.mean.toFixed(1)} min avg">
         <div class="day-pill-date">${d.label}</div>
         <div class="day-pill-meta">
-          <span>${d.orders} ord</span> &bull; <b style="color:${breachColor}">${d.pct.toFixed(0)}%</b>
+          <span class="day-pill-ha" style="color:${breachColor}">HA${state.threshold}: <b>${haPrecise}</b></span>
+          <span class="day-pill-sep">&bull;</span>
+          <span>${d.orders.toLocaleString()} ord</span>
         </div>
       </div>
     `;
