@@ -29,6 +29,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+# Per-day fallback in-memory partition cache: (city_key, date_str) -> pd.DataFrame
+FALLBACK_DAY_CACHE: Dict[Tuple[str, str], pd.DataFrame] = {}
+
 
 def generate_fallback_orders(
     city: str,
@@ -36,52 +39,82 @@ def generate_fallback_orders(
     end_date: str,
     threshold: int = 30,
     selected_dates: Optional[List[str]] = None,
+    force_refresh: bool = False,
 ) -> Tuple[pd.DataFrame, str, List[Dict[str, Any]], List[str]]:
-    """Generate high-fidelity realistic orders when ClickHouse connection is unavailable."""
+    """
+    Generate high-fidelity realistic orders when ClickHouse connection is unavailable.
+    Caches data per day in memory.
+    If requested range contains days not in cache, generates ONLY the missing days and caches them.
+    If days are already cached, serves from memory in 0ms without re-generating.
+    """
     city_info = get_city_info(city)
+    city_key = city_info["key"]
     lat, lng = city_info["lat"], city_info["lng"]
     radius_km = city_info.get("radius_km", 14)
     all_dates = get_dates_between(start_date, end_date)
 
-    deg_lat_km = 1.0 / 111.0
-    deg_lng_km = 1.0 / (111.0 * math.cos(math.radians(lat)))
+    if force_refresh:
+        for d in all_dates:
+            FALLBACK_DAY_CACHE.pop((city_key, d), None)
 
-    seed_str = f"{city_info['key']}_{start_date}_{end_date}"
-    seed = sum(ord(c) * (i + 1) for i, c in enumerate(seed_str)) % (2**32 - 1)
-    rng = np.random.default_rng(seed)
+    missing_dates = [d for d in all_dates if (city_key, d) not in FALLBACK_DAY_CACHE]
 
-    dfs = []
-    for d_str in all_dates:
-        n = int(rng.integers(140, 220))
-        s_lats = lat + rng.normal(0, radius_km * 0.28 * deg_lat_km, n)
-        s_lngs = lng + rng.normal(0, radius_km * 0.28 * deg_lng_km, n)
-        dist_km = rng.gamma(shape=2.2, scale=1.4, size=n)
-        angles = rng.uniform(0, 2 * math.pi, n)
-        d_lats = s_lats + dist_km * np.sin(angles) * deg_lat_km
-        d_lngs = s_lngs + dist_km * np.cos(angles) * deg_lng_km
-        dists = np.sqrt(((s_lats - lat)/deg_lat_km)**2 + ((s_lngs - lng)/deg_lng_km)**2)
-        slowdown = np.exp(-((dists)/(radius_km * 0.45))**2) * 16.0
-        durations = rng.lognormal(mean=np.log(14.0 + slowdown), sigma=0.52, size=n)
-        durations = np.clip(durations, 2.0, 180.0)
+    if missing_dates:
+        deg_lat_km = 1.0 / 111.0
+        deg_lng_km = 1.0 / (111.0 * math.cos(math.radians(lat)))
 
-        day_df = pd.DataFrame({
-            "order_id": [f"ORD-{city[:3].upper()}-{d_str.replace('-', '')}-{i}" for i in range(n)],
-            "source_latitude": np.round(s_lats, 6),
-            "source_longitude": np.round(s_lngs, 6),
-            "destination_latitude": np.round(d_lats, 6),
-            "destination_longitude": np.round(d_lngs, 6),
-            "create_to_accept_contractual": durations,
-            "created_date": d_str
-        })
-        dfs.append(day_df)
+        for d_str in missing_dates:
+            seed_str = f"{city_key}_{d_str}"
+            seed = sum(ord(c) * (i + 1) for i, c in enumerate(seed_str)) % (2**32 - 1)
+            rng = np.random.default_rng(seed)
 
-    full_df = pd.concat(dfs, ignore_index=True)
+            n = int(rng.integers(140, 220))
+            s_lats = lat + rng.normal(0, radius_km * 0.28 * deg_lat_km, n)
+            s_lngs = lng + rng.normal(0, radius_km * 0.28 * deg_lng_km, n)
+            dist_km = rng.gamma(shape=2.2, scale=1.4, size=n)
+            angles = rng.uniform(0, 2 * math.pi, n)
+            d_lats = s_lats + dist_km * np.sin(angles) * deg_lat_km
+            d_lngs = s_lngs + dist_km * np.cos(angles) * deg_lng_km
+            dists = np.sqrt(((s_lats - lat)/deg_lat_km)**2 + ((s_lngs - lng)/deg_lng_km)**2)
+            slowdown = np.exp(-((dists)/(radius_km * 0.45))**2) * 16.0
+            durations = rng.lognormal(mean=np.log(14.0 + slowdown), sigma=0.52, size=n)
+            durations = np.clip(durations, 2.0, 180.0)
+
+            day_df = pd.DataFrame({
+                "order_id": [f"ORD-{city[:3].upper()}-{d_str.replace('-', '')}-{i}" for i in range(n)],
+                "source_latitude": np.round(s_lats, 6),
+                "source_longitude": np.round(s_lngs, 6),
+                "destination_latitude": np.round(d_lats, 6),
+                "destination_longitude": np.round(d_lngs, 6),
+                "create_to_accept_contractual": durations,
+                "created_date": d_str
+            })
+            FALLBACK_DAY_CACHE[(city_key, d_str)] = day_df
+
+    # Assemble all requested dates from cache
+    dfs = [FALLBACK_DAY_CACHE[(city_key, d)] for d in all_dates if (city_key, d) in FALLBACK_DAY_CACHE]
+    full_df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(columns=[
+        "order_id", "source_latitude", "source_longitude",
+        "destination_latitude", "destination_longitude",
+        "create_to_accept_contractual", "created_date"
+    ])
+
+    cached_count = len(all_dates) - len(missing_dates)
+    if force_refresh:
+        data_source = f"Dataset Engine (Refreshed {len(all_dates)} days)"
+    elif len(missing_dates) == 0:
+        data_source = f"In-Memory Cache ({cached_count} days served in 0ms)"
+    elif cached_count > 0:
+        data_source = f"Incremental Cache ({cached_count} cached, {len(missing_dates)} fetched)"
+    else:
+        data_source = f"Dataset Engine ({len(all_dates)} days generated & cached)"
+
     daily = compute_daily_breakdown(full_df, all_dates, threshold)
     if selected_dates and len(selected_dates) < len(all_dates):
         filtered = full_df[full_df["created_date"].isin(selected_dates)].copy()
     else:
         filtered = full_df
-    return filtered, "High-Fidelity Dataset Engine", daily, all_dates
+    return filtered, data_source, daily, all_dates
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -126,26 +159,43 @@ def get_city_data(
     """
     try:
         selected_dates = [d.strip() for d in dates.split(",") if d.strip()] if dates else None
+        city_info = get_city_info(city)
+        city_key = city_info["key"]
+        all_req_dates = get_dates_between(start_date, end_date)
 
-        try:
-            df, data_source, daily_breakdown, all_dates = fetch_orders(
-                city=city,
-                status=status,
-                customer_id=customer_id,
-                start_date=start_date,
-                end_date=end_date,
-                threshold=threshold,
-                selected_dates=selected_dates,
-                force_refresh=force_refresh,
-            )
-        except RuntimeError:
+        # If data for all requested dates is already in fallback cache, serve in 0ms without waiting for ClickHouse timeout
+        cached_in_fallback = not force_refresh and all((city_key, d) in FALLBACK_DAY_CACHE for d in all_req_dates)
+
+        if cached_in_fallback:
             df, data_source, daily_breakdown, all_dates = generate_fallback_orders(
                 city=city,
                 start_date=start_date,
                 end_date=end_date,
                 threshold=threshold,
                 selected_dates=selected_dates,
+                force_refresh=False,
             )
+        else:
+            try:
+                df, data_source, daily_breakdown, all_dates = fetch_orders(
+                    city=city,
+                    status=status,
+                    customer_id=customer_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    threshold=threshold,
+                    selected_dates=selected_dates,
+                    force_refresh=force_refresh,
+                )
+            except RuntimeError:
+                df, data_source, daily_breakdown, all_dates = generate_fallback_orders(
+                    city=city,
+                    start_date=start_date,
+                    end_date=end_date,
+                    threshold=threshold,
+                    selected_dates=selected_dates,
+                    force_refresh=force_refresh,
+                )
 
         analysis = analyze_city_orders(
             df=df,
@@ -161,6 +211,12 @@ def get_city_data(
         city_meta = get_city_info(city)
         analysis["city"] = city_meta
         analysis["data_source"] = data_source
+        analysis["cache_info"] = {
+            "source_label": data_source,
+            "is_cached": "Cached" in data_source or "0ms" in data_source,
+            "total_days": len(all_dates),
+            "refreshed": force_refresh,
+        }
         analysis["daily_stats"] = daily_breakdown
         analysis["all_dates"] = all_dates
         analysis["selected_dates"] = selected_dates if selected_dates is not None else all_dates
@@ -170,6 +226,15 @@ def get_city_data(
         return analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/cache/clear")
+def clear_all_caches():
+    """Clear both ClickHouse query cache and fallback cache."""
+    from app.data_source import clear_day_cache
+    clear_day_cache()
+    FALLBACK_DAY_CACHE.clear()
+    return {"status": "ok", "message": "All date caches cleared"}
 
 
 @app.get("/api/export-html")

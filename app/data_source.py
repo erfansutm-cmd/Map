@@ -152,10 +152,16 @@ def fetch_orders(
     else:
         all_target_dates = all_range_dates
 
+    # If force refresh requested, invalidate cache for all target dates first
+    if force_refresh:
+        for d in all_target_dates:
+            DAY_CACHE.pop((clean_city, status, customer_id, d), None)
+            QUERIED_DATES.discard((clean_city, status, customer_id, d))
+
     # Identify which of the requested dates do not have data in cache
     missing_dates = [
         d for d in all_target_dates
-        if (clean_city, status, customer_id, d) not in QUERIED_DATES or force_refresh
+        if (clean_city, status, customer_id, d) not in QUERIED_DATES
     ]
 
     data_source_label = ""
@@ -254,7 +260,13 @@ LIMIT 1 BY order_id
                 ])
             QUERIED_DATES.add((clean_city, status, customer_id, d))
 
-        data_source_label = f"ClickHouse Live ({len(raw_df)} orders fetched for {len(missing_dates)} days)"
+        if force_refresh:
+            data_source_label = f"ClickHouse Live Refreshed ({len(raw_df)} orders fetched for {len(missing_dates)} days)"
+        elif len(missing_dates) < len(all_target_dates):
+            cached_count = len(all_target_dates) - len(missing_dates)
+            data_source_label = f"ClickHouse Live ({len(raw_df)} orders for {len(missing_dates)} missing days, {cached_count} from cache)"
+        else:
+            data_source_label = f"ClickHouse Live ({len(raw_df)} orders fetched for {len(missing_dates)} days)"
     else:
         data_source_label = f"Cached In-Memory ({len(all_target_dates)} days cached)"
 

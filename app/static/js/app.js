@@ -106,6 +106,7 @@ function probeVoyagerApiKey() {
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   setupEventListeners();
+  initCalendarUI();
   probeVoyagerApiKey();
   // Load default days at first in one query
   loadCityData('isfahan', true);
@@ -269,8 +270,16 @@ function setupEventListeners() {
       e.stopPropagation();
       popover.classList.toggle('open');
       if (popover.classList.contains('open')) {
-        document.getElementById('popoverStartDate').value = state.startDate;
-        document.getElementById('popoverEndDate').value = state.endDate;
+        calState.startDate = state.startDate;
+        calState.endDate = state.endDate;
+        calState.pickingState = 'none';
+        calState.hoverDate = null;
+        if (state.startDate) {
+          const parts = state.startDate.split('-');
+          calState.viewYear = parseInt(parts[0], 10);
+          calState.viewMonth = parseInt(parts[1], 10) - 1;
+        }
+        renderCalendarGrid();
       }
     });
 
@@ -306,10 +315,17 @@ function setupEventListeners() {
         const sDate = chip.dataset.start;
         const eDate = chip.dataset.end;
         if (sDate && eDate) {
-          document.getElementById('popoverStartDate').value = sDate;
-          document.getElementById('popoverEndDate').value = eDate;
-          applyNewDatePeriod(sDate, eDate);
-          popover.classList.remove('open');
+          calState.startDate = sDate;
+          calState.endDate = eDate;
+          calState.pickingState = 'none';
+          calState.hoverDate = null;
+          const parts = sDate.split('-');
+          calState.viewYear = parseInt(parts[0], 10);
+          calState.viewMonth = parseInt(parts[1], 10) - 1;
+          renderCalendarGrid();
+
+          document.querySelectorAll('.btn-preset-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
         }
       });
     });
@@ -318,23 +334,21 @@ function setupEventListeners() {
     if (btnApplyPeriod) {
       btnApplyPeriod.addEventListener('click', (e) => {
         e.stopPropagation();
-        const sDate = document.getElementById('popoverStartDate').value;
-        const eDate = document.getElementById('popoverEndDate').value;
+        const sDate = calState.startDate;
+        const eDate = calState.endDate;
         if (!sDate || !eDate) {
           alert("Please select both start date and end date.");
           return;
         }
-        if (sDate > eDate) {
-          alert("Start date must be before or equal to end date.");
-          return;
-        }
-        applyNewDatePeriod(sDate, eDate);
+        const minD = sDate < eDate ? sDate : eDate;
+        const maxD = sDate < eDate ? eDate : sDate;
+        applyNewDatePeriod(minD, maxD);
         popover.classList.remove('open');
       });
     }
   }
 
-  // Refresh button
+  // Refresh button (forces cache refresh)
   const btnRefresh = document.getElementById('btnRefreshData');
   if (btnRefresh) {
     btnRefresh.addEventListener('click', () => {
@@ -449,6 +463,301 @@ function updateCalendarTriggerLabel() {
   lbl.textContent = `${startFmt} – ${endFmt}, ${year}`;
 }
 
+// Interactive Visual Calendar & Cache State
+const calState = {
+  viewYear: 2026,
+  viewMonth: 9, // 0-indexed (9 = October)
+  startDate: '2026-10-22',
+  endDate: '2026-11-05',
+  pickingState: 'none', // 'none' or 'picking_end'
+  hoverDate: null
+};
+
+function initCalendarUI() {
+  calState.startDate = state.startDate;
+  calState.endDate = state.endDate;
+  if (state.startDate) {
+    const parts = state.startDate.split('-');
+    calState.viewYear = parseInt(parts[0], 10);
+    calState.viewMonth = parseInt(parts[1], 10) - 1;
+  }
+
+  const prevBtn = document.getElementById('calPrevMonth');
+  const nextBtn = document.getElementById('calNextMonth');
+  if (prevBtn) {
+    prevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calState.viewMonth--;
+      if (calState.viewMonth < 0) {
+        calState.viewMonth = 11;
+        calState.viewYear--;
+      }
+      renderCalendarGrid();
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calState.viewMonth++;
+      if (calState.viewMonth > 11) {
+        calState.viewMonth = 0;
+        calState.viewYear++;
+      }
+      renderCalendarGrid();
+    });
+  }
+
+  // Inputs change listeners
+  const startInput = document.getElementById('popoverStartDate');
+  const endInput = document.getElementById('popoverEndDate');
+  if (startInput) {
+    startInput.addEventListener('change', () => {
+      if (startInput.value) {
+        calState.startDate = startInput.value;
+        if (calState.endDate && calState.startDate > calState.endDate) {
+          calState.endDate = calState.startDate;
+          if (endInput) endInput.value = calState.endDate;
+        }
+        renderCalendarGrid();
+      }
+    });
+  }
+  if (endInput) {
+    endInput.addEventListener('change', () => {
+      if (endInput.value) {
+        calState.endDate = endInput.value;
+        if (calState.startDate && calState.endDate < calState.startDate) {
+          calState.startDate = calState.endDate;
+          if (startInput) startInput.value = calState.startDate;
+        }
+        renderCalendarGrid();
+      }
+    });
+  }
+
+  // Refresh cache button in calendar popover
+  const btnCalRefresh = document.getElementById('btnCalRefreshCache');
+  if (btnCalRefresh) {
+    btnCalRefresh.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popover = document.getElementById('calendarPopover');
+      if (popover) popover.classList.remove('open');
+      loadCityData(state.city, false, true);
+    });
+  }
+}
+
+function renderCalendarGrid() {
+  const container = document.getElementById('calDaysGrid');
+  const monthTitle = document.getElementById('calMonthTitle');
+  if (!container || !monthTitle) return;
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  monthTitle.textContent = `${monthNames[calState.viewMonth]} ${calState.viewYear}`;
+
+  container.innerHTML = '';
+
+  const y = calState.viewYear;
+  const m = calState.viewMonth;
+
+  // First day of month (0 = Sun, 1 = Mon ... 6 = Sat)
+  const firstDay = new Date(y, m, 1);
+  let startDayOfWeek = firstDay.getDay();
+  // Monday is 0, Sunday is 6
+  let firstCol = (startDayOfWeek + 6) % 7;
+
+  // Days in current and previous months
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prevMonthDays = new Date(y, m, 0).getDate();
+
+  // Trailing days from previous month
+  for (let i = firstCol - 1; i >= 0; i--) {
+    const dayNum = prevMonthDays - i;
+    const prevMonthIdx = m === 0 ? 11 : m - 1;
+    const prevYear = m === 0 ? y - 1 : y;
+    const dateStr = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const cell = createCalendarDayCell(dayNum, dateStr, true);
+    container.appendChild(cell);
+  }
+
+  // Days in current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const cell = createCalendarDayCell(d, dateStr, false);
+    container.appendChild(cell);
+  }
+
+  // Remaining slots to fill up grid row (multiples of 7)
+  const totalCells = firstCol + daysInMonth;
+  const nextMonthSlots = (7 - (totalCells % 7)) % 7;
+  for (let n = 1; n <= nextMonthSlots; n++) {
+    const nextMonthIdx = m === 11 ? 0 : m + 1;
+    const nextYear = m === 11 ? y + 1 : y;
+    const dateStr = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
+    const cell = createCalendarDayCell(n, dateStr, true);
+    container.appendChild(cell);
+  }
+
+  // Update inputs and summary
+  const startInput = document.getElementById('popoverStartDate');
+  const endInput = document.getElementById('popoverEndDate');
+  if (startInput) startInput.value = calState.startDate;
+  if (endInput) endInput.value = calState.endDate;
+
+  const countPill = document.getElementById('calSelectedDaysCount');
+  if (countPill) {
+    if (calState.startDate && calState.endDate) {
+      const dt1 = new Date(calState.startDate);
+      const dt2 = new Date(calState.endDate);
+      const diffDays = Math.round(Math.abs(dt2 - dt1) / (1000 * 60 * 60 * 24)) + 1;
+      countPill.textContent = `${diffDays} days`;
+    } else {
+      countPill.textContent = '1 day';
+    }
+  }
+
+  updateCalendarCacheStats();
+}
+
+function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
+  const cell = document.createElement('div');
+  cell.className = 'cal-day-cell';
+  cell.dataset.date = dateStr;
+
+  if (isOtherMonth) {
+    cell.classList.add('other-month');
+  }
+
+  cell.textContent = dayNum;
+
+  // Dot indicator if date is already in state.allDates (cached)
+  const isCached = state.allDates && state.allDates.includes(dateStr);
+  if (isCached) {
+    const dot = document.createElement('span');
+    dot.className = 'cal-day-cache-dot';
+    dot.title = 'Cached in memory';
+    cell.appendChild(dot);
+  }
+
+  // Selection states
+  const s = calState.startDate;
+  const e = (calState.pickingState === 'picking_end' && calState.hoverDate)
+    ? calState.hoverDate
+    : calState.endDate;
+
+  const minD = s < e ? s : e;
+  const maxD = s < e ? e : s;
+
+  if (dateStr === calState.startDate) {
+    cell.classList.add('range-start');
+  }
+  if (dateStr === calState.endDate && calState.pickingState !== 'picking_end') {
+    cell.classList.add('range-end');
+  }
+  if (minD && maxD && dateStr >= minD && dateStr <= maxD) {
+    cell.classList.add('in-range');
+  }
+
+  // Click handler
+  cell.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (calState.pickingState === 'none' || !calState.startDate) {
+      calState.startDate = dateStr;
+      calState.endDate = dateStr;
+      calState.pickingState = 'picking_end';
+    } else {
+      if (dateStr < calState.startDate) {
+        calState.endDate = calState.startDate;
+        calState.startDate = dateStr;
+      } else {
+        calState.endDate = dateStr;
+      }
+      calState.pickingState = 'none';
+      calState.hoverDate = null;
+    }
+    renderCalendarGrid();
+  });
+
+  // Hover handler for interactive range preview
+  cell.addEventListener('mouseenter', () => {
+    if (calState.pickingState === 'picking_end') {
+      calState.hoverDate = dateStr;
+      renderCalendarGrid();
+    }
+  });
+
+  return cell;
+}
+
+function updateCalendarCacheStats() {
+  const daysText = document.getElementById('calCacheDaysText');
+  const desc = document.getElementById('calCacheDesc');
+  if (!daysText) return;
+
+  if (!state.allDates || state.allDates.length === 0) {
+    daysText.textContent = 'No cached data';
+    return;
+  }
+
+  let selectedList = [];
+  if (calState.startDate && calState.endDate) {
+    const minD = calState.startDate < calState.endDate ? calState.startDate : calState.endDate;
+    const maxD = calState.startDate < calState.endDate ? calState.endDate : calState.startDate;
+    let curr = new Date(minD);
+    const end = new Date(maxD);
+    while (curr <= end) {
+      selectedList.push(curr.toISOString().split('T')[0]);
+      curr.setDate(curr.getDate() + 1);
+    }
+  }
+
+  const cachedCount = selectedList.filter(d => state.allDates.includes(d)).length;
+  const missingCount = selectedList.length - cachedCount;
+
+  if (missingCount === 0 && selectedList.length > 0) {
+    daysText.textContent = `⚡ All ${selectedList.length} days cached (0ms)`;
+    daysText.style.color = '#10b981';
+    if (desc) desc.textContent = 'Selected range is fully cached in memory.';
+  } else if (missingCount > 0) {
+    daysText.textContent = `⏳ ${cachedCount} cached, ${missingCount} missing`;
+    daysText.style.color = '#f59e0b';
+    if (desc) desc.textContent = `Only ${missingCount} missing days will be fetched from database.`;
+  } else {
+    daysText.textContent = `${state.allDates.length} days cached`;
+    daysText.style.color = '#38bdf8';
+  }
+}
+
+function updateCacheStatusUI(data) {
+  const pill = document.getElementById('cacheStatusPill');
+  const text = document.getElementById('cacheStatusText');
+  if (!pill || !text) return;
+
+  const src = data.data_source || '';
+  if (src.includes('Cached') || src.includes('0ms')) {
+    pill.className = 'cache-status-pill';
+    text.textContent = '⚡ Cached (0ms)';
+    pill.title = src;
+  } else if (src.includes('Incremental')) {
+    pill.className = 'cache-status-pill fetching';
+    text.textContent = '🔄 Incremental Hit';
+    pill.title = src;
+  } else if (src.includes('Refreshed')) {
+    pill.className = 'cache-status-pill fetching';
+    text.textContent = '🔄 Refreshed';
+    pill.title = src;
+  } else {
+    pill.className = 'cache-status-pill';
+    text.textContent = '⚡ In-Memory Cache';
+    pill.title = src;
+  }
+
+  updateCalendarCacheStats();
+}
+
 function applyNewDatePeriod(startDate, endDate) {
   state.startDate = startDate;
   state.endDate = endDate;
@@ -499,6 +808,7 @@ async function loadCityData(city, isNewCity = false, forceRefresh = false) {
 
     clearHexSelection();
     updateKpis(data.kpis, city, data.data_source);
+    updateCacheStatusUI(data);
     renderDaysSelector(state.dailyStats, state.allDates, state.selectedDates);
     renderMapHexagons();
     resizeFilterSliders();

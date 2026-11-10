@@ -123,47 +123,111 @@
         </svg>
       </button>
 
-      <!-- Calendar Period Popover -->
+      <!-- Advanced Visual Calendar Popover -->
       <div id="calendarPopover" class="calendar-popover">
         <div class="calendar-popover-header">
-          <span>Select Date Period</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span style="font-weight:700;font-size:12.5px">Date Period &amp; Cache Manager</span>
+          </div>
           <button id="btnCloseCalendarPopover" class="btn-popover-close" type="button">&times;</button>
         </div>
-        <div class="popover-presets-section">
-          <div class="popover-label">Quick Presets</div>
-          <div class="popover-presets-grid">
-            <button type="button" class="btn-preset-chip" data-start="2026-10-22" data-end="2026-11-05">Default 2 Weeks (Oct 22 - Nov 05)</button>
-            <button type="button" class="btn-preset-chip" data-start="2026-10-15" data-end="2026-10-21">Preceding 7 Days (Oct 15 - Oct 21)</button>
-            <button type="button" class="btn-preset-chip" data-start="2026-10-07" data-end="2026-11-05">Full 30 Days (Oct 07 - Nov 05)</button>
-            <button type="button" class="btn-preset-chip" data-start="2026-10-01" data-end="2026-10-31">October 2026 (Oct 01 - Oct 31)</button>
-            <button type="button" class="btn-preset-chip" data-start="2026-09-01" data-end="2026-09-30">September 2026 (Sep 01 - Sep 30)</button>
+
+        <div class="cal-popover-body">
+          <!-- Left Column: Quick Presets & Cache Summary -->
+          <div class="cal-sidebar">
+            <div class="popover-label">Quick Presets</div>
+            <div class="cal-presets-list">
+              <button type="button" class="btn-preset-chip" data-preset="default" data-start="2026-10-22" data-end="2026-11-05">Default 2 Weeks</button>
+              <button type="button" class="btn-preset-chip" data-preset="last7" data-start="2026-10-30" data-end="2026-11-05">Last 7 Days</button>
+              <button type="button" class="btn-preset-chip" data-preset="preceding7" data-start="2026-10-15" data-end="2026-10-21">Preceding 7 Days</button>
+              <button type="button" class="btn-preset-chip" data-preset="month30" data-start="2026-10-07" data-end="2026-11-05">Full 30 Days</button>
+              <button type="button" class="btn-preset-chip" data-preset="oct" data-start="2026-10-01" data-end="2026-10-31">October 2026</button>
+              <button type="button" class="btn-preset-chip" data-preset="sep" data-start="2026-09-01" data-end="2026-09-30">September 2026</button>
+            </div>
+
+            <div class="cal-cache-card">
+              <div class="cal-cache-card-title">
+                <span>⚡</span>
+                <span>Data Cache</span>
+              </div>
+              <div class="cal-cache-desc">
+                Only uncached days query the database.
+              </div>
+              <div class="cal-cache-stats">
+                <span id="calCacheDaysText">15 days cached in memory</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Interactive Month Grid -->
+          <div class="cal-main">
+            <div class="cal-nav-bar">
+              <button type="button" id="calPrevMonth" class="cal-nav-btn" title="Previous Month">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <div id="calMonthTitle" class="cal-month-title">October 2026</div>
+              <button type="button" id="calNextMonth" class="cal-nav-btn" title="Next Month">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+
+            <!-- Days of Week Header -->
+            <div class="cal-weekdays-row">
+              <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+            </div>
+
+            <!-- Interactive Day Grid Container -->
+            <div id="calDaysGrid" class="cal-days-grid">
+              <!-- Dynamically populated via JS -->
+            </div>
+
+            <!-- Manual Input and Summary Row -->
+            <div class="cal-range-inputs">
+              <div class="cal-input-group">
+                <label>Start</label>
+                <input type="date" id="popoverStartDate" class="bar-date-input" value="2026-10-22">
+              </div>
+              <div class="cal-range-arrow">&rarr;</div>
+              <div class="cal-input-group">
+                <label>End</label>
+                <input type="date" id="popoverEndDate" class="bar-date-input" value="2026-11-05">
+              </div>
+              <div class="cal-selection-summary">
+                <span id="calSelectedDaysCount" class="range-days-pill">15 days</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="popover-custom-range">
-          <div class="popover-label">Custom Period</div>
-          <div class="range-inputs-row">
-            <div>
-              <label class="range-sublabel">Start Date</label>
-              <input type="date" id="popoverStartDate" class="bar-date-input" value="2026-10-22">
-            </div>
-            <div>
-              <label class="range-sublabel">End Date</label>
-              <input type="date" id="popoverEndDate" class="bar-date-input" value="2026-11-05">
-            </div>
+
+        <div class="calendar-popover-footer">
+          <button type="button" id="btnCalRefreshCache" class="btn-cal-refresh" title="Force re-fetch / invalidate cache from database">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            Refresh Cache
+          </button>
+          <div class="cal-footer-right">
+            <button type="button" id="btnCancelCalendar" class="btn-day-preset">Cancel</button>
+            <button type="button" id="btnApplyCalendarPeriod" class="btn-primary" style="padding:4px 13px;font-size:11.5px">Apply Period</button>
           </div>
-        </div>
-        <div class="popover-footer">
-          <button type="button" id="btnCancelCalendar" class="btn-day-preset">Cancel</button>
-          <button type="button" id="btnApplyCalendarPeriod" class="btn-primary" style="padding:4px 12px;font-size:11px">Apply Period</button>
         </div>
       </div>
     </div>
 
     <!-- Refresh button -->
-    <button id="btnRefreshData" class="btn-day-preset" title="Refresh data from server">
+    <button id="btnRefreshData" class="btn-day-preset" title="Force refresh cache and re-fetch from database">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-      Refresh
+      Refresh Cache
     </button>
+
+    <div id="cacheStatusPill" class="cache-status-pill" title="Partition cache status">
+      <span class="cache-dot"></span>
+      <span id="cacheStatusText">Cached (0ms)</span>
+    </div>
 
     <div class="days-quick-actions">
       <button id="btnSelectAllDays" class="btn-day-preset" title="Select all active days">All</button>
