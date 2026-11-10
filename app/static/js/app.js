@@ -229,22 +229,25 @@ function setupEventListeners() {
     });
   }
 
-  const btnLblOnly = document.getElementById('btnLabelOrdersOnly');
   const btnLblHa = document.getElementById('btnLabelOrdersHa');
-  if (btnLblOnly && btnLblHa) {
-    btnLblOnly.addEventListener('click', () => {
-      state.cellLabelMode = 'orders_only';
-      btnLblOnly.classList.add('active');
-      btnLblHa.classList.remove('active');
-      renderLabels();
-    });
-    btnLblHa.addEventListener('click', () => {
-      state.cellLabelMode = 'orders_ha';
-      btnLblHa.classList.add('active');
-      btnLblOnly.classList.remove('active');
-      renderLabels();
-    });
+  const btnLblHaOnly = document.getElementById('btnLabelHaOnly');
+  const btnLblOnly = document.getElementById('btnLabelOrdersOnly');
+
+  function setCellLabelMode(mode) {
+    state.cellLabelMode = mode;
+    if (btnLblHa) btnLblHa.classList.toggle('active', mode === 'orders_ha');
+    if (btnLblHaOnly) btnLblHaOnly.classList.toggle('active', mode === 'ha_only');
+    if (btnLblOnly) btnLblOnly.classList.toggle('active', mode === 'orders_only');
+    if (!state.showLabels) {
+      state.showLabels = true;
+      if (checkLabels) checkLabels.checked = true;
+    }
+    renderLabels();
   }
+
+  if (btnLblHa) btnLblHa.addEventListener('click', () => setCellLabelMode('orders_ha'));
+  if (btnLblHaOnly) btnLblHaOnly.addEventListener('click', () => setCellLabelMode('ha_only'));
+  if (btnLblOnly) btnLblOnly.addEventListener('click', () => setCellLabelMode('orders_only'));
 
   // Multi-select mode checkbox
   const checkMulti = document.getElementById('checkMultiSelectMode');
@@ -965,6 +968,7 @@ function setColorMetric(metric) {
 }
 
 // Render labels on hexagons: dynamically sized and centered to fit inside each cell on every zoom & resolution
+// Displays HA percentage with 1 float precision (e.g. 14.2%) in each cell, along with order volume
 function renderLabels() {
   labelLayerGroup.clearLayers();
   if (!state.showLabels || !state.polygons || state.polygons.length === 0) return;
@@ -989,35 +993,35 @@ function renderLabels() {
   }
 
   // Compute dynamic font sizes and bounding box scaled to hexagon radius
-  let fontOrdersPx, fontSubPx, boxWPx, boxHPx;
+  let fontHaPx, fontSubPx, boxWPx, boxHPx;
 
   if (radiusPx < 11) {
-    // Zoomed out / fine resolution (14px - 22px diameter): micro compact, orders only
-    fontOrdersPx = 6.5;
+    // Zoomed out / fine resolution (14px - 22px diameter): micro compact HA float
+    fontHaPx = 6.5;
     fontSubPx = 5.5;
-    boxWPx = Math.max(16, Math.round(radiusPx * 1.6));
-    boxHPx = Math.max(10, Math.round(radiusPx * 1.2));
+    boxWPx = Math.max(22, Math.round(radiusPx * 1.8));
+    boxHPx = Math.max(12, Math.round(radiusPx * 1.2));
   } else if (radiusPx < 18) {
     // Small cells (22px - 36px diameter)
-    fontOrdersPx = 8;
+    fontHaPx = 8.5;
     fontSubPx = 6.5;
     boxWPx = Math.round(radiusPx * 1.5);
-    boxHPx = Math.round(radiusPx * 1.15);
+    boxHPx = Math.round(radiusPx * 1.2);
   } else if (radiusPx < 28) {
     // Medium cells (36px - 56px diameter)
-    fontOrdersPx = 9.5;
+    fontHaPx = 10;
     fontSubPx = 7.5;
     boxWPx = Math.round(radiusPx * 1.4);
-    boxHPx = Math.round(radiusPx * 1.05);
+    boxHPx = Math.round(radiusPx * 1.1);
   } else if (radiusPx < 45) {
     // Large cells (56px - 90px diameter)
-    fontOrdersPx = 11;
+    fontHaPx = 11.5;
     fontSubPx = 8.5;
     boxWPx = Math.round(radiusPx * 1.3);
     boxHPx = Math.round(radiusPx * 1.0);
   } else {
     // Extra large cells (> 90px diameter)
-    fontOrdersPx = Math.min(14, Math.round(radiusPx * 0.26));
+    fontHaPx = Math.min(14, Math.round(radiusPx * 0.26));
     fontSubPx = Math.min(10.5, Math.round(radiusPx * 0.19));
     boxWPx = Math.round(radiusPx * 1.2);
     boxHPx = Math.round(radiusPx * 0.9);
@@ -1032,16 +1036,20 @@ function renderLabels() {
     // Only render label if cell passes active breach and orders filters
     if (h.pct < state.minBreachFilter || h.orders < state.minOrdersFilter) return;
 
+    // HA percentage formatted with exact 1-decimal-place float precision (e.g. 14.2%)
+    const haPrecise = `${h.pct.toFixed(1)}%`;
     let htmlContent;
-    if (state.cellLabelMode === 'orders_only' || radiusPx < 11) {
-      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontOrdersPx}px">${h.orders.toLocaleString()}</span>`;
+
+    if (state.cellLabelMode === 'orders_only') {
+      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.orders.toLocaleString()}</span>`;
+    } else if (state.cellLabelMode === 'ha_only' || radiusPx < 11) {
+      // Prominent HA% with 1 decimal precision in each cell
+      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${haPrecise}</span>`;
     } else {
-      const metricText = state.colorMetric === 'ha'
-        ? `${h.pct.toFixed(0)}%`
-        : `${h.mean.toFixed(1)}m`;
+      // Default: HA% with 1-float precision prominent, plus orders volume underneath
       htmlContent = `
-        <span class="lbl-main-orders" style="font-size:${fontOrdersPx}px">${h.orders.toLocaleString()}</span>
-        <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${metricText}</span>
+        <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${haPrecise}</span>
+        <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.orders.toLocaleString()} ord</span>
       `;
     }
 

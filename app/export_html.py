@@ -370,8 +370,8 @@ function closeInspector() {
 }
 
 function labelHtml(h) {
-  var v = colorMetric === 'ha' ? ('HA' + THRESHOLD + '%: ' + h.pct.toFixed(0) + '%') : (h.mean.toFixed(1) + ' min');
-  return '<div style="font-weight:800;font-size:11px;color:#0f172a">' + h.orders + ' orders</div><div style="font-size:9.5px;color:#64748b;font-weight:600">' + v + '</div>';
+  var haText = h.pct.toFixed(1) + '%';
+  return '<div style="font-weight:800;font-size:11px;color:#0f172a">' + haText + '</div><div style="font-size:9.5px;color:#475569;font-weight:600">' + h.orders + ' ord</div>';
 }
 
 function updateLabels() {
@@ -389,15 +389,15 @@ function updateLabels() {
 
   if (radiusPx < 7) return;
 
-  var fOrd = radiusPx < 11 ? 6.5 : (radiusPx < 18 ? 8 : (radiusPx < 28 ? 9.5 : (radiusPx < 45 ? 11 : 13)));
+  var fHa = radiusPx < 11 ? 6.5 : (radiusPx < 18 ? 8.5 : (radiusPx < 28 ? 10 : (radiusPx < 45 ? 11.5 : 13)));
   var fSub = radiusPx < 11 ? 5.5 : (radiusPx < 18 ? 6.5 : (radiusPx < 28 ? 7.5 : (radiusPx < 45 ? 8.5 : 10)));
-  var boxW = radiusPx < 11 ? Math.max(16, Math.round(radiusPx * 1.6)) : Math.round(radiusPx * 1.4);
-  var boxH = radiusPx < 11 ? Math.max(10, Math.round(radiusPx * 1.2)) : Math.round(radiusPx * 1.05);
+  var boxW = radiusPx < 11 ? Math.max(22, Math.round(radiusPx * 1.8)) : Math.round(radiusPx * 1.5);
+  var boxH = radiusPx < 11 ? Math.max(12, Math.round(radiusPx * 1.2)) : Math.round(radiusPx * 1.2);
 
   items.forEach(function(it) {
-    var v = colorMetric === 'ha' ? (it.h.pct.toFixed(0) + '%') : (it.h.mean.toFixed(1) + 'm');
-    var html = '<div class="lbl-ord" style="font-size:' + fOrd + 'px">' + it.h.orders + '</div>' +
-               (radiusPx >= 11 ? ('<div class="lbl-ha" style="font-size:' + fSub + 'px">' + v + '</div>') : '');
+    var haText = it.h.pct.toFixed(1) + '%';
+    var html = '<div class="lbl-ha" style="font-size:' + fHa + 'px">' + haText + '</div>' +
+               (radiusPx >= 11 ? ('<div class="lbl-ord" style="font-size:' + fSub + 'px">' + it.h.orders + ' ord</div>') : '');
     var icon = L.divIcon({
       className: 'lbl',
       html: html,
