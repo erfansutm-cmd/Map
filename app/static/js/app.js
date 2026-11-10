@@ -1,7 +1,8 @@
 /**
  * Map Analytics & HA30 Hexagonal Fleet Performance Engine Frontend
- * Supports day-level filtering, Shift+click multi-cell merged analytics,
- * and dynamic toggling between HA30% and Mean Duration color metrics.
+ * Supports single-query batch loading with circle spinner,
+ * dynamic filter scaling, transparent compact cell labels,
+ * and calendar period selection.
  */
 
 // Application State
@@ -23,6 +24,7 @@ const state = {
   colorMetric: 'ha',          // 'ha' (HA30% breach) or 'mean' (Mean duration)
   activeBasemap: 'voyager',
   minBreachFilter: 0,
+  minOrdersFilter: 0,
   selectedDates: [],          // Active YYYY-MM-DD date strings
   allDates: [],               // Full range of dates
   dailyStats: [],             // Daily breakdown stats
@@ -32,28 +34,30 @@ const state = {
   singleSelectedHex: null,    // Single selected cell
 };
 
-// Basemap Tile Providers (Tested & Reliable - using Carto API Key from previous file)
+// Basemap Tile Providers with reliable subdomains & fallback
 const mapApiKey = window.MAP_API_KEY || 'cb1_5558_1_345367a66619045ea57fcdba';
 const BASEMAP_PROVIDERS = {
   voyager: {
-    url: window.CARTO_TILE_URL || `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${mapApiKey}`,
-    options: { maxZoom: 20, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
-  },
-  positron: {
-    url: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    options: { maxZoom: 20, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
-  },
-  dark: {
-    url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    options: { maxZoom: 20, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }
-  },
-  osm: {
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    options: { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    options: {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }
   },
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    options: { maxZoom: 19, attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye' }
+    options: {
+      maxZoom: 19,
+      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye'
+    }
+  },
+  osm: {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }
   }
 };
 
@@ -66,6 +70,7 @@ let labelLayerGroup;
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   setupEventListeners();
+  // Load default days at first in one query
   loadCityData('isfahan', true);
 });
 
@@ -78,6 +83,17 @@ function initMap() {
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
   tileLayer = L.tileLayer(BASEMAP_PROVIDERS.voyager.url, BASEMAP_PROVIDERS.voyager.options).addTo(map);
+
+  // Fallback to OSM if Carto tiles fail
+  tileLayer.on('tileerror', () => {
+    if (state.activeBasemap === 'voyager' && !tileLayer._fallbackUsed) {
+      tileLayer._fallbackUsed = true;
+      map.removeLayer(tileLayer);
+      tileLayer = L.tileLayer(BASEMAP_PROVIDERS.osm.url, BASEMAP_PROVIDERS.osm.options).addTo(map);
+      tileLayer.bringToBack();
+    }
+  });
+
   hexLayerGroup = L.layerGroup().addTo(map);
   labelLayerGroup = L.layerGroup().addTo(map);
 
@@ -91,10 +107,14 @@ function initMap() {
     }
     updateLabelsVisibility();
   });
+
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 200);
 }
 
 function setupEventListeners() {
-  // Search submit
+  // City search submit
   document.getElementById('searchForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const city = document.getElementById('cityInput').value.trim();
@@ -122,28 +142,44 @@ function setupEventListeners() {
     state.autoRes = e.target.checked;
     if (state.autoRes) {
       const zoom = map.getZoom();
-      setResolution(Math.min(10, Math.max(6, Math.round(zoom - 5))));
+      let targetRes = Math.min(10, Math.max(6, Math.round(zoom - 5)));
+      setResolution(targetRes);
     }
   });
 
-  // Opacity slider
-  document.getElementById('sliderOpacity').addEventListener('input', (e) => {
-    state.opacity = parseFloat(e.target.value);
-    document.getElementById('valOpacity').textContent = `${Math.round(state.opacity * 100)}%`;
-    state.polygons.forEach(item => {
-      const isSelected = state.selectedHexes.has(item.h.hex);
-      if (!isSelected) {
-        item.polygon.setStyle({ fillOpacity: state.opacity });
-      }
+  // Basemap buttons
+  document.querySelectorAll('.basemap-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      switchBasemap(e.target.dataset.basemap);
     });
   });
 
-  // SLA breach filter slider
-  document.getElementById('sliderBreachFilter').addEventListener('input', (e) => {
-    state.minBreachFilter = parseFloat(e.target.value);
-    document.getElementById('valBreachFilter').textContent = `${state.minBreachFilter}%`;
+  // Hexagon Opacity slider
+  document.getElementById('sliderOpacity').addEventListener('input', (e) => {
+    state.opacity = parseFloat(e.target.value);
+    document.getElementById('valOpacity').textContent = `${Math.round(state.opacity * 100)}%`;
     filterHexagons();
   });
+
+  // Dynamic SLA breach filter slider
+  const sliderBreach = document.getElementById('sliderBreachFilter');
+  if (sliderBreach) {
+    sliderBreach.addEventListener('input', (e) => {
+      state.minBreachFilter = parseFloat(e.target.value) || 0;
+      updateFilterLabels();
+      filterHexagons();
+    });
+  }
+
+  // Dynamic Min Orders filter slider
+  const sliderOrders = document.getElementById('sliderOrdersFilter');
+  if (sliderOrders) {
+    sliderOrders.addEventListener('input', (e) => {
+      state.minOrdersFilter = parseInt(e.target.value, 10) || 0;
+      updateFilterLabels();
+      filterHexagons();
+    });
+  }
 
   // Show labels checkbox and mode toggles
   const checkLabels = document.getElementById('checkShowLabels');
@@ -155,124 +191,107 @@ function setupEventListeners() {
     });
   }
 
-  const btnLblOrdersOnly = document.getElementById('btnLabelOrdersOnly');
-  const btnLblOrdersHa = document.getElementById('btnLabelOrdersHa');
-  if (btnLblOrdersOnly && btnLblOrdersHa) {
-    btnLblOrdersOnly.addEventListener('click', () => {
+  const btnLblOnly = document.getElementById('btnLabelOrdersOnly');
+  const btnLblHa = document.getElementById('btnLabelOrdersHa');
+  if (btnLblOnly && btnLblHa) {
+    btnLblOnly.addEventListener('click', () => {
       state.cellLabelMode = 'orders_only';
-      btnLblOrdersOnly.classList.add('active');
-      btnLblOrdersHa.classList.remove('active');
-      if (!state.showLabels) {
-        state.showLabels = true;
-        if (checkLabels) checkLabels.checked = true;
-      }
+      btnLblOnly.classList.add('active');
+      btnLblHa.classList.remove('active');
       renderLabels();
     });
-    btnLblOrdersHa.addEventListener('click', () => {
+    btnLblHa.addEventListener('click', () => {
       state.cellLabelMode = 'orders_ha';
-      btnLblOrdersHa.classList.add('active');
-      btnLblOrdersOnly.classList.remove('active');
-      if (!state.showLabels) {
-        state.showLabels = true;
-        if (checkLabels) checkLabels.checked = true;
-      }
+      btnLblHa.classList.add('active');
+      btnLblOnly.classList.remove('active');
       renderLabels();
     });
   }
 
   // Multi-select mode checkbox
-  document.getElementById('checkMultiSelectMode').addEventListener('change', (e) => {
-    state.multiSelectMode = e.target.checked;
-  });
-
-  // Basemap buttons
-  document.querySelectorAll('.basemap-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const provider = e.currentTarget.dataset.basemap;
-      switchBasemap(provider);
+  const checkMulti = document.getElementById('checkMultiSelectMode');
+  if (checkMulti) {
+    checkMulti.addEventListener('change', (e) => {
+      state.multiSelectMode = e.target.checked;
     });
-  });
+  }
 
-  // Day preset buttons
+  // Calendar / Period Trigger & Popover
+  const btnTrigger = document.getElementById('btnCalendarTrigger');
+  const popover = document.getElementById('calendarPopover');
+  const btnClosePopover = document.getElementById('btnCloseCalendarPopover');
+  const btnCancelPopover = document.getElementById('btnCancelCalendar');
+  const btnApplyPeriod = document.getElementById('btnApplyCalendarPeriod');
+
+  if (btnTrigger && popover) {
+    btnTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      popover.classList.toggle('open');
+      if (popover.classList.contains('open')) {
+        document.getElementById('popoverStartDate').value = state.startDate;
+        document.getElementById('popoverEndDate').value = state.endDate;
+      }
+    });
+
+    if (btnClosePopover) {
+      btnClosePopover.addEventListener('click', () => popover.classList.remove('open'));
+    }
+    if (btnCancelPopover) {
+      btnCancelPopover.addEventListener('click', () => popover.classList.remove('open'));
+    }
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!popover.contains(e.target) && !btnTrigger.contains(e.target)) {
+        popover.classList.remove('open');
+      }
+    });
+
+    // Preset chips in popover
+    document.querySelectorAll('.btn-preset-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const sDate = chip.dataset.start;
+        const eDate = chip.dataset.end;
+        if (sDate && eDate) {
+          document.getElementById('popoverStartDate').value = sDate;
+          document.getElementById('popoverEndDate').value = eDate;
+          applyNewDatePeriod(sDate, eDate);
+          popover.classList.remove('open');
+        }
+      });
+    });
+
+    // Apply button in popover
+    if (btnApplyPeriod) {
+      btnApplyPeriod.addEventListener('click', () => {
+        const sDate = document.getElementById('popoverStartDate').value;
+        const eDate = document.getElementById('popoverEndDate').value;
+        if (!sDate || !eDate) {
+          alert("Please select both start date and end date.");
+          return;
+        }
+        if (sDate > eDate) {
+          alert("Start date must be before or equal to end date.");
+          return;
+        }
+        applyNewDatePeriod(sDate, eDate);
+        popover.classList.remove('open');
+      });
+    }
+  }
+
+  // Refresh button
+  const btnRefresh = document.getElementById('btnRefreshData');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => {
+      loadCityData(state.city, false, true);
+    });
+  }
+
+  // Quick Day Actions
   document.getElementById('btnSelectAllDays').addEventListener('click', selectAllDays);
   document.getElementById('btnSelectWeekdays').addEventListener('click', selectWeekdays);
   document.getElementById('btnSelectWeekends').addEventListener('click', selectWeekends);
-  document.getElementById('btnInvertDays').addEventListener('click', invertDays);
-
-  // Date Range Fetch & Custom Days (Allows selecting days outside last 2 weeks from DB)
-  const btnFetchRange = document.getElementById('btnFetchDateRange');
-  if (btnFetchRange) {
-    btnFetchRange.addEventListener('click', () => {
-      const sDate = document.getElementById('barStartDate').value;
-      const eDate = document.getElementById('barEndDate').value;
-      if (!sDate || !eDate) {
-        alert("Please specify both Start Date and End Date.");
-        return;
-      }
-      if (sDate > eDate) {
-        alert("Start Date must be before or equal to End Date.");
-        return;
-      }
-      state.startDate = sDate;
-      state.endDate = eDate;
-      state.selectedDates = null;
-      loadCityData(state.city);
-    });
-  }
-
-  // Quick Date Window Presets
-  const selectPreset = document.getElementById('selectDatePreset');
-  if (selectPreset) {
-    selectPreset.addEventListener('change', (e) => {
-      const val = e.target.value;
-      if (!val) return;
-      if (val === 'last14') {
-        state.startDate = '2026-10-22';
-        state.endDate = '2026-11-05';
-      } else if (val === 'last7') {
-        state.startDate = '2026-10-15';
-        state.endDate = '2026-10-21';
-      } else if (val === 'last30') {
-        state.startDate = '2026-10-07';
-        state.endDate = '2026-11-05';
-      } else if (val === 'monthSep') {
-        state.startDate = '2026-09-01';
-        state.endDate = '2026-09-30';
-      } else if (val === 'monthOct') {
-        state.startDate = '2026-10-01';
-        state.endDate = '2026-10-31';
-      }
-      const barStart = document.getElementById('barStartDate');
-      const barEnd = document.getElementById('barEndDate');
-      if (barStart) barStart.value = state.startDate;
-      if (barEnd) barEnd.value = state.endDate;
-      state.selectedDates = null;
-      loadCityData(state.city);
-    });
-  }
-
-  // Add Specific Custom Day from DB
-  const btnAddDay = document.getElementById('btnAddSpecificDate');
-  if (btnAddDay) {
-    btnAddDay.addEventListener('click', () => {
-      const newDate = document.getElementById('inputAddSpecificDate').value;
-      if (!newDate) {
-        alert("Please choose a date to add from DB.");
-        return;
-      }
-      const set = new Set(state.selectedDates || state.allDates || []);
-      set.add(newDate);
-      state.selectedDates = Array.from(set).sort();
-
-      if (!state.startDate || newDate < state.startDate) {
-        state.startDate = newDate;
-      }
-      if (!state.endDate || newDate > state.endDate) {
-        state.endDate = newDate;
-      }
-      loadCityData(state.city);
-    });
-  }
 
   // Inspector & Merged panel close buttons
   document.getElementById('btnCloseInspector').addEventListener('click', closeSingleInspector);
@@ -302,15 +321,15 @@ function setupEventListeners() {
     state.endDate = document.getElementById('inputEndDate').value || '2026-11-05';
     state.selectedDates = [];
     document.getElementById('filterModal').classList.remove('open');
+    updateCalendarTriggerLabel();
     loadCityData(state.city, false);
   });
 
-  // Center Map button (Zooms in to city core, avoiding distant outlier big-picture view)
+  // Center Map button
   document.getElementById('btnFitBounds').addEventListener('click', () => centerAndZoomMap(true));
 
   // Export buttons
   document.getElementById('btnExportHtml').addEventListener('click', exportStandaloneHtml);
-  document.getElementById('btnExportCsv').addEventListener('click', exportCsvData);
 
   // CSV file upload handler
   const btnUpload = document.getElementById('btnOpenUpload');
@@ -320,41 +339,72 @@ function setupEventListeners() {
     fileInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      showLoading(true, `Uploading and analyzing ${file.name}...`);
+
       const formData = new FormData();
       formData.append('file', file);
+
+      showLoading(true, `Uploading & analyzing ${file.name}...`);
       try {
         const res = await fetch(`/api/upload-csv?threshold=${state.threshold}&min_orders=${state.minOrders}`, {
           method: 'POST',
           body: formData
         });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Upload failed with status ${res.status}`);
-        }
+        if (!res.ok) throw new Error('Upload failed');
         const data = await res.json();
         state.data = data;
-        state.city = data.city.name || 'Custom CSV';
+        state.city = 'Uploaded CSV';
+        state.allDates = [];
+        state.selectedDates = [];
+        state.dailyStats = [];
+
         clearHexSelection();
-        updateKpis(data.kpis, state.city, data.data_source);
-        renderMapHexagons();
-        renderBottlenecks(data.bottlenecks);
+        updateKpis(data.kpis, 'Uploaded CSV', data.data_source);
         renderDaysSelector([], [], []);
+        renderMapHexagons();
+        resizeFilterSliders();
+        renderBottlenecks(data.bottlenecks);
         centerAndZoomMap(true);
         updateLegend();
         updateResolutionUI();
       } catch (err) {
-        alert(`Error parsing CSV: ${err.message}`);
+        alert('Could not parse CSV: ' + err.message);
       } finally {
-        fileInput.value = '';
         showLoading(false);
       }
     });
   }
 }
 
+// Format date nicely: YYYY-MM-DD -> "Oct 22, 2026"
+function formatDateReadable(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const monthName = monthNames[monthIdx] || parts[1];
+  return `${monthName} ${parseInt(parts[2], 10)}`;
+}
+
+function updateCalendarTriggerLabel() {
+  const lbl = document.getElementById('calendarTriggerLabel');
+  if (!lbl) return;
+  const startFmt = formatDateReadable(state.startDate);
+  const endFmt = formatDateReadable(state.endDate);
+  const year = (state.endDate || state.startDate || '').split('-')[0] || '2026';
+  lbl.textContent = `${startFmt} – ${endFmt}, ${year}`;
+}
+
+function applyNewDatePeriod(startDate, endDate) {
+  state.startDate = startDate;
+  state.endDate = endDate;
+  state.selectedDates = null; // Reset to select all dates in new period
+  updateCalendarTriggerLabel();
+  loadCityData(state.city, false);
+}
+
 // Fetch city data from API with optional dates filter
-async function loadCityData(city, isNewCity = false) {
+async function loadCityData(city, isNewCity = false, forceRefresh = false) {
   showLoading(true, `Analyzing ${city.toUpperCase()} Fleet HA${state.threshold}% SLA...`);
   state.city = city;
 
@@ -367,6 +417,10 @@ async function loadCityData(city, isNewCity = false) {
       start_date: state.startDate,
       end_date: state.endDate,
     });
+
+    if (forceRefresh) {
+      params.append('force_refresh', 'true');
+    }
 
     if (state.selectedDates && state.selectedDates.length > 0) {
       params.append('dates', state.selectedDates.join(','));
@@ -382,10 +436,8 @@ async function loadCityData(city, isNewCity = false) {
     state.selectedDates = data.selected_dates || data.all_dates || [];
     state.dailyStats = data.daily_stats || [];
 
-    const barStart = document.getElementById('barStartDate');
-    const barEnd = document.getElementById('barEndDate');
-    if (barStart) barStart.value = state.startDate;
-    if (barEnd) barEnd.value = state.endDate;
+    updateCalendarTriggerLabel();
+
     const modalStart = document.getElementById('inputStartDate');
     const modalEnd = document.getElementById('inputEndDate');
     if (modalStart) modalStart.value = state.startDate;
@@ -395,9 +447,9 @@ async function loadCityData(city, isNewCity = false) {
     updateKpis(data.kpis, city, data.data_source);
     renderDaysSelector(state.dailyStats, state.allDates, state.selectedDates);
     renderMapHexagons();
+    resizeFilterSliders();
     renderBottlenecks(data.bottlenecks);
 
-    // Center and zoom map ONLY on new city load or initial search; NEVER zoom out on update!
     if (isNewCity) {
       centerAndZoomMap(false);
     }
@@ -409,6 +461,65 @@ async function loadCityData(city, isNewCity = false) {
     alert(`Could not load data for "${city}": ${err.message}`);
   } finally {
     showLoading(false);
+  }
+}
+
+// Dynamically rescale Min SLA Breach and Min Orders filter sliders to the max in active data
+function resizeFilterSliders() {
+  if (!state.data) return;
+  const layerData = state.data.layers?.[state.currentLayer]?.res?.[state.currentRes];
+  const hexes = layerData?.hexes || [];
+
+  let maxSla = 0;
+  let maxOrders = 0;
+  hexes.forEach(h => {
+    if (h.pct > maxSla) maxSla = h.pct;
+    if (h.orders > maxOrders) maxOrders = h.orders;
+  });
+
+  // Scale Min SLA Breach Filter slider
+  const breachSlider = document.getElementById('sliderBreachFilter');
+  if (breachSlider) {
+    const ceilSla = Math.ceil(maxSla);
+    const sliderMax = Math.max(ceilSla, 10);
+    breachSlider.max = sliderMax;
+    breachSlider.step = sliderMax > 25 ? 1 : 0.5;
+    if (state.minBreachFilter > sliderMax) {
+      state.minBreachFilter = 0;
+    }
+    breachSlider.value = state.minBreachFilter;
+    breachSlider.dataset.dataMax = ceilSla;
+  }
+
+  // Scale Min Orders in Cell slider
+  const ordersSlider = document.getElementById('sliderOrdersFilter');
+  if (ordersSlider) {
+    const sliderMax = Math.max(maxOrders, 10);
+    ordersSlider.max = sliderMax;
+    ordersSlider.step = 1;
+    if (state.minOrdersFilter > sliderMax) {
+      state.minOrdersFilter = 0;
+    }
+    ordersSlider.value = state.minOrdersFilter;
+    ordersSlider.dataset.dataMax = maxOrders;
+  }
+
+  updateFilterLabels();
+}
+
+function updateFilterLabels() {
+  const breachSlider = document.getElementById('sliderBreachFilter');
+  const breachVal = document.getElementById('valBreachFilter');
+  if (breachSlider && breachVal) {
+    const maxVal = breachSlider.dataset.dataMax || breachSlider.max;
+    breachVal.textContent = `${state.minBreachFilter}% (max: ${maxVal}%)`;
+  }
+
+  const ordersSlider = document.getElementById('sliderOrdersFilter');
+  const ordersVal = document.getElementById('valOrdersFilter');
+  if (ordersSlider && ordersVal) {
+    const maxVal = ordersSlider.dataset.dataMax || ordersSlider.max;
+    ordersVal.textContent = `${state.minOrdersFilter} (max: ${maxVal})`;
   }
 }
 
@@ -449,13 +560,6 @@ function updateKpis(kpis, city, dataSource) {
   document.getElementById('kpiMeanDuration').textContent = `${kpis.overall_mean_duration.toFixed(1)} min`;
   document.getElementById('kpiP90Duration').textContent = `P90: ${kpis.p90_duration || 0} min`;
   document.getElementById('kpiP50Duration').textContent = `Med: ${kpis.p50_duration || 0} min`;
-
-  // DataSource Badge
-  const sourceBadge = document.getElementById('dataSourceBadge');
-  if (sourceBadge) {
-    sourceBadge.textContent = dataSource.includes('ClickHouse') ? 'ClickHouse Live' : (dataSource.includes('Cached') ? 'Cached Query' : 'High-Fidelity Engine');
-    sourceBadge.title = dataSource;
-  }
 }
 
 // Render Interactive Day Selector Strip
@@ -464,7 +568,7 @@ function renderDaysSelector(dailyStats, allDates, selectedDates) {
   if (!container) return;
 
   if (!dailyStats || dailyStats.length === 0) {
-    container.innerHTML = '<span style="font-size:11px;color:#64748b;padding:4px">No day breakdown for uploaded data</span>';
+    container.innerHTML = '<span style="font-size:11px;color:#64748b;padding:4px">No day breakdown for active data</span>';
     return;
   }
 
@@ -532,18 +636,7 @@ function selectWeekends() {
   }
 }
 
-function invertDays() {
-  const currentSet = new Set(state.selectedDates);
-  const inverted = state.allDates.filter(d => !currentSet.has(d));
-  if (inverted.length === 0) {
-    alert("Inverting would select 0 days.");
-    return;
-  }
-  state.selectedDates = inverted;
-  loadCityData(state.city, false);
-}
-
-// Render Hexagons for current layer and resolution
+// Render Hexagon Polygons on Map
 function renderMapHexagons() {
   if (!state.data) return;
 
@@ -555,16 +648,18 @@ function renderMapHexagons() {
   if (!layerData || !layerData.hexes) return;
 
   layerData.hexes.forEach(h => {
-    const isVisible = h.pct >= state.minBreachFilter;
+    const isVisible = (h.pct >= state.minBreachFilter) && (h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(h.hex);
     const fillColor = state.colorMetric === 'ha' ? h.color_ha : h.color_mean;
 
     const polygon = L.polygon(h.ring, {
       color: isSelected ? '#06b6d4' : '#ffffff',
-      weight: isSelected ? 3.5 : 1.2,
+      weight: isVisible ? (isSelected ? 3.5 : 1.2) : 0,
       fillColor: fillColor,
-      fillOpacity: isVisible ? state.opacity : 0.05,
-      className: `h3-hex ${h.status}`
+      fillOpacity: isVisible ? state.opacity : 0,
+      opacity: isVisible ? 1 : 0,
+      className: `h3-hex ${h.status}`,
+      interactive: isVisible
     });
 
     polygon.bindTooltip(createTooltipContent(h), {
@@ -588,7 +683,6 @@ function renderMapHexagons() {
       });
     });
 
-    // Hexagon Click handler: Shift+Click for Multi-Select merge, normal click for Single-Inspector
     polygon.on('click', (e) => {
       const isShift = (e.originalEvent && e.originalEvent.shiftKey) || state.multiSelectMode;
       if (isShift) {
@@ -617,12 +711,9 @@ function createTooltipContent(h) {
   };
   const statusText = statusLabels[h.status] || '';
 
-  const haHighlight = state.colorMetric === 'ha' ? 'background:#f1f5f9;padding:2px 4px;border-radius:4px' : '';
-  const meanHighlight = state.colorMetric === 'mean' ? 'background:#f1f5f9;padding:2px 4px;border-radius:4px' : '';
-
   return `
     <div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.45;min-width:180px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;${haHighlight}">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
         <span style="font-size:13.5px;color:#0f172a"><b>HA${state.threshold}%: ${h.pct.toFixed(1)}%</b></span>
         <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
       </div>
@@ -631,7 +722,7 @@ function createTooltipContent(h) {
         <b style="color:#dc2626">${h.slow}</b>
       </div>
       <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept time &ge; ${state.threshold} min)</div>
-      <div style="display:flex;justify-content:space-between;${meanHighlight};margin:2px 0">
+      <div style="display:flex;justify-content:space-between;margin:2px 0">
         <span style="color:#64748b">Mean Duration:</span>
         <span style="color:#0f172a;font-weight:600">${h.mean.toFixed(1)} min</span>
       </div>
@@ -746,7 +837,6 @@ function renderMergedSelection() {
 
   document.getElementById('mergedMeanDuration').textContent = `${mergedMean.toFixed(1)} min`;
 
-  // Render chip tags for selected cells
   const chipsContainer = document.getElementById('mergedCellsList');
   chipsContainer.innerHTML = hexItems.map(item => `
     <span class="hex-cell-chip">
@@ -789,7 +879,6 @@ function setColorMetric(metric) {
   document.getElementById('btnMetricHa').classList.toggle('active', metric === 'ha');
   document.getElementById('btnMetricMean').classList.toggle('active', metric === 'mean');
 
-  // Re-color all polygons
   state.polygons.forEach(item => {
     const isSelected = state.selectedHexes.has(item.h.hex);
     const color = metric === 'ha' ? item.h.color_ha : item.h.color_mean;
@@ -803,33 +892,34 @@ function setColorMetric(metric) {
   renderLabels();
 }
 
-// Render labels on hexagons
+// Render labels on hexagons: SMALLER, TRANSPARENT (NO WHITE BACKGROUND), FITS CELL
 function renderLabels() {
   labelLayerGroup.clearLayers();
   if (!state.showLabels) return;
 
   state.polygons.forEach(item => {
     const h = item.h;
-    if (h.pct < state.minBreachFilter) return;
+    // Only render label if cell passes active breach and orders filters
+    if (h.pct < state.minBreachFilter || h.orders < state.minOrdersFilter) return;
 
     let htmlContent;
     if (state.cellLabelMode === 'orders_only') {
-      htmlContent = `<div class="lbl-main-orders"><b>${h.orders.toLocaleString()}</b> <span class="lbl-unit">orders</span></div>`;
+      htmlContent = `<span class="lbl-main-orders">${h.orders.toLocaleString()}</span>`;
     } else {
       const metricText = state.colorMetric === 'ha'
-        ? `${h.pct.toFixed(0)}% HA${state.threshold}`
-        : `${h.mean.toFixed(1)} min`;
+        ? `${h.pct.toFixed(0)}%`
+        : `${h.mean.toFixed(1)}m`;
       htmlContent = `
-        <div class="lbl-main-orders"><b>${h.orders.toLocaleString()}</b> <span class="lbl-unit">orders</span></div>
-        <div class="lbl-sub-metric">${metricText}</div>
+        <span class="lbl-main-orders">${h.orders.toLocaleString()}</span>
+        <span class="lbl-sub-metric">${metricText}</span>
       `;
     }
 
     const icon = L.divIcon({
       className: 'leaflet-hex-label',
       html: htmlContent,
-      iconSize: [84, 32],
-      iconAnchor: [42, 16]
+      iconSize: [44, 20],
+      iconAnchor: [22, 10]
     });
     const marker = L.marker(h.center, { interactive: false, icon: icon });
     labelLayerGroup.addLayer(marker);
@@ -842,19 +932,33 @@ function updateLabelsVisibility() {
   }
 }
 
-// Filter hexagons by breach rate slider
+// Filter hexagons by breach rate and orders slider: completely hides non-matching cells
 function filterHexagons() {
   state.polygons.forEach(item => {
-    const isVisible = item.h.pct >= state.minBreachFilter;
+    const isVisible = (item.h.pct >= state.minBreachFilter) && (item.h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(item.h.hex);
-    item.polygon.setStyle({
-      fillOpacity: isVisible ? state.opacity : 0.05,
-      weight: isSelected ? 3.5 : (isVisible ? 1.2 : 0.2)
-    });
+
+    if (isVisible) {
+      item.polygon.setStyle({
+        fillOpacity: state.opacity,
+        opacity: 1,
+        weight: isSelected ? 3.5 : 1.2,
+        color: isSelected ? '#06b6d4' : '#ffffff'
+      });
+      const el = item.polygon.getElement();
+      if (el) el.style.pointerEvents = 'auto';
+    } else {
+      item.polygon.setStyle({
+        fillOpacity: 0,
+        opacity: 0,
+        weight: 0
+      });
+      const el = item.polygon.getElement();
+      if (el) el.style.pointerEvents = 'none';
+    }
   });
-  if (state.showLabels) {
-    renderLabels();
-  }
+
+  renderLabels();
 }
 
 // Update Legend UI based on active color metric
@@ -871,9 +975,9 @@ function updateLegend() {
 
   if (state.colorMetric === 'ha') {
     titleEl.textContent = `HA${state.threshold}% SLA Breach Rate`;
-    subEl.textContent = `Share of orders exceeding ${state.threshold} min contractual accept`;
-    minEl.textContent = `${s.vmin.toFixed(0)}% (Fast/Best)`;
-    maxEl.textContent = `${s.vmax.toFixed(0)}% (Slow/Worst)`;
+    subEl.textContent = `Orders exceeding ${state.threshold} min contractual accept`;
+    minEl.textContent = `${s.vmin.toFixed(0)}% (Fast)`;
+    maxEl.textContent = `${s.vmax.toFixed(0)}% (Slow)`;
   } else {
     titleEl.textContent = `Mean Accept Duration (minutes)`;
     subEl.textContent = `Average time from order creation to courier accept`;
@@ -902,6 +1006,7 @@ function setLayer(layerName) {
   document.getElementById('btnLayerDest').classList.toggle('active', layerName === 'destination');
   clearHexSelection();
   renderMapHexagons();
+  resizeFilterSliders();
 }
 
 // Set Resolution (6 to 10)
@@ -912,6 +1017,7 @@ function setResolution(r) {
   state.currentRes = r;
   clearHexSelection();
   renderMapHexagons();
+  resizeFilterSliders();
   updateResolutionUI();
 }
 
@@ -930,7 +1036,7 @@ function switchBasemap(type) {
   tileLayer.bringToBack();
 }
 
-// Center Map on city core and zoom in (avoids zooming out to a giant picture from distant outlier dropoffs)
+// Center Map on city core
 function centerAndZoomMap(animate = true) {
   let center = [32.6546, 51.6680];
   if (state.data && state.data.city && state.data.city.lat && state.data.city.lng) {
@@ -939,11 +1045,9 @@ function centerAndZoomMap(animate = true) {
     center = state.data.center;
   }
 
-  // Zoomed-in level to inspect hexagons clearly without a wide "big picture"
   const targetZoom = 13.5;
 
   if (state.polygons.length > 0) {
-    // Filter to core urban polygons within 10km of city center
     const coreCenters = state.polygons
       .map(p => p.h.center)
       .filter(c => {
@@ -979,12 +1083,12 @@ function renderBottlenecks(bottlenecks) {
   }
 
   container.innerHTML = bottlenecks.map((b, i) => `
-    <div class="bottleneck-item" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
+    <div class="bottleneck-row" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
       <div>
-        <div class="b-name">#${i + 1} Zone: ${b.hex.substring(0, 8)}...</div>
-        <div class="b-sub">${b.orders} orders &bull; ${b.slow} HA30 count &bull; ${b.mean} min avg</div>
+        <div style="font-weight:700">#${i + 1} ${b.hex.substring(0, 8)}...</div>
+        <div style="font-size:9.5px;color:#64748b">${b.orders} orders &bull; ${b.slow} HA30 &bull; ${b.mean}m avg</div>
       </div>
-      <div class="b-badge">${b.pct.toFixed(1)}%</div>
+      <div style="font-weight:800;color:#dc2626">${b.pct.toFixed(1)}%</div>
     </div>
   `).join('');
 }
@@ -1062,40 +1166,7 @@ function exportStandaloneHtml() {
   window.open(`/api/export-html?${params.toString()}`, '_blank');
 }
 
-// Export CSV data
-function exportCsvData() {
-  if (!state.data) return;
-  const layerData = state.data.layers[state.currentLayer].res[state.currentRes];
-  if (!layerData || !layerData.hexes) return;
-
-  const rows = [
-    ['hex', 'latitude', 'longitude', 'orders', 'ha30_orders_count', 'ha30_pct', 'mean_duration_min', 'reliable', 'status']
-  ];
-
-  layerData.hexes.forEach(h => {
-    rows.push([
-      h.hex,
-      h.center[0],
-      h.center[1],
-      h.orders,
-      h.ha30_count !== undefined ? h.ha30_count : h.slow,
-      h.pct,
-      h.mean,
-      h.reliable,
-      h.status
-    ]);
-  });
-
-  const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `${state.city}_ha${state.threshold}_res${state.currentRes}_${state.currentLayer}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
+// Show/Hide Circle Loading Spinner
 function showLoading(show, message = 'Loading...') {
   const el = document.getElementById('loadingIndicator');
   const txt = document.getElementById('loadingText');

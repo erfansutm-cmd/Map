@@ -25,21 +25,34 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 
 #map { width: 100%; height: 100%; }
 
-/* Hexagon labels */
+/* Hexagon labels - transparent, no white background */
 .lbl {
-  font: 600 11px/1.2 'Inter', sans-serif;
-  color: #0f172a;
+  font-family: 'Inter', sans-serif;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  pointer-events: none;
   text-align: center;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.94);
-  padding: 3px 6px;
-  border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  pointer-events: none;
-  border: 1px solid rgba(0,0,0,0.12);
 }
-.lbl-ha { font-weight: 700; color: #1e293b; }
-.lbl-ord { font-size: 9.5px; color: #64748b; }
+.lbl-ord {
+  font-size: 10px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 2px #fff;
+  display: block;
+}
+.lbl-ha {
+  font-size: 8px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1;
+  margin-top: 1px;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 2px #fff;
+  display: block;
+}
 
 /* Control Panel */
 .panel {

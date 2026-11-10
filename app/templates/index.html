@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>HA30 HexMap Analytics | Fleet SLA Performance Engine</title>
+  <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="/static/css/app.css">
@@ -13,7 +13,7 @@
 <body>
 
 <div class="app-container">
-  <!-- Header Navbar -->
+  <!-- Simplified Header Top Bar -->
   <header class="app-header">
     <div class="brand-section">
       <div class="brand-logo">
@@ -27,9 +27,9 @@
       </div>
     </div>
 
-    <!-- City Search Bar -->
+    <!-- Clean City Search Bar -->
     <div class="city-search-container">
-      <form id="searchForm" style="display:flex;width:100%;gap:8px">
+      <form id="searchForm" style="display:flex;width:100%;gap:6px">
         <div class="search-input-wrapper">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"></circle>
@@ -39,7 +39,7 @@
             type="text"
             id="cityInput"
             class="city-input"
-            placeholder="Type city name (e.g. Isfahan, Tehran, Shiraz...)"
+            placeholder="Search city (e.g. Isfahan, Tehran, Shiraz...)"
             value="isfahan"
             autocomplete="off"
             list="citySuggestions"
@@ -62,20 +62,12 @@
             <option value="Frankfurt">
           </datalist>
         </div>
-        <button type="submit" class="btn-search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-          Analyze
-        </button>
+        <button type="submit" class="btn-search">Search</button>
       </form>
     </div>
 
-    <!-- Header Actions -->
+    <!-- Essential Clean Header Actions -->
     <div class="header-actions">
-      <span id="dataSourceBadge" class="btn-action" style="font-size:11px;font-weight:600;background:rgba(59,130,246,0.15);color:#93c5fd;border-color:rgba(59,130,246,0.3)">
-        Live Connected
-      </span>
       <button id="btnOpenCityModal" class="btn-action" title="View Full Citywide SLA Report">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 3v18h18"></path>
@@ -83,7 +75,7 @@
           <path d="M13 17V5"></path>
           <path d="M8 17v-3"></path>
         </svg>
-        Citywide HA30
+        Citywide Report
       </button>
       <button id="btnOpenFilters" class="btn-action" title="Configure Filters">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -100,7 +92,7 @@
         Upload CSV
       </button>
       <input type="file" id="csvFileInput" accept=".csv" style="display:none">
-      <button id="btnExportHtml" class="btn-action" title="Export self-contained standalone HTML hover map">
+      <button id="btnExportHtml" class="btn-action" title="Export Standalone HTML Map">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
           <polyline points="7 10 12 15 17 10"></polyline>
@@ -108,62 +100,71 @@
         </svg>
         Export HTML
       </button>
-      <button id="btnExportCsv" class="btn-action" title="Export Hexagon Data to CSV">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-        </svg>
-        CSV
-      </button>
     </div>
   </header>
 
-  <!-- Interactive Day Selector Strip with Custom Date Range & DB Fetch -->
+  <!-- Interactive Day Selector Strip with Calendar / Period Selector -->
   <div class="days-selector-bar">
-    <div class="days-bar-title">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-        <line x1="16" y1="2" x2="16" y2="6"></line>
-        <line x1="8" y1="2" x2="8" y2="6"></line>
-        <line x1="3" y1="10" x2="21" y2="10"></line>
-      </svg>
-      <span>Date Range:</span>
-    </div>
-
-    <!-- Date Range Pickers (Select other days/weeks/months) -->
-    <div class="days-range-group">
-      <input type="date" id="barStartDate" class="bar-date-input" value="2026-10-22" title="Start date">
-      <span style="font-size:11px;color:#64748b">&ndash;</span>
-      <input type="date" id="barEndDate" class="bar-date-input" value="2026-11-05" title="End date">
-      <button id="btnFetchDateRange" class="btn-day-preset btn-day-fetch" title="Fetch days from database if not already cached">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-        Load Range
+    <div class="calendar-trigger-wrapper">
+      <button id="btnCalendarTrigger" class="btn-calendar-trigger" title="Select Date Period">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span id="calendarTriggerLabel">Oct 22 – Nov 05, 2026</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
       </button>
+
+      <!-- Calendar Period Popover -->
+      <div id="calendarPopover" class="calendar-popover">
+        <div class="calendar-popover-header">
+          <span>Select Date Period</span>
+          <button id="btnCloseCalendarPopover" class="btn-popover-close" type="button">&times;</button>
+        </div>
+        <div class="popover-presets-section">
+          <div class="popover-label">Quick Presets</div>
+          <div class="popover-presets-grid">
+            <button type="button" class="btn-preset-chip" data-start="2026-10-22" data-end="2026-11-05">Default 2 Weeks (Oct 22 - Nov 05)</button>
+            <button type="button" class="btn-preset-chip" data-start="2026-10-15" data-end="2026-10-21">Preceding 7 Days (Oct 15 - Oct 21)</button>
+            <button type="button" class="btn-preset-chip" data-start="2026-10-07" data-end="2026-11-05">Full 30 Days (Oct 07 - Nov 05)</button>
+            <button type="button" class="btn-preset-chip" data-start="2026-10-01" data-end="2026-10-31">October 2026 (Oct 01 - Oct 31)</button>
+            <button type="button" class="btn-preset-chip" data-start="2026-09-01" data-end="2026-09-30">September 2026 (Sep 01 - Sep 30)</button>
+          </div>
+        </div>
+        <div class="popover-custom-range">
+          <div class="popover-label">Custom Period</div>
+          <div class="range-inputs-row">
+            <div>
+              <label class="range-sublabel">Start Date</label>
+              <input type="date" id="popoverStartDate" class="bar-date-input" value="2026-10-22">
+            </div>
+            <div>
+              <label class="range-sublabel">End Date</label>
+              <input type="date" id="popoverEndDate" class="bar-date-input" value="2026-11-05">
+            </div>
+          </div>
+        </div>
+        <div class="popover-footer">
+          <button type="button" id="btnCancelCalendar" class="btn-day-preset">Cancel</button>
+          <button type="button" id="btnApplyCalendarPeriod" class="btn-primary" style="padding:4px 12px;font-size:11px">Apply Period</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Date Presets Dropdown -->
-    <select id="selectDatePreset" class="bar-date-select" title="Quickly pick a date window outside last 2 weeks">
-      <option value="" disabled selected>Presets &amp; Windows...</option>
-      <option value="last14">Default 2 Weeks (Oct 22 - Nov 05)</option>
-      <option value="last7">Preceding 7 Days (Oct 15 - Oct 21)</option>
-      <option value="last30">Full 30 Days (Oct 07 - Nov 05)</option>
-      <option value="monthSep">September 2026 (Sep 01 - Sep 30)</option>
-      <option value="monthOct">October 2026 (Oct 01 - Oct 31)</option>
-    </select>
-
-    <!-- Add Any Specific Day Outside Range -->
-    <div class="days-add-group">
-      <input type="date" id="inputAddSpecificDate" class="bar-date-input" title="Pick any individual day from DB to add to map">
-      <button id="btnAddSpecificDate" class="btn-day-preset btn-day-add" title="Fetch and add this day from DB">+ Add Day</button>
-    </div>
+    <!-- Refresh button -->
+    <button id="btnRefreshData" class="btn-day-preset" title="Refresh data from server">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+      Refresh
+    </button>
 
     <div class="days-quick-actions">
       <button id="btnSelectAllDays" class="btn-day-preset" title="Select all active days">All</button>
       <button id="btnSelectWeekdays" class="btn-day-preset" title="Select weekdays only">Weekdays</button>
       <button id="btnSelectWeekends" class="btn-day-preset" title="Select weekends only">Weekends</button>
-      <button id="btnInvertDays" class="btn-day-preset" title="Invert day selection">Invert</button>
     </div>
 
     <div id="daysPillsContainer" class="days-pills-container">
@@ -266,12 +267,22 @@
           <input type="range" id="sliderOpacity" class="range-slider" min="0.1" max="1.0" step="0.05" value="0.65">
         </div>
 
+        <!-- Dynamic Min SLA Breach Filter -->
         <div class="control-slider-group">
           <div class="slider-label-row">
             <span>Min SLA Breach Filter</span>
             <span id="valBreachFilter">0%</span>
           </div>
-          <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="60" step="5" value="0">
+          <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="100" step="1" value="0">
+        </div>
+
+        <!-- Dynamic Min Orders in Cell Filter -->
+        <div class="control-slider-group">
+          <div class="slider-label-row">
+            <span>Min Orders in Cell</span>
+            <span id="valOrdersFilter">0</span>
+          </div>
+          <input type="range" id="sliderOrdersFilter" class="range-slider" min="0" max="100" step="1" value="0">
         </div>
 
         <div style="margin:10px 0 6px">
@@ -304,10 +315,10 @@
         <div id="bottlenecksList" class="bottlenecks-list"></div>
       </div>
 
-      <!-- Bottom-Right Legend Card (Dynamic: HA30 or Mean Duration) -->
+      <!-- Bottom-Right Legend Card -->
       <div class="map-legend-card">
         <div id="legendTitle" style="font-weight:700;color:#0f172a;margin-bottom:2px">HA30% SLA Breach Rate</div>
-        <div id="legendSub" style="font-size:10px;color:#64748b">Orders exceeding 30s contractual accept</div>
+        <div id="legendSub" style="font-size:10px;color:#64748b">Orders exceeding 30 min contractual accept</div>
         <div class="legend-bar"></div>
         <div class="legend-ticks">
           <span id="legendMin">0% (Fast)</span>
@@ -377,7 +388,6 @@
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span id="mergedSlaBadge" class="badge badge-warning">MERGED REGION</span>
           <span id="mergedDeltaBadge" style="font-size:11px;font-weight:700;color:#0e7490">+0.0% vs City</span>
         </div>
 
@@ -420,7 +430,7 @@
         <kbd>Shift + Click</kbd> Select multiple hexagons to merge and view combined analytics
       </div>
 
-      <!-- Loading Indicator -->
+      <!-- Loading Indicator Spinner -->
       <div id="loadingIndicator" class="loading-indicator">
         <div class="spinner"></div>
         <span id="loadingText">Analyzing city fleet data...</span>

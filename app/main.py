@@ -50,7 +50,7 @@ async def get_cities_list():
 
 
 @app.get("/api/data")
-async def get_city_data(
+def get_city_data(
     city: str = Query(default=settings.DEFAULT_CITY, description="City name to analyze"),
     status: str = Query(default=settings.DEFAULT_STATUS),
     customer_id: int = Query(default=settings.DEFAULT_CUSTOMER_ID),
@@ -64,8 +64,8 @@ async def get_city_data(
     force_refresh: bool = Query(default=False),
 ):
     """
-    Fetch and analyze orders for a given city and selected days.
-    Executes the ClickHouse query ONCE for the date range, then serves day filters from cache.
+    Fetch and analyze orders for a given city and selected days in ONE query.
+    Runs synchronously in threadpool so Uvicorn event loop is never blocked.
     """
     try:
         selected_dates = [d.strip() for d in dates.split(",") if d.strip()] if dates else None
@@ -107,7 +107,7 @@ async def get_city_data(
 
 
 @app.get("/api/export-html")
-async def export_html(
+def export_html(
     city: str = Query(default=settings.DEFAULT_CITY),
     status: str = Query(default=settings.DEFAULT_STATUS),
     customer_id: int = Query(default=settings.DEFAULT_CUSTOMER_ID),
