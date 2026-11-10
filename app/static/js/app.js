@@ -335,9 +335,9 @@ function setupEventListeners() {
       btnApplyPeriod.addEventListener('click', (e) => {
         e.stopPropagation();
         const sDate = calState.startDate;
-        const eDate = calState.endDate;
-        if (!sDate || !eDate) {
-          alert("Please select both start date and end date.");
+        const eDate = calState.endDate || calState.startDate;
+        if (!sDate) {
+          alert("Please select dates on the calendar.");
           return;
         }
         const minD = sDate < eDate ? sDate : eDate;
@@ -507,34 +507,6 @@ function initCalendarUI() {
     });
   }
 
-  // Inputs change listeners
-  const startInput = document.getElementById('popoverStartDate');
-  const endInput = document.getElementById('popoverEndDate');
-  if (startInput) {
-    startInput.addEventListener('change', () => {
-      if (startInput.value) {
-        calState.startDate = startInput.value;
-        if (calState.endDate && calState.startDate > calState.endDate) {
-          calState.endDate = calState.startDate;
-          if (endInput) endInput.value = calState.endDate;
-        }
-        renderCalendarGrid();
-      }
-    });
-  }
-  if (endInput) {
-    endInput.addEventListener('change', () => {
-      if (endInput.value) {
-        calState.endDate = endInput.value;
-        if (calState.startDate && calState.endDate < calState.startDate) {
-          calState.startDate = calState.endDate;
-          if (startInput) startInput.value = calState.startDate;
-        }
-        renderCalendarGrid();
-      }
-    });
-  }
-
   // Refresh cache button in calendar popover
   const btnCalRefresh = document.getElementById('btnCalRefreshCache');
   if (btnCalRefresh) {
@@ -601,24 +573,6 @@ function renderCalendarGrid() {
     container.appendChild(cell);
   }
 
-  // Update inputs and summary
-  const startInput = document.getElementById('popoverStartDate');
-  const endInput = document.getElementById('popoverEndDate');
-  if (startInput) startInput.value = calState.startDate;
-  if (endInput) endInput.value = calState.endDate;
-
-  const countPill = document.getElementById('calSelectedDaysCount');
-  if (countPill) {
-    if (calState.startDate && calState.endDate) {
-      const dt1 = new Date(calState.startDate);
-      const dt2 = new Date(calState.endDate);
-      const diffDays = Math.round(Math.abs(dt2 - dt1) / (1000 * 60 * 60 * 24)) + 1;
-      countPill.textContent = `${diffDays} days`;
-    } else {
-      countPill.textContent = '1 day';
-    }
-  }
-
   updateCalendarCacheStats();
 }
 
@@ -648,8 +602,8 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
     ? calState.hoverDate
     : calState.endDate;
 
-  const minD = s < e ? s : e;
-  const maxD = s < e ? e : s;
+  const minD = (s && e) ? (s < e ? s : e) : (s || e);
+  const maxD = (s && e) ? (s < e ? e : s) : (s || e);
 
   if (dateStr === calState.startDate) {
     cell.classList.add('range-start');
@@ -657,18 +611,24 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
   if (dateStr === calState.endDate && calState.pickingState !== 'picking_end') {
     cell.classList.add('range-end');
   }
+  if (calState.startDate && !calState.endDate && calState.pickingState !== 'picking_end' && dateStr === calState.startDate) {
+    cell.classList.add('single-day');
+  }
   if (minD && maxD && dateStr >= minD && dateStr <= maxD) {
     cell.classList.add('in-range');
   }
 
-  // Click handler
+  // Click handler: Click 1 selects start, Click 2 selects end, next click starts fresh
   cell.addEventListener('click', (ev) => {
     ev.stopPropagation();
     if (calState.pickingState === 'none' || !calState.startDate) {
+      // First click: select start date
       calState.startDate = dateStr;
-      calState.endDate = dateStr;
+      calState.endDate = null;
       calState.pickingState = 'picking_end';
+      calState.hoverDate = null;
     } else {
+      // Second click: select end date
       if (dateStr < calState.startDate) {
         calState.endDate = calState.startDate;
         calState.startDate = dateStr;
@@ -681,7 +641,7 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
     renderCalendarGrid();
   });
 
-  // Hover handler for interactive range preview
+  // Hover handler for interactive range preview while waiting for end date
   cell.addEventListener('mouseenter', () => {
     if (calState.pickingState === 'picking_end') {
       calState.hoverDate = dateStr;
@@ -695,6 +655,28 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
 function updateCalendarCacheStats() {
   const daysText = document.getElementById('calCacheDaysText');
   const desc = document.getElementById('calCacheDesc');
+  const hintEl = document.getElementById('calSelectionHint');
+
+  // Update selection hint text
+  if (hintEl) {
+    if (calState.pickingState === 'picking_end') {
+      const hover = calState.hoverDate || calState.startDate;
+      const minD = calState.startDate < hover ? calState.startDate : hover;
+      const maxD = calState.startDate < hover ? hover : calState.startDate;
+      hintEl.textContent = `Select end date: ${formatDateReadable(minD)} → ${formatDateReadable(maxD)}`;
+      hintEl.style.color = '#38bdf8';
+    } else if (calState.startDate && calState.endDate) {
+      hintEl.textContent = `Selected: ${formatDateReadable(calState.startDate)} – ${formatDateReadable(calState.endDate)}`;
+      hintEl.style.color = '#cbd5e1';
+    } else if (calState.startDate) {
+      hintEl.textContent = `Selected: ${formatDateReadable(calState.startDate)}`;
+      hintEl.style.color = '#cbd5e1';
+    } else {
+      hintEl.textContent = `Click start date, then click end date`;
+      hintEl.style.color = '#94a3b8';
+    }
+  }
+
   if (!daysText) return;
 
   if (!state.allDates || state.allDates.length === 0) {
@@ -703,9 +685,10 @@ function updateCalendarCacheStats() {
   }
 
   let selectedList = [];
-  if (calState.startDate && calState.endDate) {
-    const minD = calState.startDate < calState.endDate ? calState.startDate : calState.endDate;
-    const maxD = calState.startDate < calState.endDate ? calState.endDate : calState.startDate;
+  const activeEnd = calState.endDate || calState.startDate;
+  if (calState.startDate && activeEnd) {
+    const minD = calState.startDate < activeEnd ? calState.startDate : activeEnd;
+    const maxD = calState.startDate < activeEnd ? activeEnd : calState.startDate;
     let curr = new Date(minD);
     const end = new Date(maxD);
     while (curr <= end) {
