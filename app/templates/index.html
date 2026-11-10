@@ -193,8 +193,8 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
             Mean Accept Time
           </div>
-          <div id="kpiMeanDuration" class="kpi-val">0.0s</div>
-          <div class="kpi-sub"><span id="kpiP90Duration">P90: 0s</span> &bull; <span id="kpiP50Duration">Med: 0s</span></div>
+          <div id="kpiMeanDuration" class="kpi-val">0.0 min</div>
+          <div class="kpi-sub"><span id="kpiP90Duration">P90: 0 min</span> &bull; <span id="kpiP50Duration">Med: 0 min</span></div>
         </div>
 
         <div class="kpi-card">
@@ -223,7 +223,7 @@
         </div>
         <div class="color-metric-toggle">
           <button id="btnMetricHa" class="color-metric-btn active">HA30% Breach</button>
-          <button id="btnMetricMean" class="color-metric-btn">Mean Duration (s)</button>
+          <button id="btnMetricMean" class="color-metric-btn">Mean Duration (min)</button>
         </div>
 
         <div class="panel-section-title">
@@ -346,7 +346,7 @@
 
         <div class="stat-box" style="margin-bottom:8px">
           <div class="stat-box-label">Mean Accept Duration</div>
-          <div id="inspMeanDuration" class="stat-box-val">0.0s</div>
+          <div id="inspMeanDuration" class="stat-box-val">0.0 min</div>
         </div>
 
         <div style="font-size:9.5px;color:#94a3b8;word-break:break-all">
@@ -399,7 +399,7 @@
 
         <div class="stat-box" style="margin-bottom:8px">
           <div class="stat-box-label">Weighted Mean Duration</div>
-          <div id="mergedMeanDuration" class="stat-box-val">0.0s</div>
+          <div id="mergedMeanDuration" class="stat-box-val">0.0 min</div>
         </div>
 
         <div style="font-size:10px;font-weight:600;color:#64748b;margin-bottom:2px">Selected Cells:</div>
@@ -457,19 +457,19 @@
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <div class="stat-box" style="flex:1">
         <div class="stat-box-label">Median (P50)</div>
-        <div id="modalCityP50" class="stat-box-val">0.0s</div>
+        <div id="modalCityP50" class="stat-box-val">0.0 min</div>
       </div>
       <div class="stat-box" style="flex:1">
         <div class="stat-box-label">Average (Mean)</div>
-        <div id="modalCityMean" class="stat-box-val">0.0s</div>
+        <div id="modalCityMean" class="stat-box-val">0.0 min</div>
       </div>
       <div class="stat-box" style="flex:1">
         <div class="stat-box-label">90th Pct (P90)</div>
-        <div id="modalCityP90" class="stat-box-val">0.0s</div>
+        <div id="modalCityP90" class="stat-box-val">0.0 min</div>
       </div>
       <div class="stat-box" style="flex:1">
         <div class="stat-box-label">95th Pct (P95)</div>
-        <div id="modalCityP95" class="stat-box-val">0.0s</div>
+        <div id="modalCityP95" class="stat-box-val">0.0 min</div>
       </div>
     </div>
 
@@ -503,8 +503,8 @@
     <form id="filterForm">
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">SLA Threshold (Seconds)</label>
-          <input type="number" id="inputThreshold" class="form-input" value="30" min="1" max="300">
+          <label class="form-label">SLA Threshold (Minutes)</label>
+          <input type="number" id="inputThreshold" class="form-input" value="30" min="1" max="180">
         </div>
         <div class="form-group">
           <label class="form-label">Min Orders per Hex</label>

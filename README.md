@@ -38,8 +38,8 @@ This project expands and elevates the standalone `isfahan_hex_html.py` script in
 ### 4. Toggle Colors by HA30% or Mean Duration
 * **Dual Hexagon Color Metric**: Toggle between:
   * **HA30% Breach**: Colored by SLA failure percentage (Green = fast SLA, Yellow = moderate, Red = severe breach).
-  * **Mean Duration**: Colored by average create-to-accept duration in seconds (Green = fast <15s, Yellow = 15-30s, Red = >30s delay).
-* **Dynamic Legend**: Automatically updates the gradient bar and tick ranges between HA30 percentages and duration seconds.
+  * **Mean Duration**: Colored by average create-to-accept duration in minutes (Green = fast <15 min, Yellow = 15-30 min, Red = >30 min delay).
+* **Dynamic Legend**: Automatically updates the gradient bar and tick ranges between HA30 percentages and duration minutes.
 
 ### 5. High-Fidelity Map Visualization ("See the Map Better")
 * **Multiple Basemaps**:

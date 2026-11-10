@@ -19,7 +19,7 @@ from app.export_html import build_standalone_html
 def main():
     parser = argparse.ArgumentParser(description="Generate HA30 Hexagon Map HTML report.")
     parser.add_argument("--city", default=settings.DEFAULT_CITY, help="City name (e.g. isfahan, tehran)")
-    parser.add_argument("--threshold", type=int, default=settings.DEFAULT_THRESHOLD, help="SLA threshold in seconds (default: 30)")
+    parser.add_argument("--threshold", type=int, default=settings.DEFAULT_THRESHOLD, help="SLA threshold in minutes (default: 30)")
     parser.add_argument("--min-orders", type=int, default=settings.DEFAULT_MIN_ORDERS, help="Minimum orders for reliability (default: 5)")
     parser.add_argument("--customer-id", type=int, default=settings.DEFAULT_CUSTOMER_ID, help="Customer ID filter")
     parser.add_argument("--start-date", default=settings.DEFAULT_START_DATE, help="Start date (YYYY-MM-DD)")
@@ -31,7 +31,7 @@ def main():
     out_file = args.out or f"{city}_hexagons_{args.end_date.replace('-', '')}.html"
 
     print(f"Fetching order data for {city.title()}...")
-    df, source = fetch_orders(
+    df, source, _, _ = fetch_orders(
         city=city,
         status="DELIVERED",
         customer_id=args.customer_id,
@@ -53,7 +53,7 @@ def main():
 
     kpis = analysis["kpis"]
     print(f"Overall HA{args.threshold}%: {kpis['overall_ha_pct']}% slow ({kpis['total_slow']} of {kpis['total_orders']})")
-    print(f"Average accept duration: {kpis['overall_mean_duration']}s")
+    print(f"Average accept duration: {kpis['overall_mean_duration']} min")
 
     print(f"Writing standalone HTML to {out_file}...")
     html_content = build_standalone_html(

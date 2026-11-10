@@ -328,10 +328,10 @@ function updateKpis(kpis, city, dataSource) {
   document.getElementById('kpiSlaSlowBar').style.width = `${slowPct}%`;
   document.getElementById('kpiSlaFastBar').style.width = `${100 - slowPct}%`;
 
-  // Duration metrics
-  document.getElementById('kpiMeanDuration').textContent = `${kpis.overall_mean_duration.toFixed(1)}s`;
-  document.getElementById('kpiP90Duration').textContent = `P90: ${kpis.p90_duration || 0}s`;
-  document.getElementById('kpiP50Duration').textContent = `Med: ${kpis.p50_duration || 0}s`;
+  // Duration metrics (minutes)
+  document.getElementById('kpiMeanDuration').textContent = `${kpis.overall_mean_duration.toFixed(1)} min`;
+  document.getElementById('kpiP90Duration').textContent = `P90: ${kpis.p90_duration || 0} min`;
+  document.getElementById('kpiP50Duration').textContent = `Med: ${kpis.p50_duration || 0} min`;
 
   // Days selected
   const daysCount = state.selectedDates.length;
@@ -363,7 +363,7 @@ function renderDaysSelector(dailyStats, allDates, selectedDates) {
     const isSelected = selectedSet.has(d.date);
     const breachColor = d.pct > 35 ? '#ef4444' : d.pct > 20 ? '#f59e0b' : '#10b981';
     return `
-      <div class="day-pill ${isSelected ? 'active' : ''}" data-date="${d.date}" title="${d.label}: ${d.orders} orders, ${d.pct}% breach, ${d.mean}s avg">
+      <div class="day-pill ${isSelected ? 'active' : ''}" data-date="${d.date}" title="${d.label}: ${d.orders} orders, ${d.pct}% breach, ${d.mean} min avg">
         <div class="day-pill-date">${d.label}</div>
         <div class="day-pill-meta">
           <span>${d.orders} ord</span> &bull; <b style="color:${breachColor}">${d.pct.toFixed(0)}%</b>
@@ -516,7 +516,7 @@ function createTooltipContent(h) {
       </div>
       <div style="display:flex;justify-content:space-between;${meanHighlight};margin:2px 0">
         <span style="color:#64748b">Mean Duration:</span>
-        <b style="color:#0f172a">${h.mean.toFixed(1)}s</b>
+        <b style="color:#0f172a">${h.mean.toFixed(1)} min</b>
       </div>
       <div style="font-size:10.5px;color:#64748b;margin-bottom:4px">${statusText}</div>
       <hr style="border:0;border-top:1px solid #e2e8f0;margin:4px 0">
@@ -525,7 +525,7 @@ function createTooltipContent(h) {
         <b style="color:#0f172a">${h.orders}</b>
       </div>
       <div style="display:flex;justify-content:space-between">
-        <span style="color:#64748b">Slow (&ge;${state.threshold}s):</span>
+        <span style="color:#64748b">Slow (&ge;${state.threshold} min):</span>
         <b style="color:#dc2626">${h.slow}</b>
       </div>
       <div style="margin-top:4px;font-size:9.5px;color:#94a3b8">Hex: ${h.hex}</div>
@@ -559,7 +559,7 @@ function selectSingleHexagon(h, polygon) {
   document.getElementById('inspTotalOrders').textContent = h.orders;
   document.getElementById('inspSlowOrders').textContent = h.slow;
   document.getElementById('inspFastOrders').textContent = fast;
-  document.getElementById('inspMeanDuration').textContent = `${h.mean.toFixed(1)}s`;
+  document.getElementById('inspMeanDuration').textContent = `${h.mean.toFixed(1)} min`;
   document.getElementById('inspCoords').textContent = `${h.center[0]}, ${h.center[1]}`;
 
   document.getElementById('inspBarSlow').style.width = `${slowPct}%`;
@@ -631,7 +631,7 @@ function renderMergedSelection() {
   document.getElementById('mergedTotalOrders').textContent = totalOrders.toLocaleString();
   document.getElementById('mergedSlowOrders').textContent = totalSlow.toLocaleString();
   document.getElementById('mergedFastOrders').textContent = fastOrders.toLocaleString();
-  document.getElementById('mergedMeanDuration').textContent = `${mergedMean.toFixed(1)}s`;
+  document.getElementById('mergedMeanDuration').textContent = `${mergedMean.toFixed(1)} min`;
 
   const slowPct = totalWithValue > 0 ? (totalSlow / totalWithValue * 100) : 0;
   document.getElementById('mergedBarSlow').style.width = `${slowPct}%`;
@@ -703,7 +703,7 @@ function renderLabels() {
     const h = item.h;
     if (h.pct < state.minBreachFilter) return;
 
-    let primaryVal = state.colorMetric === 'ha' ? `${h.pct.toFixed(0)}%` : `${h.mean.toFixed(1)}s`;
+    let primaryVal = state.colorMetric === 'ha' ? `${h.pct.toFixed(0)}%` : `${h.mean.toFixed(1)} min`;
     let subVal = `${h.orders} ord`;
 
     const icon = L.divIcon({
@@ -752,14 +752,14 @@ function updateLegend() {
 
   if (state.colorMetric === 'ha') {
     titleEl.textContent = `HA${state.threshold}% SLA Breach Rate`;
-    subEl.textContent = `Share of orders exceeding ${state.threshold}s contractual accept`;
+    subEl.textContent = `Share of orders exceeding ${state.threshold} min contractual accept`;
     minEl.textContent = `${s.vmin.toFixed(0)}% (Fast/Best)`;
     maxEl.textContent = `${s.vmax.toFixed(0)}% (Slow/Worst)`;
   } else {
-    titleEl.textContent = `Mean Accept Duration (seconds)`;
+    titleEl.textContent = `Mean Accept Duration (minutes)`;
     subEl.textContent = `Average time from order creation to courier accept`;
-    minEl.textContent = `${s.mmin.toFixed(0)}s (Fastest)`;
-    maxEl.textContent = `${s.mmax.toFixed(0)}s (Slowest)`;
+    minEl.textContent = `${s.mmin.toFixed(0)} min (Fastest)`;
+    maxEl.textContent = `${s.mmax.toFixed(0)} min (Slowest)`;
   }
 
   document.getElementById('legendMinOrders').textContent = state.minOrders;
@@ -834,7 +834,7 @@ function renderBottlenecks(bottlenecks) {
     <div class="bottleneck-item" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
       <div>
         <div class="b-name">#${i + 1} Zone: ${b.hex.substring(0, 8)}...</div>
-        <div class="b-sub">${b.orders} orders &bull; ${b.slow} slow &bull; ${b.mean}s avg</div>
+        <div class="b-sub">${b.orders} orders &bull; ${b.slow} slow &bull; ${b.mean} min avg</div>
       </div>
       <div class="b-badge">${b.pct.toFixed(1)}%</div>
     </div>
@@ -863,10 +863,10 @@ function openCityModal() {
   document.getElementById('modalCitySlowOrders').textContent = kpis.total_slow.toLocaleString();
   document.getElementById('modalCityFastOrders').textContent = kpis.total_fast.toLocaleString();
 
-  document.getElementById('modalCityP50').textContent = `${kpis.p50_duration || 0}s`;
-  document.getElementById('modalCityMean').textContent = `${kpis.overall_mean_duration.toFixed(1)}s`;
-  document.getElementById('modalCityP90').textContent = `${kpis.p90_duration || 0}s`;
-  document.getElementById('modalCityP95').textContent = `${kpis.p95_duration || 0}s`;
+  document.getElementById('modalCityP50').textContent = `${kpis.p50_duration || 0} min`;
+  document.getElementById('modalCityMean').textContent = `${kpis.overall_mean_duration.toFixed(1)} min`;
+  document.getElementById('modalCityP90').textContent = `${kpis.p90_duration || 0} min`;
+  document.getElementById('modalCityP95').textContent = `${kpis.p95_duration || 0} min`;
 
   // Daily Table
   const tbody = document.getElementById('modalDailyTableBody');

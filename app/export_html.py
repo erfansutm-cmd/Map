@@ -217,7 +217,7 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
   </div>
   <div>
     <span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700">Mean Duration</span>
-    <div style="font-size:16px;font-weight:800;color:#0f172a">__OVERALL_MEAN__s</div>
+    <div style="font-size:16px;font-weight:800;color:#0f172a">__OVERALL_MEAN__ min</div>
   </div>
 </div>
 
@@ -280,7 +280,7 @@ function getStatusBadge(status) {
 function tooltipHtml(h) {
   var breachText = '<b>HA' + THRESHOLD + '%: ' + h.pct.toFixed(1) + '%</b> (' + h.slow + ' slow of ' + h.with_value + ')';
   var ordText = 'Total Orders: <b>' + h.orders + '</b>';
-  var meanText = 'Mean Duration: <b>' + h.mean.toFixed(1) + 's</b>';
+  var meanText = 'Mean Duration: <b>' + h.mean.toFixed(1) + ' min</b>';
   var idText = '<span style="font-size:10px;color:#94a3b8">Hex: ' + h.hex + '</span>';
   return '<div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.4">' +
          breachText + '<br>' + ordText + '<br>' + meanText + '<br>' + idText + '</div>';
@@ -297,9 +297,9 @@ function openInspector(h) {
     '<div style="margin-bottom:8px">' + statusBadge + '</div>' +
     '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + '% Breach Rate</span><span class="metric-val" style="color:#e11d48">' + h.pct.toFixed(1) + '%</span></div>' +
     '<div class="metric-row"><span class="metric-label">Total Orders</span><span class="metric-val">' + h.orders + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Slow Orders (&ge;' + THRESHOLD + 's)</span><span class="metric-val">' + h.slow + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Fast Orders (&lt;' + THRESHOLD + 's)</span><span class="metric-val">' + fast + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Mean Duration</span><span class="metric-val">' + h.mean.toFixed(1) + 's</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Slow Orders (&ge;' + THRESHOLD + ' min)</span><span class="metric-val">' + h.slow + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Fast Orders (&lt;' + THRESHOLD + ' min)</span><span class="metric-val">' + fast + '</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Mean Duration</span><span class="metric-val">' + h.mean.toFixed(1) + ' min</span></div>' +
     '<div class="metric-row"><span class="metric-label">H3 Hex ID</span><span class="metric-val" style="font-size:10px">' + h.hex + '</span></div>' +
     '<div class="metric-row"><span class="metric-label">Coordinates</span><span class="metric-val" style="font-size:10px">' + h.center[0] + ', ' + h.center[1] + '</span></div>';
   el.classList.add('open');
@@ -333,7 +333,7 @@ function renderMergedSelection() {
     '<div class="metric-row"><span class="metric-label">Combined Orders</span><span class="metric-val">' + totalOrders + '</span></div>' +
     '<div class="metric-row"><span class="metric-label">Slow Orders</span><span class="metric-val">' + totalSlow + '</span></div>' +
     '<div class="metric-row"><span class="metric-label">Fast Orders</span><span class="metric-val">' + fast + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Weighted Mean</span><span class="metric-val">' + mergedMean.toFixed(1) + 's</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Weighted Mean</span><span class="metric-val">' + mergedMean.toFixed(1) + ' min</span></div>' +
     '<button onclick="clearHexSelection()" style="width:100%;margin-top:10px;padding:6px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-weight:600">Clear Selection</button>';
   el.classList.add('open');
 }
@@ -350,7 +350,7 @@ function closeInspector() {
 }
 
 function labelHtml(h) {
-  var v = colorMetric === 'ha' ? (h.pct.toFixed(0) + '%') : (h.mean.toFixed(1) + 's');
+  var v = colorMetric === 'ha' ? (h.pct.toFixed(0) + '%') : (h.mean.toFixed(1) + ' min');
   return '<div class="lbl-ha">' + v + '</div><div class="lbl-ord">' + h.orders + ' ord</div>';
 }
 
@@ -502,16 +502,16 @@ function updateLegend() {
   if (colorMetric === 'ha') {
     el.innerHTML =
       '<div style="font-weight:700;margin-bottom:2px">HA' + THRESHOLD + '% SLA Breach Rate</div>' +
-      '<div style="font-size:10.5px;color:#64748b">Orders exceeding ' + THRESHOLD + 's contractual accept</div>' +
+      '<div style="font-size:10.5px;color:#64748b">Orders exceeding ' + THRESHOLD + ' min contractual accept</div>' +
       '<div class="bar-ha"></div>' +
       '<div class="legend-ticks"><span>' + s.vmin.toFixed(0) + '% (Fast)</span><span>' + s.vmax.toFixed(0) + '% (Slow)</span></div>' +
       '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
   } else {
     el.innerHTML =
-      '<div style="font-weight:700;margin-bottom:2px">Mean Accept Duration (seconds)</div>' +
+      '<div style="font-weight:700;margin-bottom:2px">Mean Accept Duration (minutes)</div>' +
       '<div style="font-size:10.5px;color:#64748b">Average duration from creation to accept</div>' +
       '<div class="bar-ha"></div>' +
-      '<div class="legend-ticks"><span>' + (s.mmin || 10).toFixed(0) + 's (Fast)</span><span>' + (s.mmax || 50).toFixed(0) + 's (Slow)</span></div>' +
+      '<div class="legend-ticks"><span>' + (s.mmin || 10).toFixed(0) + ' min (Fast)</span><span>' + (s.mmax || 50).toFixed(0) + ' min (Slow)</span></div>' +
       '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
   }
 }
