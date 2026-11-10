@@ -34,22 +34,16 @@ const state = {
   singleSelectedHex: null,    // Single selected cell
 };
 
-// Basemap Tile Providers with reliable subdomains & fallback
+// Basemap Tile Providers (Carto with API key, OpenStreetMap, Esri Satellite)
 const mapApiKey = window.MAP_API_KEY || 'cb1_5558_1_345367a66619045ea57fcdba';
+const cartoTileUrl = window.CARTO_TILE_URL || `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${mapApiKey}`;
+
 const BASEMAP_PROVIDERS = {
   voyager: {
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    url: cartoTileUrl.includes('key=') ? cartoTileUrl : `${cartoTileUrl}?key=${mapApiKey}`,
     options: {
-      subdomains: 'abcd',
       maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-    }
-  },
-  satellite: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    options: {
-      maxZoom: 19,
-      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye'
     }
   },
   osm: {
@@ -57,6 +51,13 @@ const BASEMAP_PROVIDERS = {
     options: {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
+    }
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    options: {
+      maxZoom: 19,
+      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye'
     }
   }
 };
@@ -66,10 +67,46 @@ let tileLayer;
 let hexLayerGroup;
 let labelLayerGroup;
 
+function createTileLayer(type) {
+  const cfg = BASEMAP_PROVIDERS[type] || BASEMAP_PROVIDERS.osm;
+  const layer = L.tileLayer(cfg.url, cfg.options);
+
+  let tileErrors = 0;
+  layer.on('tileerror', () => {
+    tileErrors++;
+    // If Voyager tiles fail or API key is rejected, auto-fallback to OpenStreetMap
+    if (tileErrors >= 2 && state.activeBasemap === 'voyager') {
+      console.warn('Voyager tiles failed or API key rejected. Auto-switching to OpenStreetMap.');
+      switchBasemap('osm');
+    }
+  });
+
+  return layer;
+}
+
+// Proactively test if Carto Voyager API key works or is rejected
+function probeVoyagerApiKey() {
+  const testUrl = BASEMAP_PROVIDERS.voyager.url
+    .replace('{z}', '13')
+    .replace('{x}', '4812')
+    .replace('{y}', '3256')
+    .replace('{r}', '');
+
+  const img = new Image();
+  img.onerror = () => {
+    console.warn('Carto Voyager API key rejected (401/403). Falling back to OpenStreetMap.');
+    if (state.activeBasemap === 'voyager') {
+      switchBasemap('osm');
+    }
+  };
+  img.src = testUrl;
+}
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   setupEventListeners();
+  probeVoyagerApiKey();
   // Load default days at first in one query
   loadCityData('isfahan', true);
 });
@@ -82,17 +119,7 @@ function initMap() {
 
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-  tileLayer = L.tileLayer(BASEMAP_PROVIDERS.voyager.url, BASEMAP_PROVIDERS.voyager.options).addTo(map);
-
-  // Fallback to OSM if Carto tiles fail
-  tileLayer.on('tileerror', () => {
-    if (state.activeBasemap === 'voyager' && !tileLayer._fallbackUsed) {
-      tileLayer._fallbackUsed = true;
-      map.removeLayer(tileLayer);
-      tileLayer = L.tileLayer(BASEMAP_PROVIDERS.osm.url, BASEMAP_PROVIDERS.osm.options).addTo(map);
-      tileLayer.bringToBack();
-    }
-  });
+  tileLayer = createTileLayer(state.activeBasemap).addTo(map);
 
   hexLayerGroup = L.layerGroup().addTo(map);
   labelLayerGroup = L.layerGroup().addTo(map);
@@ -1030,9 +1057,10 @@ function switchBasemap(type) {
     btn.classList.toggle('active', btn.dataset.basemap === type);
   });
 
-  map.removeLayer(tileLayer);
-  const cfg = BASEMAP_PROVIDERS[type];
-  tileLayer = L.tileLayer(cfg.url, cfg.options).addTo(map);
+  if (tileLayer) {
+    map.removeLayer(tileLayer);
+  }
+  tileLayer = createTileLayer(type).addTo(map);
   tileLayer.bringToBack();
 }
 

@@ -276,6 +276,10 @@ var currentTile = L.tileLayer(TILE_PROVIDERS.voyager, {
   attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
 }).addTo(map);
 
+currentTile.on('tileerror', function() {
+  setTile('osm');
+});
+
 var hexGroup = L.layerGroup().addTo(map);
 var labelGroup = L.layerGroup().addTo(map);
 
@@ -444,6 +448,9 @@ function setTile(type) {
     maxZoom: 20,
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
+  currentTile.on('tileerror', function() {
+    if (type === 'voyager') setTile('osm');
+  });
   currentTile.bringToBack();
 }
 
@@ -487,6 +494,7 @@ panelControl.onAdd = function() {
     '<div class="section-title">Basemap</div>' +
     '<div class="radio-group">' +
       '<button class="radio-btn active" onclick="switchBase(this, \'voyager\')">Voyager</button>' +
+      '<button class="radio-btn" onclick="switchBase(this, \'osm\')">OSM</button>' +
       '<button class="radio-btn" onclick="switchBase(this, \'satellite\')">Satellite</button>' +
     '</div>';
   L.DomEvent.disableClickPropagation(div);
