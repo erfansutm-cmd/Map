@@ -551,6 +551,14 @@ function initCalendarUI() {
     });
   }
 
+  // Mouseleave on grid to clear hover preview back to start date
+  const daysGrid = document.getElementById('calDaysGrid');
+  if (daysGrid) {
+    daysGrid.addEventListener('mouseleave', () => {
+      clearHoverRange();
+    });
+  }
+
   // Refresh cache button in calendar popover
   const btnCalRefresh = document.getElementById('btnCalRefreshCache');
   if (btnCalRefresh) {
@@ -642,9 +650,7 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
 
   // Selection states
   const s = calState.startDate;
-  const e = (calState.pickingState === 'picking_end' && calState.hoverDate)
-    ? calState.hoverDate
-    : calState.endDate;
+  const e = calState.endDate;
 
   const minD = (s && e) ? (s < e ? s : e) : (s || e);
   const maxD = (s && e) ? (s < e ? e : s) : (s || e);
@@ -655,10 +661,10 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
   if (dateStr === calState.endDate && calState.pickingState !== 'picking_end') {
     cell.classList.add('range-end');
   }
-  if (calState.startDate && !calState.endDate && calState.pickingState !== 'picking_end' && dateStr === calState.startDate) {
+  if (calState.startDate && (!calState.endDate || calState.pickingState === 'picking_end') && dateStr === calState.startDate) {
     cell.classList.add('single-day');
   }
-  if (minD && maxD && dateStr >= minD && dateStr <= maxD) {
+  if (minD && maxD && dateStr >= minD && dateStr <= maxD && calState.pickingState !== 'picking_end') {
     cell.classList.add('in-range');
   }
 
@@ -671,6 +677,7 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
       calState.endDate = null;
       calState.pickingState = 'picking_end';
       calState.hoverDate = null;
+      renderCalendarGrid();
     } else {
       // Second click: select end date
       if (dateStr < calState.startDate) {
@@ -681,22 +688,76 @@ function createCalendarDayCell(dayNum, dateStr, isOtherMonth) {
       }
       calState.pickingState = 'none';
       calState.hoverDate = null;
+      renderCalendarGrid();
     }
-    renderCalendarGrid();
   });
 
-  // Hover handler for interactive range preview while waiting for end date
+  // Hover handler for range preview without recreating DOM nodes
   cell.addEventListener('mouseenter', () => {
-    if (calState.pickingState === 'picking_end') {
-      calState.hoverDate = dateStr;
-      renderCalendarGrid();
+    if (calState.pickingState === 'picking_end' && calState.startDate) {
+      updateHoverRange(dateStr);
     }
   });
 
   return cell;
 }
 
-function updateCalendarCacheStats() {
+function updateHoverRange(hoverDateStr) {
+  if (calState.pickingState !== 'picking_end' || !calState.startDate) return;
+
+  const minD = hoverDateStr < calState.startDate ? hoverDateStr : calState.startDate;
+  const maxD = hoverDateStr < calState.startDate ? calState.startDate : hoverDateStr;
+
+  const container = document.getElementById('calDaysGrid');
+  if (!container) return;
+
+  container.querySelectorAll('.cal-day-cell').forEach(c => {
+    const d = c.dataset.date;
+    if (!d) return;
+    const inRange = d >= minD && d <= maxD;
+    c.classList.toggle('in-range', inRange);
+
+    if (d === minD && d === maxD) {
+      c.classList.add('range-start');
+      c.classList.add('single-day');
+      c.classList.remove('range-end');
+    } else if (d === minD) {
+      c.classList.add('range-start');
+      c.classList.remove('range-end');
+      c.classList.remove('single-day');
+    } else if (d === maxD) {
+      c.classList.add('range-end');
+      c.classList.remove('range-start');
+      c.classList.remove('single-day');
+    } else {
+      c.classList.remove('range-start');
+      c.classList.remove('range-end');
+      c.classList.remove('single-day');
+    }
+  });
+
+  updateCalendarCacheStats(hoverDateStr);
+}
+
+function clearHoverRange() {
+  if (calState.pickingState !== 'picking_end' || !calState.startDate) return;
+
+  const container = document.getElementById('calDaysGrid');
+  if (!container) return;
+
+  container.querySelectorAll('.cal-day-cell').forEach(c => {
+    const d = c.dataset.date;
+    const isStart = d === calState.startDate;
+    c.classList.toggle('range-start', isStart);
+    c.classList.toggle('single-day', isStart);
+    c.classList.remove('range-end');
+    c.classList.remove('in-range');
+  });
+
+  updateCalendarCacheStats(null);
+}
+
+function updateCalendarCacheStats(previewEndDate = null) {
   const daysText = document.getElementById('calCacheDaysText');
   const desc = document.getElementById('calCacheDesc');
   const hintEl = document.getElementById('calSelectionHint');
@@ -704,11 +765,15 @@ function updateCalendarCacheStats() {
   // Update selection hint text
   if (hintEl) {
     if (calState.pickingState === 'picking_end') {
-      const hover = calState.hoverDate || calState.startDate;
-      const minD = calState.startDate < hover ? calState.startDate : hover;
-      const maxD = calState.startDate < hover ? hover : calState.startDate;
-      hintEl.textContent = `Select end date: ${formatDateReadable(minD)} → ${formatDateReadable(maxD)}`;
-      hintEl.style.color = '#38bdf8';
+      if (previewEndDate) {
+        const minD = calState.startDate < previewEndDate ? calState.startDate : previewEndDate;
+        const maxD = calState.startDate < previewEndDate ? previewEndDate : calState.startDate;
+        hintEl.textContent = `Click to select end date: ${formatDateReadable(minD)} → ${formatDateReadable(maxD)}`;
+        hintEl.style.color = '#38bdf8';
+      } else {
+        hintEl.textContent = `Start date selected (${formatDateReadable(calState.startDate)}). Now click a date to select end date.`;
+        hintEl.style.color = '#38bdf8';
+      }
     } else if (calState.startDate && calState.endDate) {
       hintEl.textContent = `Selected: ${formatDateReadable(calState.startDate)} – ${formatDateReadable(calState.endDate)}`;
       hintEl.style.color = '#cbd5e1';
@@ -729,7 +794,7 @@ function updateCalendarCacheStats() {
   }
 
   let selectedList = [];
-  const activeEnd = calState.endDate || calState.startDate;
+  const activeEnd = previewEndDate || calState.endDate || calState.startDate;
   if (calState.startDate && activeEnd) {
     const minD = calState.startDate < activeEnd ? calState.startDate : activeEnd;
     const maxD = calState.startDate < activeEnd ? activeEnd : calState.startDate;
