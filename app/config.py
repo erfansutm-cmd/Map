@@ -1,5 +1,18 @@
 import os
+from pathlib import Path
 from pydantic import BaseModel
+
+# Automatically load .env file if available
+try:
+    from dotenv import load_dotenv
+    # Look for .env in current directory or parent directory
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
+    else:
+        load_dotenv()
+except ImportError:
+    pass
 
 class Settings(BaseModel):
     # Business Logic Defaults
@@ -25,7 +38,7 @@ class Settings(BaseModel):
     CLICKHOUSE_PORT: int = int(os.getenv("CLICKHOUSE_PORT", "8123"))
     CLICKHOUSE_USER: str = os.getenv("CLICKHOUSE_USER", "default")
     CLICKHOUSE_PASSWORD: str = os.getenv("CLICKHOUSE_PASSWORD", "")
-    CLICKHOUSE_DATABASE: str = os.getenv("CLICKHOUSE_DATABASE", "dwh_box")
+    CLICKHOUSE_DATABASE: str = os.getenv("CLICKHOUSE_DB", os.getenv("CLICKHOUSE_DATABASE", "default"))
     CLICKHOUSE_SECURE: bool = os.getenv("CLICKHOUSE_SECURE", "false").lower() in ("true", "1", "yes")
 
 settings = Settings()

@@ -4,22 +4,24 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: fleet-hexmap
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:
-      - DEFAULT_CITY=isfahan
-      - DEFAULT_STATUS=DELIVERED
-      - DEFAULT_CUSTOMER_ID=2
-      - DEFAULT_START_DATE=2026-10-22
-      - DEFAULT_END_DATE=2026-11-05
-      - DEFAULT_THRESHOLD=30
-      - DEFAULT_MIN_ORDERS=5
-      # ClickHouse connection settings (optional; falls back to realistic simulation if empty)
-      - CLICKHOUSE_HOST=
-      - CLICKHOUSE_PORT=8123
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=
-      - CLICKHOUSE_DATABASE=dwh_box
+      - DEFAULT_CITY=${DEFAULT_CITY:-isfahan}
+      - DEFAULT_STATUS=${DEFAULT_STATUS:-DELIVERED}
+      - DEFAULT_CUSTOMER_ID=${DEFAULT_CUSTOMER_ID:-2}
+      - DEFAULT_START_DATE=${DEFAULT_START_DATE:-2026-10-22}
+      - DEFAULT_END_DATE=${DEFAULT_END_DATE:-2026-11-05}
+      - DEFAULT_THRESHOLD=${DEFAULT_THRESHOLD:-30}
+      - DEFAULT_MIN_ORDERS=${DEFAULT_MIN_ORDERS:-5}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-8123}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-default}
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DB:-default}
       - CLICKHOUSE_SECURE=false
     volumes:
       - ./data:/app/data

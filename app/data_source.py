@@ -33,6 +33,11 @@ def try_get_clickhouse_client():
                 print(f"Failed to load connect.py from {path}: {e}")
 
     if settings.CLICKHOUSE_HOST:
+        # Check if password is a masked placeholder or not active yet
+        if settings.CLICKHOUSE_PASSWORD in ("**************", "your_password_here", "placeholder", ""):
+            print(f"ClickHouse host configured ({settings.CLICKHOUSE_HOST}), but credentials are marked for future use / inactive.")
+            return None, None
+
         try:
             import clickhouse_connect
             client = clickhouse_connect.get_client(
@@ -42,7 +47,7 @@ def try_get_clickhouse_client():
                 password=settings.CLICKHOUSE_PASSWORD,
                 database=settings.CLICKHOUSE_DATABASE,
                 secure=settings.CLICKHOUSE_SECURE,
-                connect_timeout=5,
+                connect_timeout=3,
             )
             return client, "clickhouse_connect"
         except Exception as e:
