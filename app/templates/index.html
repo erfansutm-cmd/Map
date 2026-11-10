@@ -120,7 +120,7 @@
     </div>
   </header>
 
-  <!-- Interactive Day Selector Strip -->
+  <!-- Interactive Day Selector Strip with Custom Date Range & DB Fetch -->
   <div class="days-selector-bar">
     <div class="days-bar-title">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -129,14 +129,43 @@
         <line x1="8" y1="2" x2="8" y2="6"></line>
         <line x1="3" y1="10" x2="21" y2="10"></line>
       </svg>
-      <span>Select Days:</span>
+      <span>Date Range:</span>
     </div>
+
+    <!-- Date Range Pickers (Select other days/weeks/months) -->
+    <div class="days-range-group">
+      <input type="date" id="barStartDate" class="bar-date-input" value="2026-10-22" title="Start date">
+      <span style="font-size:11px;color:#64748b">&ndash;</span>
+      <input type="date" id="barEndDate" class="bar-date-input" value="2026-11-05" title="End date">
+      <button id="btnFetchDateRange" class="btn-day-preset btn-day-fetch" title="Fetch days from database if not already cached">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+        Load Range
+      </button>
+    </div>
+
+    <!-- Date Presets Dropdown -->
+    <select id="selectDatePreset" class="bar-date-select" title="Quickly pick a date window outside last 2 weeks">
+      <option value="" disabled selected>Presets &amp; Windows...</option>
+      <option value="last14">Default 2 Weeks (Oct 22 - Nov 05)</option>
+      <option value="last7">Preceding 7 Days (Oct 15 - Oct 21)</option>
+      <option value="last30">Full 30 Days (Oct 07 - Nov 05)</option>
+      <option value="monthSep">September 2026 (Sep 01 - Sep 30)</option>
+      <option value="monthOct">October 2026 (Oct 01 - Oct 31)</option>
+    </select>
+
+    <!-- Add Any Specific Day Outside Range -->
+    <div class="days-add-group">
+      <input type="date" id="inputAddSpecificDate" class="bar-date-input" title="Pick any individual day from DB to add to map">
+      <button id="btnAddSpecificDate" class="btn-day-preset btn-day-add" title="Fetch and add this day from DB">+ Add Day</button>
+    </div>
+
     <div class="days-quick-actions">
-      <button id="btnSelectAllDays" class="btn-day-preset">All Days</button>
-      <button id="btnSelectWeekdays" class="btn-day-preset">Weekdays</button>
-      <button id="btnSelectWeekends" class="btn-day-preset">Weekends</button>
-      <button id="btnInvertDays" class="btn-day-preset">Invert</button>
+      <button id="btnSelectAllDays" class="btn-day-preset" title="Select all active days">All</button>
+      <button id="btnSelectWeekdays" class="btn-day-preset" title="Select weekdays only">Weekdays</button>
+      <button id="btnSelectWeekends" class="btn-day-preset" title="Select weekends only">Weekends</button>
+      <button id="btnInvertDays" class="btn-day-preset" title="Invert day selection">Invert</button>
     </div>
+
     <div id="daysPillsContainer" class="days-pills-container">
       <!-- Dynamic day pills populated via JS -->
     </div>

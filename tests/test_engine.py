@@ -135,6 +135,32 @@ class TestEngine(unittest.TestCase):
             fetch_orders("tabriz", start_date="2026-10-22", end_date="2026-10-23", force_refresh=True)
         self.assertIn("ClickHouse", str(ctx.exception))
 
+    def test_day_cache_serving_and_db_trigger_for_missing_days(self):
+        from app.data_source import DAY_CACHE, QUERIED_DATES, clear_day_cache
+
+        clear_day_cache()
+        sample_df = make_sample_orders_df("isfahan", n_orders=50)
+
+        # Pre-cache two days
+        DAY_CACHE[("isfahan", "DELIVERED", 2, "2026-10-22")] = sample_df.iloc[:25].copy()
+        DAY_CACHE[("isfahan", "DELIVERED", 2, "2026-10-23")] = sample_df.iloc[25:].copy()
+        QUERIED_DATES.add(("isfahan", "DELIVERED", 2, "2026-10-22"))
+        QUERIED_DATES.add(("isfahan", "DELIVERED", 2, "2026-10-23"))
+
+        # When requesting cached days, it returns immediately with "Cached In-Memory"
+        df, src_label, daily_stats, all_dates = fetch_orders(
+            "isfahan", start_date="2026-10-22", end_date="2026-10-23"
+        )
+        self.assertEqual(len(df), 50)
+        self.assertIn("Cached", src_label)
+        self.assertEqual(len(all_dates), 2)
+
+        # When requesting another day NOT in the cache (e.g. 2026-09-15 outside last 2 weeks),
+        # it identifies missing day and triggers DB fetch (raising RuntimeError if DB unreachable)
+        with self.assertRaises(RuntimeError) as ctx:
+            fetch_orders("isfahan", start_date="2026-09-15", end_date="2026-09-15")
+        self.assertIn("ClickHouse", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

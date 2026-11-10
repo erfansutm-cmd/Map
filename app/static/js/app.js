@@ -168,6 +168,81 @@ function setupEventListeners() {
   document.getElementById('btnSelectWeekends').addEventListener('click', selectWeekends);
   document.getElementById('btnInvertDays').addEventListener('click', invertDays);
 
+  // Date Range Fetch & Custom Days (Allows selecting days outside last 2 weeks from DB)
+  const btnFetchRange = document.getElementById('btnFetchDateRange');
+  if (btnFetchRange) {
+    btnFetchRange.addEventListener('click', () => {
+      const sDate = document.getElementById('barStartDate').value;
+      const eDate = document.getElementById('barEndDate').value;
+      if (!sDate || !eDate) {
+        alert("Please specify both Start Date and End Date.");
+        return;
+      }
+      if (sDate > eDate) {
+        alert("Start Date must be before or equal to End Date.");
+        return;
+      }
+      state.startDate = sDate;
+      state.endDate = eDate;
+      state.selectedDates = null;
+      loadCityData(state.city);
+    });
+  }
+
+  // Quick Date Window Presets
+  const selectPreset = document.getElementById('selectDatePreset');
+  if (selectPreset) {
+    selectPreset.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (!val) return;
+      if (val === 'last14') {
+        state.startDate = '2026-10-22';
+        state.endDate = '2026-11-05';
+      } else if (val === 'last7') {
+        state.startDate = '2026-10-15';
+        state.endDate = '2026-10-21';
+      } else if (val === 'last30') {
+        state.startDate = '2026-10-07';
+        state.endDate = '2026-11-05';
+      } else if (val === 'monthSep') {
+        state.startDate = '2026-09-01';
+        state.endDate = '2026-09-30';
+      } else if (val === 'monthOct') {
+        state.startDate = '2026-10-01';
+        state.endDate = '2026-10-31';
+      }
+      const barStart = document.getElementById('barStartDate');
+      const barEnd = document.getElementById('barEndDate');
+      if (barStart) barStart.value = state.startDate;
+      if (barEnd) barEnd.value = state.endDate;
+      state.selectedDates = null;
+      loadCityData(state.city);
+    });
+  }
+
+  // Add Specific Custom Day from DB
+  const btnAddDay = document.getElementById('btnAddSpecificDate');
+  if (btnAddDay) {
+    btnAddDay.addEventListener('click', () => {
+      const newDate = document.getElementById('inputAddSpecificDate').value;
+      if (!newDate) {
+        alert("Please choose a date to add from DB.");
+        return;
+      }
+      const set = new Set(state.selectedDates || state.allDates || []);
+      set.add(newDate);
+      state.selectedDates = Array.from(set).sort();
+
+      if (!state.startDate || newDate < state.startDate) {
+        state.startDate = newDate;
+      }
+      if (!state.endDate || newDate > state.endDate) {
+        state.endDate = newDate;
+      }
+      loadCityData(state.city);
+    });
+  }
+
   // Inspector & Merged panel close buttons
   document.getElementById('btnCloseInspector').addEventListener('click', closeSingleInspector);
   document.getElementById('btnCloseMerged').addEventListener('click', clearHexSelection);
@@ -275,6 +350,15 @@ async function loadCityData(city) {
     state.allDates = data.all_dates || [];
     state.selectedDates = data.selected_dates || data.all_dates || [];
     state.dailyStats = data.daily_stats || [];
+
+    const barStart = document.getElementById('barStartDate');
+    const barEnd = document.getElementById('barEndDate');
+    if (barStart) barStart.value = state.startDate;
+    if (barEnd) barEnd.value = state.endDate;
+    const modalStart = document.getElementById('inputStartDate');
+    const modalEnd = document.getElementById('inputEndDate');
+    if (modalStart) modalStart.value = state.startDate;
+    if (modalEnd) modalEnd.value = state.endDate;
 
     clearHexSelection();
     updateKpis(data.kpis, city, data.data_source);

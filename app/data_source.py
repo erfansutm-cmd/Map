@@ -1,6 +1,6 @@
 """
 Data Source abstraction layer.
-Directly connects to ClickHouse (fact_ka) with single-execution query caching,
+Directly connects to ClickHouse (fact_ka) with single-execution per-day query caching,
 or parses custom uploaded CSV files.
 Mock data generation has been completely removed.
 """
@@ -9,14 +9,23 @@ import math
 import os
 import sys
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict, Any, List
+from typing import Optional, Tuple, Dict, Any, List, Set
 import pandas as pd
 
 from app.config import settings
 from app.cities import normalize_city_name
 
-# Global in-memory cache for executed queries to avoid re-running slow ClickHouse queries
-QUERY_CACHE: Dict[str, pd.DataFrame] = {}
+# Daily in-memory partition cache: (clean_city, status, customer_id, date_str) -> pd.DataFrame
+DAY_CACHE: Dict[Tuple[str, str, int, str], pd.DataFrame] = {}
+
+# Set of dates that have been queried against ClickHouse: (clean_city, status, customer_id, date_str)
+QUERIED_DATES: Set[Tuple[str, str, int, str]] = set()
+
+
+def clear_day_cache():
+    """Clear the in-memory cache."""
+    DAY_CACHE.clear()
+    QUERIED_DATES.clear()
 
 
 def try_get_clickhouse_client():
@@ -130,17 +139,28 @@ def fetch_orders(
 ) -> Tuple[pd.DataFrame, str, List[Dict[str, Any]], List[str]]:
     """
     Fetch orders directly from ClickHouse (no mock data).
-    Executes query once for the date range and caches in-memory per day.
+    Saves data per day in memory.
+    If requested days (or other days not in last 2 weeks) are not in cache,
+    queries ClickHouse specifically for the missing days, caches them, and returns.
+    If days are already cached, serves from memory in 0ms without hitting ClickHouse.
     """
     clean_city = normalize_city_name(city)
-    all_dates = get_dates_between(start_date, end_date)
-    cache_key = f"{clean_city}_{status}_{customer_id}_{start_date}_{end_date}"
+    all_range_dates = get_dates_between(start_date, end_date)
 
-    # 1. Check in-memory query cache
-    if not force_refresh and cache_key in QUERY_CACHE:
-        raw_df = QUERY_CACHE[cache_key]
-        data_source_label = f"Cached In-Memory ({len(raw_df)} orders)"
+    if selected_dates:
+        all_target_dates = sorted(list(set(all_range_dates + selected_dates)))
     else:
+        all_target_dates = all_range_dates
+
+    # Identify which of the requested dates do not have data in cache
+    missing_dates = [
+        d for d in all_target_dates
+        if (clean_city, status, customer_id, d) not in QUERIED_DATES or force_refresh
+    ]
+
+    data_source_label = ""
+
+    if missing_dates:
         client, client_desc = try_get_clickhouse_client()
         if client is None:
             err_msg = (
@@ -150,7 +170,20 @@ def fetch_orders(
             )
             raise RuntimeError(err_msg)
 
-        # Query identical to previous file, with created_date for daily grouping
+        missing_dates = sorted(missing_dates)
+        min_d = missing_dates[0]
+        max_d = missing_dates[-1]
+
+        # Contiguous range check
+        contiguous_dates = get_dates_between(min_d, max_d)
+        if len(missing_dates) == 1:
+            date_clause = f"created_date = toDate('{missing_dates[0]}')"
+        elif len(contiguous_dates) == len(missing_dates):
+            date_clause = f"created_date >= toDate('{min_d}') AND created_date <= toDate('{max_d}')"
+        else:
+            dates_sql = ", ".join(f"toDate('{d}')" for d in missing_dates)
+            date_clause = f"created_date IN ({dates_sql})"
+
         sql = f"""
 SELECT
     order_id,
@@ -164,11 +197,10 @@ FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
   AND customer_id = {customer_id}
-  AND created_date >= toDate('{start_date}')
-  AND created_date <= toDate('{end_date}')
+  AND {date_clause}
 LIMIT 1 BY order_id
 """
-        print(f"Executing ClickHouse query ONCE for {clean_city} ({start_date} to {end_date})...")
+        print(f"Querying ClickHouse for {clean_city} ({len(missing_dates)} missing days: {min_d} to {max_d})...")
         try:
             if hasattr(client, "query_df"):
                 raw_df = client.query_df(sql)
@@ -180,7 +212,6 @@ LIMIT 1 BY order_id
                 raw_df["created_date"] = raw_df["created_date"].astype(str).str[:10]
         except Exception as e:
             print(f"ClickHouse query failed with created_date: {e}. Trying fallback exact query...")
-            # Fallback to exact 6 columns
             sql_fallback = f"""
 SELECT
     order_id,
@@ -193,8 +224,8 @@ FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
   AND customer_id = {customer_id}
-  AND created_date >= toDate('{start_date}')
-  AND created_date <= toDate('{end_date}')
+  AND created_date >= toDate('{min_d}')
+  AND created_date <= toDate('{max_d}')
 LIMIT 1 BY order_id
 """
             if hasattr(client, "query_df"):
@@ -204,62 +235,89 @@ LIMIT 1 BY order_id
                 raw_df = pd.DataFrame(result.result_rows, columns=result.column_names)
 
             if len(raw_df) > 0 and "created_date" not in raw_df.columns:
-                raw_df["created_date"] = end_date
+                raw_df["created_date"] = max_d
 
-        data_source_label = f"ClickHouse Live ({len(raw_df)} orders via {client_desc})"
-        QUERY_CACHE[cache_key] = raw_df
+        # Partition returned rows into DAY_CACHE
+        if len(raw_df) > 0 and "created_date" in raw_df.columns:
+            for d_val, grp in raw_df.groupby("created_date"):
+                d_key = str(d_val)[:10]
+                DAY_CACHE[(clean_city, status, customer_id, d_key)] = grp.copy()
+                QUERIED_DATES.add((clean_city, status, customer_id, d_key))
 
-    # Compute daily breakdown
-    daily_breakdown = compute_daily_breakdown(raw_df, all_dates, threshold)
+        # Mark missing dates with no orders as queried with empty DataFrame
+        for d in missing_dates:
+            if (clean_city, status, customer_id, d) not in DAY_CACHE:
+                DAY_CACHE[(clean_city, status, customer_id, d)] = pd.DataFrame(columns=[
+                    "order_id", "source_latitude", "source_longitude",
+                    "destination_latitude", "destination_longitude",
+                    "create_to_accept_contractual", "created_date"
+                ])
+            QUERIED_DATES.add((clean_city, status, customer_id, d))
 
-    # Filter by selected dates in-memory without re-executing SQL
-    if selected_dates and len(selected_dates) > 0 and len(selected_dates) < len(all_dates):
-        filtered_df = raw_df[raw_df["created_date"].isin(selected_dates)].copy()
+        data_source_label = f"ClickHouse Live ({len(raw_df)} orders fetched for {len(missing_dates)} days)"
     else:
-        filtered_df = raw_df
+        data_source_label = f"Cached In-Memory ({len(all_target_dates)} days cached)"
 
-    return filtered_df, data_source_label, daily_breakdown, all_dates
+    # Combine all target dates from DAY_CACHE
+    day_frames = [
+        DAY_CACHE[(clean_city, status, customer_id, d)]
+        for d in all_target_dates
+        if (clean_city, status, customer_id, d) in DAY_CACHE and len(DAY_CACHE[(clean_city, status, customer_id, d)]) > 0
+    ]
+    if day_frames:
+        target_full_df = pd.concat(day_frames, ignore_index=True)
+    else:
+        target_full_df = pd.DataFrame(columns=[
+            "order_id", "source_latitude", "source_longitude",
+            "destination_latitude", "destination_longitude",
+            "create_to_accept_contractual", "created_date"
+        ])
+
+    # Compute daily breakdown across all target dates
+    daily_breakdown = compute_daily_breakdown(target_full_df, all_target_dates, threshold)
+
+    # Filter for active/selected dates
+    if selected_dates and len(selected_dates) > 0 and len(selected_dates) < len(all_target_dates):
+        filtered_df = target_full_df[target_full_df["created_date"].isin(selected_dates)].copy()
+    else:
+        filtered_df = target_full_df
+
+    return filtered_df, data_source_label, daily_breakdown, all_target_dates
 
 
-def parse_csv_orders(content: bytes) -> pd.DataFrame:
-    """Parse an uploaded CSV file containing order coordinates and duration."""
-    df = pd.read_csv(io.BytesIO(content))
-    df.columns = [c.strip().lower() for c in df.columns]
-
-    col_map = {
-        "order": "order_id",
-        "id": "order_id",
-        "src_lat": "source_latitude",
-        "source_lat": "source_latitude",
-        "src_lng": "source_longitude",
-        "source_lon": "source_longitude",
-        "source_lng": "source_longitude",
-        "dest_lat": "destination_latitude",
-        "destination_lat": "destination_latitude",
-        "dest_lng": "destination_longitude",
-        "destination_lon": "destination_longitude",
-        "destination_lng": "destination_longitude",
-        "duration": "create_to_accept_contractual",
-        "accept_duration": "create_to_accept_contractual",
-        "accept_time": "create_to_accept_contractual",
-        "create_to_accept": "create_to_accept_contractual",
-        "date": "created_date",
-        "created": "created_date",
-    }
-    df = df.rename(columns={c: col_map[c] for c in df.columns if c in col_map})
+def parse_csv_orders(csv_bytes: bytes) -> pd.DataFrame:
+    """Parse uploaded custom orders CSV into required DataFrame format."""
+    df = pd.read_csv(io.BytesIO(csv_bytes))
+    required = ["source_latitude", "source_longitude"]
+    for col in required:
+        if col not in df.columns:
+            raise ValueError(f"Uploaded CSV must contain '{col}' column")
 
     if "order_id" not in df.columns:
-        df["order_id"] = [f"CSV-{i+1}" for i in range(len(df))]
+        df["order_id"] = [f"CSV-{i}" for i in range(len(df))]
 
-    required = ["source_latitude", "source_longitude", "destination_latitude", "destination_longitude"]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise ValueError(f"Uploaded CSV is missing required columns: {missing}")
+    if "destination_latitude" not in df.columns:
+        df["destination_latitude"] = df["source_latitude"]
+    if "destination_longitude" not in df.columns:
+        df["destination_longitude"] = df["source_longitude"]
 
     if "create_to_accept_contractual" not in df.columns:
-        df["create_to_accept_contractual"] = 20.0
+        candidates = ["duration", "create_to_accept", "accept_time", "time_to_accept"]
+        found = False
+        for c in candidates:
+            if c in df.columns:
+                df["create_to_accept_contractual"] = df[c]
+                found = True
+                break
+        if not found:
+            df["create_to_accept_contractual"] = 15.0
+
+    df["source_latitude"] = pd.to_numeric(df["source_latitude"], errors="coerce")
+    df["source_longitude"] = pd.to_numeric(df["source_longitude"], errors="coerce")
+    df["create_to_accept_contractual"] = pd.to_numeric(df["create_to_accept_contractual"], errors="coerce")
+    df = df.dropna(subset=["source_latitude", "source_longitude"]).copy()
 
     if "created_date" not in df.columns:
-        df["created_date"] = "2026-11-05"
+        df["created_date"] = "2026-10-22"
 
     return df
