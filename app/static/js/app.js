@@ -620,33 +620,6 @@ function setupControlPanelTabs() {
       filterHexagons();
     });
   }
-
-  // Preset chips for Breach and Orders filters
-  document.querySelectorAll('.preset-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const filterType = chip.dataset.filter;
-      const val = parseFloat(chip.dataset.val) || 0;
-      if (filterType === 'breach') {
-        if (state.colorMetric === 'ha') {
-          state.minBreachFilter = val;
-        } else {
-          state.minMeanFilter = val;
-        }
-        const s = document.getElementById('sliderBreachFilter');
-        const n = document.getElementById('numBreachFilter');
-        if (s) s.value = val;
-        if (n) n.value = val;
-      } else if (filterType === 'orders') {
-        state.minOrdersFilter = val;
-        const s = document.getElementById('sliderOrdersFilter');
-        const n = document.getElementById('numOrdersFilter');
-        if (s) s.value = val;
-        if (n) n.value = val;
-      }
-      updateFilterLabels();
-      filterHexagons();
-    });
-  });
 }
 
 // Format date nicely: YYYY-MM-DD -> "Oct 22, 2026"
@@ -1650,16 +1623,6 @@ function updateFilterLabels() {
   if (tabFilterDot) {
     tabFilterDot.style.display = isFiltered ? 'inline-block' : 'none';
   }
-
-  // Sync preset chips active state
-  document.querySelectorAll('#presetChipsBreach .preset-chip').forEach(chip => {
-    const val = parseFloat(chip.dataset.val) || 0;
-    chip.classList.toggle('active', Math.abs(activeMetricVal - val) < 0.001);
-  });
-  document.querySelectorAll('#presetChipsOrders .preset-chip').forEach(chip => {
-    const val = parseInt(chip.dataset.val, 10) || 0;
-    chip.classList.toggle('active', state.minOrdersFilter === val);
-  });
 }
 
 // Update Top Floating Citywide HA30 Overview & KPI Cards

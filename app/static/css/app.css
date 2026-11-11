@@ -1034,41 +1034,6 @@ html, body {
   color: #1d4ed8;
 }
 
-/* Preset Chips for Filters */
-.filter-preset-chips {
-  display: flex;
-  gap: 3px;
-  margin-top: 6px;
-}
-
-.preset-chip {
-  flex: 1;
-  padding: 2.5px 1px;
-  font-size: 9.5px;
-  font-weight: 600;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  color: #475569;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.preset-chip:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #0f172a;
-}
-
-.preset-chip.active {
-  background: #eff6ff;
-  border-color: #3b82f6;
-  color: #1d4ed8;
-  font-weight: 700;
-}
-
 /* Clean Map Only Mode Styles */
 body.map-only-mode .map-controls-panel,
 body.map-only-mode .citywide-kpi-bar,
