@@ -395,8 +395,9 @@ function updateLabels() {
   var boxH = radiusPx < 11 ? Math.max(12, Math.round(radiusPx * 1.2)) : Math.round(radiusPx * 1.2);
 
   items.forEach(function(it) {
-    var haText = it.h.pct.toFixed(1) + '%';
-    var html = '<div class="lbl-ha" style="font-size:' + fHa + 'px">' + haText + '</div>' +
+    var isHa = colorMetric === 'ha';
+    var metricText = isHa ? (it.h.pct.toFixed(1) + '%') : (radiusPx < 14 ? (it.h.mean.toFixed(1) + 'm') : (it.h.mean.toFixed(1) + ' min'));
+    var html = '<div class="lbl-ha" style="font-size:' + fHa + 'px">' + metricText + '</div>' +
                (radiusPx >= 11 ? ('<div class="lbl-ord" style="font-size:' + fSub + 'px">' + it.h.orders + ' ord</div>') : '');
     var icon = L.divIcon({
       className: 'lbl',

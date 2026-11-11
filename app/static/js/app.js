@@ -24,6 +24,7 @@ const state = {
   colorMetric: 'ha',          // 'ha' (HA30% breach) or 'mean' (Mean duration)
   activeBasemap: 'voyager',
   minBreachFilter: 0,
+  minMeanFilter: 0,
   minOrdersFilter: 0,
   selectedDates: [],          // Active YYYY-MM-DD date strings
   allDates: [],               // Full range of dates
@@ -201,12 +202,18 @@ function setupEventListeners() {
   });
 
   // Dynamic SLA breach filter slider & number input
+  // Dynamic Metric (SLA breach / Mean duration) filter slider & number input
   const sliderBreach = document.getElementById('sliderBreachFilter');
   const numBreach = document.getElementById('numBreachFilter');
   if (sliderBreach) {
     sliderBreach.addEventListener('input', (e) => {
-      state.minBreachFilter = parseFloat(e.target.value) || 0;
-      if (numBreach) numBreach.value = state.minBreachFilter;
+      const val = parseFloat(e.target.value) || 0;
+      if (state.colorMetric === 'ha') {
+        state.minBreachFilter = val;
+      } else {
+        state.minMeanFilter = val;
+      }
+      if (numBreach) numBreach.value = val;
       updateFilterLabels();
       filterHexagons();
     });
@@ -217,7 +224,11 @@ function setupEventListeners() {
         let val = parseFloat(e.target.value) || 0;
         const maxVal = parseFloat(sliderBreach?.dataset.dataMax || sliderBreach?.max) || 100;
         val = Math.max(0, Math.min(val, maxVal));
-        state.minBreachFilter = val;
+        if (state.colorMetric === 'ha') {
+          state.minBreachFilter = val;
+        } else {
+          state.minMeanFilter = val;
+        }
         if (sliderBreach) sliderBreach.value = val;
         updateFilterLabels();
         filterHexagons();
@@ -1415,31 +1426,47 @@ async function loadCityData(city, isNewCity = false, forceRefresh = false) {
   }
 }
 
-// Dynamically rescale Min SLA Breach and Min Orders filter sliders to the max in active data
+// Dynamically rescale Primary Metric (SLA breach / Mean duration) and Min Orders filter sliders to the max in active data
 function resizeFilterSliders() {
   if (!state.data) return;
   const layerData = state.data.layers?.[state.currentLayer]?.res?.[state.currentRes];
   const hexes = layerData?.hexes || [];
 
   let maxSla = 0;
+  let maxMean = 0;
   let maxOrders = 0;
   hexes.forEach(h => {
     if (h.pct > maxSla) maxSla = h.pct;
+    if (h.mean > maxMean) maxMean = h.mean;
     if (h.orders > maxOrders) maxOrders = h.orders;
   });
 
-  // Scale Min SLA Breach Filter slider
+  const isHa = state.colorMetric === 'ha';
+
+  // Scale Primary Metric Filter slider (HA% or Mean Duration)
   const breachSlider = document.getElementById('sliderBreachFilter');
   if (breachSlider) {
-    const ceilSla = Math.ceil(maxSla);
-    const sliderMax = Math.max(ceilSla, 10);
-    breachSlider.max = sliderMax;
-    breachSlider.step = sliderMax > 25 ? 1 : 0.5;
-    if (state.minBreachFilter > sliderMax) {
-      state.minBreachFilter = 0;
+    if (isHa) {
+      const ceilSla = Math.ceil(maxSla);
+      const sliderMax = Math.max(ceilSla, 10);
+      breachSlider.max = sliderMax;
+      breachSlider.step = sliderMax > 25 ? 1 : 0.5;
+      if (state.minBreachFilter > sliderMax) {
+        state.minBreachFilter = 0;
+      }
+      breachSlider.value = state.minBreachFilter;
+      breachSlider.dataset.dataMax = ceilSla;
+    } else {
+      const ceilMean = Math.ceil(maxMean);
+      const sliderMax = Math.max(ceilMean, 10);
+      breachSlider.max = sliderMax;
+      breachSlider.step = sliderMax > 20 ? 1 : 0.5;
+      if ((state.minMeanFilter || 0) > sliderMax) {
+        state.minMeanFilter = 0;
+      }
+      breachSlider.value = state.minMeanFilter || 0;
+      breachSlider.dataset.dataMax = ceilMean;
     }
-    breachSlider.value = state.minBreachFilter;
-    breachSlider.dataset.dataMax = ceilSla;
   }
 
   // Scale Min Orders in Cell slider
@@ -1459,15 +1486,34 @@ function resizeFilterSliders() {
 }
 
 function updateFilterLabels() {
+  const isHa = state.colorMetric === 'ha';
+  const titleEl = document.getElementById('titleMetricFilter');
+  const unitEl = document.getElementById('unitBreachFilter');
+  const minScaleEl = document.getElementById('minScaleMetricFilter');
   const breachSlider = document.getElementById('sliderBreachFilter');
   const breachVal = document.getElementById('valBreachFilter');
   const breachNum = document.getElementById('numBreachFilter');
+
+  if (titleEl) {
+    titleEl.textContent = isHa ? 'Min SLA Breach Filter' : 'Min Mean Duration Filter';
+  }
+  if (unitEl) {
+    unitEl.textContent = isHa ? '%' : 'min';
+  }
+  if (minScaleEl) {
+    minScaleEl.textContent = isHa ? '0%' : '0 min';
+  }
+
   if (breachSlider) {
     const maxVal = breachSlider.dataset.dataMax || breachSlider.max;
-    if (breachVal) breachVal.textContent = `% (max: ${maxVal}%)`;
+    if (breachVal) {
+      breachVal.textContent = isHa ? `max: ${maxVal}%` : `max: ${maxVal} min`;
+    }
     if (breachNum) {
-      breachNum.value = state.minBreachFilter;
+      const curVal = isHa ? state.minBreachFilter : (state.minMeanFilter || 0);
+      breachNum.value = curVal;
       breachNum.max = maxVal;
+      breachNum.title = isHa ? 'Type minimum SLA breach percentage' : 'Type minimum mean accept duration in minutes';
     }
   }
 
@@ -1476,11 +1522,25 @@ function updateFilterLabels() {
   const ordersNum = document.getElementById('numOrdersFilter');
   if (ordersSlider) {
     const maxVal = ordersSlider.dataset.dataMax || ordersSlider.max;
-    if (ordersVal) ordersVal.textContent = `(max: ${Number(maxVal).toLocaleString()})`;
+    if (ordersVal) ordersVal.textContent = `max: ${Number(maxVal).toLocaleString()} ord`;
     if (ordersNum) {
       ordersNum.value = state.minOrdersFilter;
       ordersNum.max = maxVal;
     }
+  }
+
+  // Update cell numbers button labels and checkbox text
+  const btnLabelOrdersHa = document.getElementById('btnLabelOrdersHa');
+  const btnLabelHaOnly = document.getElementById('btnLabelHaOnly');
+  const labelCheckboxText = document.getElementById('labelCheckboxText');
+  if (btnLabelOrdersHa) {
+    btnLabelOrdersHa.textContent = isHa ? 'HA% + Orders' : 'Mean + Orders';
+  }
+  if (btnLabelHaOnly) {
+    btnLabelHaOnly.textContent = isHa ? 'HA% Only' : 'Mean Only';
+  }
+  if (labelCheckboxText) {
+    labelCheckboxText.textContent = isHa ? 'Cell Numbers (HA% & Orders)' : 'Cell Numbers (Mean & Orders)';
   }
 }
 
@@ -1623,7 +1683,10 @@ function renderMapHexagons() {
   if (!layerData || !layerData.hexes) return;
 
   layerData.hexes.forEach(h => {
-    const isVisible = (h.pct >= state.minBreachFilter) && (h.orders >= state.minOrdersFilter);
+    const passesMetric = state.colorMetric === 'ha'
+      ? (h.pct >= state.minBreachFilter)
+      : (h.mean >= (state.minMeanFilter || 0));
+    const isVisible = passesMetric && (h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(h.hex);
     const fillColor = state.colorMetric === 'ha' ? h.color_ha : h.color_mean;
 
@@ -1698,21 +1761,34 @@ function createTooltipContent(h) {
     statusBadgeHtml = '<div style="font-size:10px;color:#94a3b8;margin:3px 0 2px">⚪ Low Order Volume (&lt;5)</div>';
   }
 
-  return `
-    <div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.45;min-width:180px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+  const isMean = state.colorMetric === 'mean';
+  const topMetricHtml = isMean
+    ? `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+        <span style="font-size:13.5px;color:#0f172a"><b>Mean: ${h.mean.toFixed(1)} min</b></span>
+        <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
+       </div>
+       <div style="display:flex;justify-content:space-between;margin:2px 0">
+        <span style="color:#64748b">HA${state.threshold}% Breach:</span>
+        <span style="color:#dc2626;font-weight:700">${h.pct.toFixed(1)}% (${h.slow} ord)</span>
+       </div>
+       <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept average: ${h.mean.toFixed(1)} min)</div>`
+    : `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
         <span style="font-size:13.5px;color:#0f172a"><b>HA${state.threshold}%: ${h.pct.toFixed(1)}%</b></span>
         <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
+       </div>
+       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
         <span style="color:#64748b">HA${state.threshold} Orders Count:</span>
         <b style="color:#dc2626">${h.slow}</b>
-      </div>
-      <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept time &ge; ${state.threshold} min)</div>
-      <div style="display:flex;justify-content:space-between;margin:2px 0">
+       </div>
+       <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept time &ge; ${state.threshold} min)</div>
+       <div style="display:flex;justify-content:space-between;margin:2px 0">
         <span style="color:#64748b">Mean Duration:</span>
         <span style="color:#0f172a;font-weight:600">${h.mean.toFixed(1)} min</span>
-      </div>
+       </div>`;
+
+  return `
+    <div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.45;min-width:180px">
+      ${topMetricHtml}
       ${statusBadgeHtml}
       <div style="margin-top:4px;font-size:9.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:3px">Hex: ${h.hex}</div>
     </div>
@@ -2038,8 +2114,18 @@ function setColorMetric(metric) {
     });
   });
 
+  resizeFilterSliders();
+  updateFilterLabels();
+  filterHexagons();
   updateLegend();
   renderLabels();
+
+  if (state.data) {
+    const layerData = state.data.layers?.[state.currentLayer]?.res?.[state.currentRes];
+    if (layerData && layerData.bottlenecks) {
+      renderBottlenecks(layerData.bottlenecks);
+    }
+  }
 }
 
 // Render labels on hexagons: dynamically sized and centered to fit inside each cell on every zoom & resolution
@@ -2105,25 +2191,34 @@ function renderLabels() {
   // Exact anchor at box midpoint ensures the text is centered precisely at hexagon centroid
   const anchorX = boxWPx / 2;
   const anchorY = boxHPx / 2;
+  const isHa = state.colorMetric === 'ha';
 
   state.polygons.forEach(item => {
     const h = item.h;
-    // Only render label if cell passes active breach and orders filters
-    if (h.pct < state.minBreachFilter || h.orders < state.minOrdersFilter) return;
+    // Only render label if cell passes active metric and orders filters
+    const passesMetric = isHa
+      ? (h.pct >= state.minBreachFilter)
+      : (h.mean >= (state.minMeanFilter || 0));
+    if (!passesMetric || h.orders < state.minOrdersFilter) return;
 
-    // HA percentage formatted with exact 1-decimal-place float precision (e.g. 14.2%)
-    const haPrecise = `${h.pct.toFixed(1)}%`;
+    // Display metric in each cell:
+    // When HA mode: HA percentage (e.g. 14.2%)
+    // When Mean Duration mode: Mean duration in minutes (e.g. 18.4m or 18.4 min)
+    const metricText = isHa
+      ? `${h.pct.toFixed(1)}%`
+      : (radiusPx < 14 ? `${h.mean.toFixed(1)}m` : `${h.mean.toFixed(1)} min`);
+
     let htmlContent;
 
     if (state.cellLabelMode === 'orders_only') {
       htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.orders.toLocaleString()}</span>`;
     } else if (state.cellLabelMode === 'ha_only' || radiusPx < 11) {
-      // Prominent HA% with 1 decimal precision in each cell
-      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${haPrecise}</span>`;
+      // Primary metric only (HA% or Mean Duration)
+      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>`;
     } else {
-      // Default: HA% with 1-float precision prominent, plus orders volume underneath
+      // Default: Metric prominent, plus orders volume underneath
       htmlContent = `
-        <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${haPrecise}</span>
+        <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>
         <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.orders.toLocaleString()} ord</span>
       `;
     }
@@ -2145,10 +2240,15 @@ function updateLabelsVisibility() {
   }
 }
 
-// Filter hexagons by breach rate and orders slider: completely hides non-matching cells
+// Filter hexagons by breach rate or mean duration and orders slider: completely hides non-matching cells
 function filterHexagons() {
+  const isHa = state.colorMetric === 'ha';
+
   state.polygons.forEach(item => {
-    const isVisible = (item.h.pct >= state.minBreachFilter) && (item.h.orders >= state.minOrdersFilter);
+    const passesMetric = isHa
+      ? (item.h.pct >= state.minBreachFilter)
+      : (item.h.mean >= (state.minMeanFilter || 0));
+    const isVisible = passesMetric && (item.h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(item.h.hex);
 
     if (isVisible) {
@@ -2296,13 +2396,15 @@ function renderBottlenecks(bottlenecks) {
     return;
   }
 
+  const isHa = state.colorMetric === 'ha';
+
   container.innerHTML = bottlenecks.map((b, i) => `
     <div class="bottleneck-row" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
       <div>
         <div style="font-weight:700">#${i + 1} ${b.hex.substring(0, 8)}...</div>
         <div style="font-size:9.5px;color:#64748b">${b.orders} orders &bull; ${b.slow} HA30 &bull; ${b.mean}m avg</div>
       </div>
-      <div style="font-weight:800;color:#dc2626">${b.pct.toFixed(1)}%</div>
+      <div style="font-weight:800;color:${isHa ? '#dc2626' : '#2563eb'}">${isHa ? `${b.pct.toFixed(1)}%` : `${b.mean.toFixed(1)} min`}</div>
     </div>
   `).join('');
 }

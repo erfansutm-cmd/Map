@@ -361,39 +361,52 @@
           <input type="range" id="sliderOpacity" class="range-slider" min="0.1" max="1.0" step="0.05" value="0.65">
         </div>
 
-        <!-- Dynamic Min SLA Breach Filter -->
-        <div class="control-slider-group">
-          <div class="slider-label-row" style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-weight:600">Min SLA Breach Filter</span>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" id="numBreachFilter" class="small-num-input" min="0" max="100" step="1" value="0" title="Type minimum SLA breach percentage">
-              <span id="valBreachFilter" style="font-size:10.5px;color:#64748b">% (max: 100%)</span>
+        <!-- Dynamic Metric Filter (HA30% or Mean Duration) -->
+        <div class="filter-control-card">
+          <div class="filter-card-header">
+            <span class="filter-title" id="titleMetricFilter">Min SLA Breach Filter</span>
+            <div class="filter-val-badge">
+              <input type="number" id="numBreachFilter" class="filter-num-input" min="0" max="100" step="1" value="0" title="Type minimum value">
+              <span id="unitBreachFilter" class="filter-unit-tag">%</span>
             </div>
           </div>
-          <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="100" step="1" value="0">
+          <div class="filter-slider-container">
+            <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="100" step="1" value="0">
+          </div>
+          <div class="filter-scale-footer">
+            <span id="minScaleMetricFilter">0%</span>
+            <span id="valBreachFilter">max: 100%</span>
+          </div>
         </div>
 
         <!-- Dynamic Min Orders in Cell Filter -->
-        <div class="control-slider-group">
-          <div class="slider-label-row" style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-weight:600">Min Orders in Cell</span>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" id="numOrdersFilter" class="small-num-input" min="0" max="100" step="1" value="0" title="Type minimum orders count">
-              <span id="valOrdersFilter" style="font-size:10px;color:#64748b">(max: 0)</span>
+        <div class="filter-control-card">
+          <div class="filter-card-header">
+            <span class="filter-title">Min Orders in Cell</span>
+            <div class="filter-val-badge">
+              <input type="number" id="numOrdersFilter" class="filter-num-input" min="0" max="100" step="1" value="0" title="Type minimum orders count">
+              <span class="filter-unit-tag">ord</span>
             </div>
           </div>
-          <input type="range" id="sliderOrdersFilter" class="range-slider" min="0" max="100" step="1" value="0">
+          <div class="filter-slider-container">
+            <input type="range" id="sliderOrdersFilter" class="range-slider" min="0" max="100" step="1" value="0">
+          </div>
+          <div class="filter-scale-footer">
+            <span>0 ord</span>
+            <span id="valOrdersFilter">max: 0 ord</span>
+          </div>
         </div>
 
-        <div style="margin:10px 0 6px">
+        <!-- Cell Numbers Toggle & Display Modes -->
+        <div class="filter-control-card">
           <label class="checkbox-label" style="margin-bottom:6px">
             <input type="checkbox" id="checkShowLabels" checked>
-            <span style="font-weight:600">Cell Numbers (HA% &amp; Orders)</span>
+            <span style="font-weight:600" id="labelCheckboxText">Cell Numbers (HA% &amp; Orders)</span>
           </label>
-          <div class="pill-segmented" style="font-size:10px">
-            <button id="btnLabelOrdersHa" class="pill-item active">HA% + Orders</button>
-            <button id="btnLabelHaOnly" class="pill-item">HA% Only</button>
-            <button id="btnLabelOrdersOnly" class="pill-item">Orders Only</button>
+          <div class="pill-segmented pill-cell-labels">
+            <button id="btnLabelOrdersHa" class="pill-item active" type="button">HA% + Orders</button>
+            <button id="btnLabelHaOnly" class="pill-item" type="button">HA% Only</button>
+            <button id="btnLabelOrdersOnly" class="pill-item" type="button">Orders Only</button>
           </div>
         </div>
 
