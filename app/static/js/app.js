@@ -2386,11 +2386,8 @@ function setColorMetric(metric) {
     boxMergedShare.classList.toggle('active-metric-box', metric === 'share');
   }
 
-  if (state.data) {
-    const layerData = state.data.layers?.[state.currentLayer]?.res?.[state.currentRes];
-    if (layerData && layerData.bottlenecks) {
-      renderBottlenecks(layerData.bottlenecks);
-    }
+  if (state.data && state.data.bottlenecks) {
+    renderBottlenecks(state.data.bottlenecks);
   }
 }
 
@@ -2704,15 +2701,23 @@ function renderBottlenecks(bottlenecks) {
     return;
   }
 
-  const isHa = state.colorMetric === 'ha';
+  // Rank bottlenecks by percentage of hyperact orders (highest % first)
+  const sorted = [...bottlenecks].sort((a, b) => {
+    const pctA = a.pct !== undefined ? a.pct : 0;
+    const pctB = b.pct !== undefined ? b.pct : 0;
+    if (pctB !== pctA) return pctB - pctA;
+    return (b.orders || 0) - (a.orders || 0);
+  });
 
-  container.innerHTML = bottlenecks.map((b, i) => `
+  const thresh = state.threshold || 30;
+
+  container.innerHTML = sorted.map((b, i) => `
     <div class="bottleneck-row" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
-      <div>
+      <div style="min-width:0;flex:1">
         <div style="font-weight:700">#${i + 1} ${b.hex.substring(0, 8)}...</div>
-        <div style="font-size:9.5px;color:#64748b">${b.orders} orders &bull; ${b.slow} HA30 &bull; ${b.mean}m avg</div>
+        <div style="font-size:9.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(b.orders || 0).toLocaleString()} orders &bull; ${(b.slow || 0).toLocaleString()} HA${thresh} &bull; ${b.mean ? b.mean.toFixed(1) : 0}m avg</div>
       </div>
-      <div style="font-weight:800;color:${isHa ? '#dc2626' : '#2563eb'}">${isHa ? `${b.pct.toFixed(1)}%` : `${b.mean.toFixed(1)} min`}</div>
+      <div style="font-weight:800;font-size:12.5px;color:#dc2626;margin-left:8px;flex-shrink:0">${b.pct ? b.pct.toFixed(1) : '0.0'}%</div>
     </div>
   `).join('');
 }

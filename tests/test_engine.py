@@ -119,6 +119,20 @@ class TestEngine(unittest.TestCase):
         self.assertIn("slow", first_hex)
         self.assertIn("ha30_count", first_hex)
 
+    def test_bottlenecks_ranking_by_hyperact_percentage(self):
+        df = make_sample_orders_df("isfahan", n_orders=300)
+        analysis = analyze_city_orders(df, threshold=30, min_orders=2, res_min=6, res_max=8, res_default=7)
+        bottlenecks = analysis["bottlenecks"]
+        self.assertTrue(len(bottlenecks) > 0)
+        pcts = [b["pct"] for b in bottlenecks]
+        self.assertEqual(pcts, sorted(pcts, reverse=True))
+        for b in bottlenecks:
+            self.assertIn("pct", b)
+            self.assertIn("share_pct", b)
+            self.assertIn("orders", b)
+            self.assertIn("slow", b)
+            self.assertIn("mean", b)
+
     def test_export_html(self):
         df = make_sample_orders_df("shiraz", n_orders=150)
         analysis = analyze_city_orders(df, threshold=30, min_orders=2, res_min=7, res_max=8, res_default=8)

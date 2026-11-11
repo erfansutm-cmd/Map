@@ -328,22 +328,23 @@ def analyze_city_orders(
         }
         areas[str(r)] = f"~{h3.average_hexagon_area(r, 'km^2'):.2g} km\u00b2"
 
-    # Identify critical operational bottlenecks at default resolution
+    # Identify critical operational bottlenecks at default resolution ranked by percentage of hyperact orders
     default_src_tbl = rollup(base_src, res_default, min_orders, res_max)
     bottlenecks = []
     best_performers = []
     if len(default_src_tbl) > 0:
         reliable_src = default_src_tbl[default_src_tbl["reliable"]].copy()
         if len(reliable_src) > 0:
-            reliable_src["bottleneck_score"] = reliable_src["orders"] * (reliable_src["pct_slow"] ** 1.3)
-            sorted_bottlenecks = reliable_src.sort_values(by="bottleneck_score", ascending=False).head(8)
+            sorted_bottlenecks = reliable_src.sort_values(by=["pct_slow", "orders"], ascending=[False, False]).head(8)
             for row in sorted_bottlenecks.itertuples():
                 c_lat, c_lng = h3.cell_to_latlng(row.hex)
+                share_pct = round(float(row.slow) / float(total_slow) * 100.0, 2) if total_slow > 0 else 0.0
                 bottlenecks.append({
                     "hex": row.hex,
                     "orders": int(row.orders),
                     "slow": int(row.slow),
                     "pct": round(float(row.pct_slow), 1),
+                    "share_pct": share_pct,
                     "mean": round(float(row.mean), 1),
                     "center": [round(c_lat, 5), round(c_lng, 5)],
                     "status": row.status,
@@ -352,11 +353,13 @@ def analyze_city_orders(
             sorted_best = reliable_src.sort_values(by=["pct_slow", "orders"], ascending=[True, False]).head(5)
             for row in sorted_best.itertuples():
                 c_lat, c_lng = h3.cell_to_latlng(row.hex)
+                share_pct = round(float(row.slow) / float(total_slow) * 100.0, 2) if total_slow > 0 else 0.0
                 best_performers.append({
                     "hex": row.hex,
                     "orders": int(row.orders),
                     "slow": int(row.slow),
                     "pct": round(float(row.pct_slow), 1),
+                    "share_pct": share_pct,
                     "mean": round(float(row.mean), 1),
                     "center": [round(c_lat, 5), round(c_lng, 5)],
                     "status": row.status,
