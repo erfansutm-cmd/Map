@@ -88,15 +88,19 @@ html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Inter', -a
 .radio-group { display: flex; gap: 4px; background: #f1f5f9; padding: 3px; border-radius: 6px; margin-bottom: 10px; }
 .radio-btn {
   flex: 1;
+  min-width: 0;
   text-align: center;
-  padding: 6px 4px;
-  font-size: 11.5px;
+  padding: 6px 3px;
+  font-size: 10.5px;
   font-weight: 600;
   border-radius: 4px;
   cursor: pointer;
   border: none;
   background: transparent;
   color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: all 0.15s;
 }
 .radio-btn.active {
@@ -504,7 +508,7 @@ panelControl.onAdd = function() {
     '<div class="radio-group">' +
       '<button id="btnColHa" class="radio-btn primary-active active" onclick="setMetric(\'ha\')">HA' + THRESHOLD + '% Breach</button>' +
       '<button id="btnColMean" class="radio-btn primary-active" onclick="setMetric(\'mean\')">Mean Duration</button>' +
-      '<button id="btnColShare" class="radio-btn primary-active" onclick="setMetric(\'share\')">City HA Share %</button>' +
+      '<button id="btnColShare" class="radio-btn primary-active" onclick="setMetric(\'share\')">HA Share</button>' +
     '</div>' +
     '<div class="section-title">Resolution (H3 Level)</div>' +
     '<div class="res-stepper">' +

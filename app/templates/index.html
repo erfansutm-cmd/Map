@@ -371,7 +371,7 @@
               <div class="color-metric-toggle">
                 <button id="btnMetricHa" class="color-metric-btn active" type="button" title="Cell local SLA breach percentage">HA30% Breach</button>
                 <button id="btnMetricMean" class="color-metric-btn" type="button" title="Mean accept duration in minutes">Mean (min)</button>
-                <button id="btnMetricShare" class="color-metric-btn" type="button" title="Percentage share of whole city's hyper act orders">City HA Share %</button>
+                <button id="btnMetricShare" class="color-metric-btn" type="button" title="Percentage share of whole city's hyper act orders">HA Share</button>
               </div>
 
               <div class="ctrl-card-header" style="margin-top:8px">
@@ -463,12 +463,12 @@
               </div>
 
               <!-- Cell Numbers Toggle & Display Modes -->
-              <div class="filter-control-card" style="margin-top:8px">
+              <div class="cell-display-options" style="margin-top:10px;padding-top:8px;border-top:1px solid #e2e8f0">
                 <label class="checkbox-label" style="margin-bottom:6px">
                   <input type="checkbox" id="checkShowLabels" checked>
                   <span style="font-weight:600" id="labelCheckboxText">Cell Numbers (HA% &amp; Orders)</span>
                 </label>
-                <div class="pill-segmented pill-cell-labels">
+                <div class="pill-cell-labels">
                   <button id="btnLabelOrdersHa" class="pill-item active" type="button" title="Show metric and order count in cell views">HA% + Orders</button>
                   <button id="btnLabelHaOnly" class="pill-item" type="button" title="Show only metric in cell views">HA% Only</button>
                   <button id="btnLabelOrdersOnly" class="pill-item" type="button" title="Show only orders count in cell views">Orders Only</button>

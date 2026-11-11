@@ -1596,7 +1596,7 @@ function updateFilterLabels() {
   if (titleEl) {
     if (isHa) titleEl.textContent = 'Min SLA Breach Filter';
     else if (isMean) titleEl.textContent = 'Min Mean Duration Filter';
-    else titleEl.textContent = 'Min City HA Share Filter';
+    else titleEl.textContent = 'Min HA Share Filter';
   }
   if (unitEl) {
     unitEl.textContent = isMean ? 'min' : '%';
@@ -1648,21 +1648,21 @@ function updateFilterLabels() {
   if (btnLabelOrdersHa) {
     if (isHa) btnLabelOrdersHa.textContent = 'HA% + Orders';
     else if (isMean) btnLabelOrdersHa.textContent = 'Mean + Orders';
-    else btnLabelOrdersHa.textContent = 'Share% + HA Orders';
+    else btnLabelOrdersHa.textContent = 'Share + HA';
   }
   if (btnLabelHaOnly) {
     if (isHa) btnLabelHaOnly.textContent = 'HA% Only';
     else if (isMean) btnLabelHaOnly.textContent = 'Mean Only';
-    else btnLabelHaOnly.textContent = 'Share% Only';
+    else btnLabelHaOnly.textContent = 'Share Only';
   }
   if (btnLabelOrdersOnly) {
-    if (isShare) btnLabelOrdersOnly.textContent = 'HA Orders Only';
+    if (isShare) btnLabelOrdersOnly.textContent = 'HA Only';
     else btnLabelOrdersOnly.textContent = 'Orders Only';
   }
   if (labelCheckboxText) {
     if (isHa) labelCheckboxText.textContent = 'Cell Numbers (HA% & Orders)';
     else if (isMean) labelCheckboxText.textContent = 'Cell Numbers (Mean & Orders)';
-    else labelCheckboxText.textContent = 'Cell Numbers (City HA% Share)';
+    else labelCheckboxText.textContent = 'Cell Numbers (HA Share)';
   }
 
   // Update indicator dot on filters tab
@@ -1681,7 +1681,9 @@ function updateFilterLabels() {
 // Update Top Floating Citywide HA30 Overview & KPI Cards
 function updateKpis(kpis, city, dataSource) {
   document.getElementById('headerCityLabel').textContent = `${city.toUpperCase()}`;
-  document.getElementById('headerThresholdLabel').textContent = state.colorMetric === 'ha' ? `HA${kpis.threshold}%` : 'MEAN DURATION';
+  document.getElementById('headerThresholdLabel').textContent = state.colorMetric === 'ha'
+    ? `HA${kpis.threshold}%`
+    : (state.colorMetric === 'mean' ? 'MEAN DURATION' : 'HA SHARE');
   document.getElementById('kpiThresholdVal').textContent = kpis.threshold;
 
   // Citywide HA30 Overview Card
@@ -2359,7 +2361,7 @@ function setColorMetric(metric) {
   if (headerThresh) {
     if (metric === 'ha') headerThresh.textContent = `HA${state.threshold}%`;
     else if (metric === 'mean') headerThresh.textContent = 'MEAN DURATION';
-    else headerThresh.textContent = 'CITY HA% SHARE';
+    else headerThresh.textContent = 'HA SHARE';
   }
 
   const boxInspHa = document.getElementById('boxInspHa');
