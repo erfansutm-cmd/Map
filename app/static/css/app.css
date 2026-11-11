@@ -1678,39 +1678,6 @@ body.map-only-mode .btn-exit-map-only {
   white-space: nowrap;
 }
 
-.cell-metric-badge {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #2563eb;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  padding: 1px 7px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.cell-metric-badge:hover {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  transform: translateY(-1px);
-}
-
-.cell-metric-badge.metric-mean {
-  color: #4f46e5;
-  background: #eef2ff;
-  border-color: #c7d2fe;
-}
-
-.cell-metric-badge.metric-mean:hover {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
-}
-
 .stat-box.active-metric-box {
   background: #eff6ff;
   border: 1.5px solid #3b82f6;

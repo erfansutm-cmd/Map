@@ -291,14 +291,6 @@ function setupEventListeners() {
   if (btnLblHaOnly) btnLblHaOnly.addEventListener('click', () => setCellLabelMode('ha_only'));
   if (btnLblOnly) btnLblOnly.addEventListener('click', () => setCellLabelMode('orders_only'));
 
-  // Quick toggle between HA% and Mean Duration for cell views
-  const btnToggleCellMetric = document.getElementById('btnToggleCellMetric');
-  if (btnToggleCellMetric) {
-    btnToggleCellMetric.addEventListener('click', () => {
-      setColorMetric(state.colorMetric === 'ha' ? 'mean' : 'ha');
-    });
-  }
-
   // Multi-select mode checkbox
   const checkMulti = document.getElementById('checkMultiSelectMode');
   if (checkMulti) {
@@ -1541,7 +1533,6 @@ function updateFilterLabels() {
   const btnLabelOrdersHa = document.getElementById('btnLabelOrdersHa');
   const btnLabelHaOnly = document.getElementById('btnLabelHaOnly');
   const labelCheckboxText = document.getElementById('labelCheckboxText');
-  const btnToggleCellMetric = document.getElementById('btnToggleCellMetric');
 
   if (btnLabelOrdersHa) {
     btnLabelOrdersHa.textContent = isHa ? 'HA% + Orders' : 'Mean + Orders';
@@ -1551,13 +1542,6 @@ function updateFilterLabels() {
   }
   if (labelCheckboxText) {
     labelCheckboxText.textContent = isHa ? 'Cell Numbers (HA% & Orders)' : 'Cell Numbers (Mean & Orders)';
-  }
-  if (btnToggleCellMetric) {
-    btnToggleCellMetric.textContent = isHa ? 'HA30%' : 'Mean (min)';
-    btnToggleCellMetric.className = 'cell-metric-badge ' + (isHa ? '' : 'metric-mean');
-    btnToggleCellMetric.title = isHa
-      ? 'Currently showing HA30% in cell views. Click to switch cell views to Mean Duration.'
-      : 'Currently showing Mean Duration in cell views. Click to switch cell views to HA30%.';
   }
 }
 

@@ -395,15 +395,10 @@
 
         <!-- Cell Numbers Toggle & Display Modes -->
         <div class="filter-control-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <label class="checkbox-label" style="margin-bottom:0">
-              <input type="checkbox" id="checkShowLabels" checked>
-              <span style="font-weight:600" id="labelCheckboxText">Cell Numbers (HA% &amp; Orders)</span>
-            </label>
-            <button type="button" id="btnToggleCellMetric" class="cell-metric-badge" title="Click to toggle cell views metric between HA30% and Mean Duration">
-              HA30%
-            </button>
-          </div>
+          <label class="checkbox-label" style="margin-bottom:6px">
+            <input type="checkbox" id="checkShowLabels" checked>
+            <span style="font-weight:600" id="labelCheckboxText">Cell Numbers (HA% &amp; Orders)</span>
+          </label>
           <div class="pill-segmented pill-cell-labels">
             <button id="btnLabelOrdersHa" class="pill-item active" type="button" title="Show metric and order count in cell views">HA% + Orders</button>
             <button id="btnLabelHaOnly" class="pill-item" type="button" title="Show only metric in cell views">HA% Only</button>
