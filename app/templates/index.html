@@ -366,11 +366,12 @@
               </div>
 
               <div class="ctrl-card-header" style="margin-top:8px">
-                <span class="ctrl-card-title">Color Metric</span>
+                <span class="ctrl-card-title">Color Metric / Layer View</span>
               </div>
               <div class="color-metric-toggle">
-                <button id="btnMetricHa" class="color-metric-btn active" type="button">HA30% Breach</button>
-                <button id="btnMetricMean" class="color-metric-btn" type="button">Mean Duration (min)</button>
+                <button id="btnMetricHa" class="color-metric-btn active" type="button" title="Cell local SLA breach percentage">HA30% Breach</button>
+                <button id="btnMetricMean" class="color-metric-btn" type="button" title="Mean accept duration in minutes">Mean (min)</button>
+                <button id="btnMetricShare" class="color-metric-btn" type="button" title="Percentage share of whole city's hyper act orders">City HA Share %</button>
               </div>
 
               <div class="ctrl-card-header" style="margin-top:8px">
@@ -561,6 +562,12 @@
           <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">create to accept time &ge; <span class="inspThresholdText">30</span> min</div>
         </div>
 
+        <div class="stat-box" id="boxInspShare" style="margin-bottom:8px">
+          <div class="stat-box-label">Citywide HA Share</div>
+          <div id="inspSharePct" class="stat-box-val">0.0%</div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">share of all hyper act orders in whole city</div>
+        </div>
+
         <div class="stat-box" style="margin-bottom:8px">
           <div class="stat-box-label">Mean Accept Duration</div>
           <div id="inspMeanDuration" class="stat-box-val">0.0 min</div>
@@ -617,6 +624,12 @@
             <span id="mergedHaRatio" style="font-size:11px;color:#64748b">0 of 0</span>
           </div>
           <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">create to accept time &ge; <span class="inspThresholdText">30</span> min</div>
+        </div>
+
+        <div class="stat-box" id="boxMergedShare" style="margin-bottom:8px">
+          <div class="stat-box-label">Combined Citywide HA Share</div>
+          <div id="mergedSharePct" class="stat-box-val">0.0%</div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">share of all hyper act orders in whole city</div>
         </div>
 
         <div class="stat-box" style="margin-bottom:8px">

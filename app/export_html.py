@@ -394,10 +394,18 @@ function updateLabels() {
   var boxH = radiusPx < 11 ? Math.max(12, Math.round(radiusPx * 1.2)) : Math.round(radiusPx * 1.2);
 
   items.forEach(function(it) {
-    var isHa = colorMetric === 'ha';
-    var metricText = isHa ? (it.h.pct.toFixed(1) + '%') : (radiusPx < 14 ? (it.h.mean.toFixed(1) + 'm') : (it.h.mean.toFixed(1) + ' min'));
-    var html = '<div class="lbl-ha" style="font-size:' + fHa + 'px">' + metricText + '</div>' +
-               (radiusPx >= 11 ? ('<div class="lbl-ord" style="font-size:' + fSub + 'px">' + it.h.orders + ' ord</div>') : '');
+    var html;
+    if (colorMetric === 'share') {
+      var citySlow = (DATA.kpis && (DATA.kpis.ha30_count || DATA.kpis.total_slow)) ? (DATA.kpis.ha30_count || DATA.kpis.total_slow) : 1;
+      var share = it.h.share_pct !== undefined ? it.h.share_pct : ((it.h.slow / citySlow) * 100);
+      html = '<div class="lbl-ha" style="font-size:' + fHa + 'px">' + share.toFixed(1) + '%</div>' +
+             (radiusPx >= 11 ? ('<div class="lbl-ord" style="font-size:' + fSub + 'px">' + it.h.slow + ' HA ord</div>') : '');
+    } else {
+      var isHa = colorMetric === 'ha';
+      var metricText = isHa ? (it.h.pct.toFixed(1) + '%') : (radiusPx < 14 ? (it.h.mean.toFixed(1) + 'm') : (it.h.mean.toFixed(1) + ' min'));
+      html = '<div class="lbl-ha" style="font-size:' + fHa + 'px">' + metricText + '</div>' +
+             (radiusPx >= 11 ? ('<div class="lbl-ord" style="font-size:' + fSub + 'px">' + it.h.orders + ' ord</div>') : '');
+    }
     var icon = L.divIcon({
       className: 'lbl',
       html: html,
@@ -417,7 +425,7 @@ function renderMap() {
 
   lData.hexes.forEach(function(h) {
     var isSel = selectedHexes.has(h.hex);
-    var fillColor = colorMetric === 'ha' ? h.color_ha : h.color_mean;
+    var fillColor = colorMetric === 'ha' ? h.color_ha : (colorMetric === 'mean' ? h.color_mean : (h.color_share || h.color_ha));
     var p = L.polygon(h.ring, {
       color: isSel ? '#06b6d4' : '#ffffff',
       weight: isSel ? 3.5 : 1.2,
@@ -492,10 +500,11 @@ panelControl.onAdd = function() {
       '<button id="btnSrc" class="radio-btn active" onclick="setLayer(\'source\')">Pickup (Source)</button>' +
       '<button id="btnDest" class="radio-btn" onclick="setLayer(\'destination\')">Dropoff (Dest)</button>' +
     '</div>' +
-    '<div class="section-title">Color Metric</div>' +
+    '<div class="section-title">Color Metric / Layer View</div>' +
     '<div class="radio-group">' +
       '<button id="btnColHa" class="radio-btn primary-active active" onclick="setMetric(\'ha\')">HA' + THRESHOLD + '% Breach</button>' +
       '<button id="btnColMean" class="radio-btn primary-active" onclick="setMetric(\'mean\')">Mean Duration</button>' +
+      '<button id="btnColShare" class="radio-btn primary-active" onclick="setMetric(\'share\')">City HA Share %</button>' +
     '</div>' +
     '<div class="section-title">Resolution (H3 Level)</div>' +
     '<div class="res-stepper">' +
@@ -543,7 +552,7 @@ function updateLegend() {
   var el = document.getElementById('legendContent');
   if (!el) return;
   var lData = curLayer();
-  var s = lData ? lData.scale : {vmin: 0, vmax: 100, mmin: 10, mmax: 50};
+  var s = lData ? lData.scale : {vmin: 0, vmax: 100, mmin: 10, mmax: 50, smax: 5};
 
   if (colorMetric === 'ha') {
     el.innerHTML =
@@ -552,12 +561,19 @@ function updateLegend() {
       '<div class="bar-ha"></div>' +
       '<div class="legend-ticks"><span>' + s.vmin.toFixed(0) + '% (Fast)</span><span>' + s.vmax.toFixed(0) + '% (Slow)</span></div>' +
       '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
-  } else {
+  } else if (colorMetric === 'mean') {
     el.innerHTML =
       '<div style="font-weight:700;margin-bottom:2px">Mean Accept Duration (minutes)</div>' +
       '<div style="font-size:10.5px;color:#64748b">Average duration from creation to accept</div>' +
       '<div class="bar-ha"></div>' +
       '<div class="legend-ticks"><span>' + (s.mmin || 10).toFixed(0) + ' min (Fast)</span><span>' + (s.mmax || 50).toFixed(0) + ' min (Slow)</span></div>' +
+      '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
+  } else {
+    el.innerHTML =
+      '<div style="font-weight:700;margin-bottom:2px">Citywide HA' + THRESHOLD + '% Share</div>' +
+      '<div style="font-size:10.5px;color:#64748b">Share of whole city\'s hyper act orders</div>' +
+      '<div class="bar-ha"></div>' +
+      '<div class="legend-ticks"><span>0.0% (Low)</span><span>' + (s.smax || 5).toFixed(1) + '% (Top)</span></div>' +
       '<div class="legend-note"><span class="dot-grey"></span> Fewer than ' + MIN_ORDERS + ' orders (Low sample)</div>';
   }
 }
@@ -585,10 +601,15 @@ window.setMetric = function(m) {
   colorMetric = m;
   document.getElementById('btnColHa').classList.toggle('active', m === 'ha');
   document.getElementById('btnColMean').classList.toggle('active', m === 'mean');
+  var bShare = document.getElementById('btnColShare');
+  if (bShare) bShare.classList.toggle('active', m === 'share');
   items.forEach(function(it) {
-    it.p.setStyle({fillColor: colorMetric === 'ha' ? it.h.color_ha : it.h.color_mean});
+    var c = colorMetric === 'ha' ? it.h.color_ha : (colorMetric === 'mean' ? it.h.color_mean : (it.h.color_share || it.h.color_ha));
+    it.p.setStyle({fillColor: c});
   });
   updateLegend();
+  updateLabels();
+};
   updateLabels();
 };
 

@@ -106,12 +106,14 @@ class TestEngine(unittest.TestCase):
         self.assertIn("p50_duration", kpis)
         self.assertIn("p90_duration", kpis)
 
-        # Dual colors and HA30 fields on hexagons
+        # Dual colors, City HA share, and HA30 fields on hexagons
         hexes = analysis["layers"]["source"]["res"]["7"]["hexes"]
         self.assertTrue(len(hexes) > 0)
         first_hex = hexes[0]
         self.assertIn("color_ha", first_hex)
         self.assertIn("color_mean", first_hex)
+        self.assertIn("color_share", first_hex)
+        self.assertIn("share_pct", first_hex)
         self.assertIn("pct", first_hex)
         self.assertIn("mean", first_hex)
         self.assertIn("slow", first_hex)

@@ -19,12 +19,13 @@ const state = {
   autoRes: false,
   opacity: 0.65,
   showLabels: true,
-  cellLabelMode: 'orders_ha', // 'orders_ha' or 'orders_only'
+  cellLabelMode: 'orders_ha', // 'orders_ha', 'ha_only', or 'orders_only'
   multiSelectMode: false,
-  colorMetric: 'ha',          // 'ha' (HA30% breach) or 'mean' (Mean duration)
+  colorMetric: 'ha',          // 'ha' (HA30% breach), 'mean' (Mean duration), or 'share' (City HA Share %)
   activeBasemap: 'voyager',
   minBreachFilter: 0,
   minMeanFilter: 0,
+  minShareFilter: 0,
   minOrdersFilter: 0,
   selectedDates: [],          // Active YYYY-MM-DD date strings
   allDates: [],               // Full range of dates
@@ -169,9 +170,13 @@ function setupEventListeners() {
   document.getElementById('btnLayerSrc').addEventListener('click', () => setLayer('source'));
   document.getElementById('btnLayerDest').addEventListener('click', () => setLayer('destination'));
 
-  // Color Metric Toggle (HA30 vs Mean Duration)
+  // Color Metric Toggle (HA30 vs Mean Duration vs City HA Share)
   document.getElementById('btnMetricHa').addEventListener('click', () => setColorMetric('ha'));
   document.getElementById('btnMetricMean').addEventListener('click', () => setColorMetric('mean'));
+  const btnMetricShare = document.getElementById('btnMetricShare');
+  if (btnMetricShare) {
+    btnMetricShare.addEventListener('click', () => setColorMetric('share'));
+  }
 
   // Resolution stepper
   document.getElementById('btnResMinus').addEventListener('click', () => setResolution(state.currentRes - 1));
@@ -210,8 +215,10 @@ function setupEventListeners() {
       const val = parseFloat(e.target.value) || 0;
       if (state.colorMetric === 'ha') {
         state.minBreachFilter = val;
-      } else {
+      } else if (state.colorMetric === 'mean') {
         state.minMeanFilter = val;
+      } else {
+        state.minShareFilter = val;
       }
       if (numBreach) numBreach.value = val;
       updateFilterLabels();
@@ -226,8 +233,10 @@ function setupEventListeners() {
         val = Math.max(0, Math.min(val, maxVal));
         if (state.colorMetric === 'ha') {
           state.minBreachFilter = val;
-        } else {
+        } else if (state.colorMetric === 'mean') {
           state.minMeanFilter = val;
+        } else {
+          state.minShareFilter = val;
         }
         if (sliderBreach) sliderBreach.value = val;
         updateFilterLabels();
@@ -607,6 +616,7 @@ function setupControlPanelTabs() {
     btnResetAll.addEventListener('click', () => {
       state.minBreachFilter = 0;
       state.minMeanFilter = 0;
+      state.minShareFilter = 0;
       state.minOrdersFilter = 0;
       const sliderBreach = document.getElementById('sliderBreachFilter');
       const numBreach = document.getElementById('numBreachFilter');
@@ -1507,15 +1517,20 @@ function resizeFilterSliders() {
   let maxSla = 0;
   let maxMean = 0;
   let maxOrders = 0;
+  let maxShare = 0;
   hexes.forEach(h => {
     if (h.pct > maxSla) maxSla = h.pct;
     if (h.mean > maxMean) maxMean = h.mean;
     if (h.orders > maxOrders) maxOrders = h.orders;
+    const s = getHexSharePct(h);
+    if (s > maxShare) maxShare = s;
   });
 
   const isHa = state.colorMetric === 'ha';
+  const isMean = state.colorMetric === 'mean';
+  const isShare = state.colorMetric === 'share';
 
-  // Scale Primary Metric Filter slider (HA% or Mean Duration)
+  // Scale Primary Metric Filter slider (HA%, Mean Duration, or City HA Share)
   const breachSlider = document.getElementById('sliderBreachFilter');
   if (breachSlider) {
     if (isHa) {
@@ -1528,7 +1543,7 @@ function resizeFilterSliders() {
       }
       breachSlider.value = state.minBreachFilter;
       breachSlider.dataset.dataMax = ceilSla;
-    } else {
+    } else if (isMean) {
       const ceilMean = Math.ceil(maxMean);
       const sliderMax = Math.max(ceilMean, 10);
       breachSlider.max = sliderMax;
@@ -1538,6 +1553,16 @@ function resizeFilterSliders() {
       }
       breachSlider.value = state.minMeanFilter || 0;
       breachSlider.dataset.dataMax = ceilMean;
+    } else {
+      const ceilShare = Math.ceil(maxShare * 1.05) || 5;
+      const sliderMax = Math.max(ceilShare, 2);
+      breachSlider.max = sliderMax;
+      breachSlider.step = 0.1;
+      if ((state.minShareFilter || 0) > sliderMax) {
+        state.minShareFilter = 0;
+      }
+      breachSlider.value = state.minShareFilter || 0;
+      breachSlider.dataset.dataMax = maxShare.toFixed(1);
     }
   }
 
@@ -1559,6 +1584,8 @@ function resizeFilterSliders() {
 
 function updateFilterLabels() {
   const isHa = state.colorMetric === 'ha';
+  const isMean = state.colorMetric === 'mean';
+  const isShare = state.colorMetric === 'share';
   const titleEl = document.getElementById('titleMetricFilter');
   const unitEl = document.getElementById('unitBreachFilter');
   const minScaleEl = document.getElementById('minScaleMetricFilter');
@@ -1567,25 +1594,36 @@ function updateFilterLabels() {
   const breachNum = document.getElementById('numBreachFilter');
 
   if (titleEl) {
-    titleEl.textContent = isHa ? 'Min SLA Breach Filter' : 'Min Mean Duration Filter';
+    if (isHa) titleEl.textContent = 'Min SLA Breach Filter';
+    else if (isMean) titleEl.textContent = 'Min Mean Duration Filter';
+    else titleEl.textContent = 'Min City HA Share Filter';
   }
   if (unitEl) {
-    unitEl.textContent = isHa ? '%' : 'min';
+    unitEl.textContent = isMean ? 'min' : '%';
   }
   if (minScaleEl) {
-    minScaleEl.textContent = isHa ? '0%' : '0 min';
+    minScaleEl.textContent = isMean ? '0 min' : (isShare ? '0.0%' : '0%');
   }
 
   if (breachSlider) {
     const maxVal = breachSlider.dataset.dataMax || breachSlider.max;
     if (breachVal) {
-      breachVal.textContent = isHa ? `max: ${maxVal}%` : `max: ${maxVal} min`;
+      if (isHa) breachVal.textContent = `max: ${maxVal}%`;
+      else if (isMean) breachVal.textContent = `max: ${maxVal} min`;
+      else breachVal.textContent = `max: ${maxVal}%`;
     }
     if (breachNum) {
-      const curVal = isHa ? state.minBreachFilter : (state.minMeanFilter || 0);
+      let curVal = 0;
+      if (isHa) curVal = state.minBreachFilter;
+      else if (isMean) curVal = state.minMeanFilter || 0;
+      else curVal = state.minShareFilter || 0;
+
       breachNum.value = curVal;
       breachNum.max = maxVal;
-      breachNum.title = isHa ? 'Type minimum SLA breach percentage' : 'Type minimum mean accept duration in minutes';
+      breachNum.step = isShare ? '0.1' : (isMean ? '0.5' : '1');
+      breachNum.title = isHa
+        ? 'Type minimum SLA breach percentage'
+        : (isMean ? 'Type minimum mean accept duration in minutes' : 'Type minimum citywide HA share percentage');
     }
   }
 
@@ -1604,21 +1642,36 @@ function updateFilterLabels() {
   // Update cell numbers button labels, badge, and checkbox text
   const btnLabelOrdersHa = document.getElementById('btnLabelOrdersHa');
   const btnLabelHaOnly = document.getElementById('btnLabelHaOnly');
+  const btnLabelOrdersOnly = document.getElementById('btnLabelOrdersOnly');
   const labelCheckboxText = document.getElementById('labelCheckboxText');
 
   if (btnLabelOrdersHa) {
-    btnLabelOrdersHa.textContent = isHa ? 'HA% + Orders' : 'Mean + Orders';
+    if (isHa) btnLabelOrdersHa.textContent = 'HA% + Orders';
+    else if (isMean) btnLabelOrdersHa.textContent = 'Mean + Orders';
+    else btnLabelOrdersHa.textContent = 'Share% + HA Orders';
   }
   if (btnLabelHaOnly) {
-    btnLabelHaOnly.textContent = isHa ? 'HA% Only' : 'Mean Only';
+    if (isHa) btnLabelHaOnly.textContent = 'HA% Only';
+    else if (isMean) btnLabelHaOnly.textContent = 'Mean Only';
+    else btnLabelHaOnly.textContent = 'Share% Only';
+  }
+  if (btnLabelOrdersOnly) {
+    if (isShare) btnLabelOrdersOnly.textContent = 'HA Orders Only';
+    else btnLabelOrdersOnly.textContent = 'Orders Only';
   }
   if (labelCheckboxText) {
-    labelCheckboxText.textContent = isHa ? 'Cell Numbers (HA% & Orders)' : 'Cell Numbers (Mean & Orders)';
+    if (isHa) labelCheckboxText.textContent = 'Cell Numbers (HA% & Orders)';
+    else if (isMean) labelCheckboxText.textContent = 'Cell Numbers (Mean & Orders)';
+    else labelCheckboxText.textContent = 'Cell Numbers (City HA% Share)';
   }
 
   // Update indicator dot on filters tab
   const tabFilterDot = document.getElementById('tabFilterDot');
-  const activeMetricVal = isHa ? state.minBreachFilter : state.minMeanFilter;
+  let activeMetricVal = 0;
+  if (isHa) activeMetricVal = state.minBreachFilter;
+  else if (isMean) activeMetricVal = state.minMeanFilter || 0;
+  else activeMetricVal = state.minShareFilter || 0;
+
   const isFiltered = (activeMetricVal > 0) || (state.minOrdersFilter > 0);
   if (tabFilterDot) {
     tabFilterDot.style.display = isFiltered ? 'inline-block' : 'none';
@@ -1752,6 +1805,43 @@ function selectWeekends() {
   }
 }
 
+// Helpers for Citywide HA Share Calculation & Color Interpolation
+function getCityTotalSlow() {
+  if (!state.data || !state.data.kpis) return 1;
+  return state.data.kpis.ha30_count || state.data.kpis.total_slow || 1;
+}
+
+function getHexSharePct(h) {
+  if (h.share_pct !== undefined && h.share_pct !== null) return h.share_pct;
+  const total = getCityTotalSlow();
+  return total > 0 ? (h.slow / total * 100) : 0;
+}
+
+function interpolateHaColor(t) {
+  t = Math.min(Math.max(t, 0.0), 1.0);
+  const GREEN = [16, 185, 129];
+  const YELLOW = [250, 204, 21];
+  const RED = [239, 68, 68];
+  let a, b, f;
+  if (t < 0.5) {
+    a = GREEN; b = YELLOW; f = t / 0.5;
+  } else {
+    a = YELLOW; b = RED; f = (t - 0.5) / 0.5;
+  }
+  const rgb = a.map((val, i) => Math.round(val + (b[i] - val) * f));
+  return `#${rgb.map(c => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function getHexFillColor(h) {
+  if (state.colorMetric === 'ha') return h.color_ha;
+  if (state.colorMetric === 'mean') return h.color_mean;
+  if (h.color_share) return h.color_share;
+  const layerData = state.data?.layers?.[state.currentLayer]?.res?.[state.currentRes];
+  const smax = layerData?.scale?.smax || 5.0;
+  const share = getHexSharePct(h);
+  return h.reliable ? interpolateHaColor(share / smax) : '#94a3b8';
+}
+
 // Render Hexagon Polygons on Map
 function renderMapHexagons() {
   if (!state.data) return;
@@ -1764,12 +1854,17 @@ function renderMapHexagons() {
   if (!layerData || !layerData.hexes) return;
 
   layerData.hexes.forEach(h => {
-    const passesMetric = state.colorMetric === 'ha'
-      ? (h.pct >= state.minBreachFilter)
-      : (h.mean >= (state.minMeanFilter || 0));
+    let passesMetric = true;
+    if (state.colorMetric === 'ha') {
+      passesMetric = h.pct >= state.minBreachFilter;
+    } else if (state.colorMetric === 'mean') {
+      passesMetric = h.mean >= (state.minMeanFilter || 0);
+    } else {
+      passesMetric = getHexSharePct(h) >= (state.minShareFilter || 0);
+    }
     const isVisible = passesMetric && (h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(h.hex);
-    const fillColor = state.colorMetric === 'ha' ? h.color_ha : h.color_mean;
+    const fillColor = getHexFillColor(h);
 
     const polygon = L.polygon(h.ring, {
       color: isSelected ? '#06b6d4' : '#ffffff',
@@ -1841,8 +1936,33 @@ function createTooltipContent(h) {
   }
 
   const isMean = state.colorMetric === 'mean';
-  const topMetricHtml = isMean
-    ? `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+  const isShare = state.colorMetric === 'share';
+  let topMetricHtml;
+
+  if (isShare) {
+    const totalCitySlow = getCityTotalSlow();
+    const sharePct = getHexSharePct(h);
+    topMetricHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+        <span style="font-size:13.5px;color:#0f172a"><b>City HA Share: ${sharePct.toFixed(1)}%</b></span>
+        <span style="font-size:12px;font-weight:600;color:#2563eb">${h.slow.toLocaleString()} HA ord</span>
+      </div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px">${h.slow.toLocaleString()} of ${totalCitySlow.toLocaleString()} citywide delayed orders</div>
+      <div style="display:flex;justify-content:space-between;margin:2px 0">
+        <span style="color:#64748b">Cell HA${state.threshold}% Breach:</span>
+        <span style="color:#0f172a;font-weight:600">${h.pct.toFixed(1)}%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin:2px 0">
+        <span style="color:#64748b">Mean Duration:</span>
+        <span style="color:#0f172a;font-weight:600">${h.mean.toFixed(1)} min</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin:2px 0">
+        <span style="color:#64748b">Cell Total Orders:</span>
+        <span style="color:#0f172a;font-weight:600">${h.orders.toLocaleString()}</span>
+      </div>`;
+  } else if (isMean) {
+    topMetricHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
         <span style="font-size:13.5px;color:#0f172a"><b>Mean: ${h.mean.toFixed(1)} min</b></span>
         <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
        </div>
@@ -1850,8 +1970,10 @@ function createTooltipContent(h) {
         <span style="color:#64748b">HA${state.threshold}% Breach:</span>
         <span style="color:#dc2626;font-weight:700">${h.pct.toFixed(1)}% (${h.slow} ord)</span>
        </div>
-       <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept average: ${h.mean.toFixed(1)} min)</div>`
-    : `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+       <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept average: ${h.mean.toFixed(1)} min)</div>`;
+  } else {
+    topMetricHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
         <span style="font-size:13.5px;color:#0f172a"><b>HA${state.threshold}%: ${h.pct.toFixed(1)}%</b></span>
         <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
        </div>
@@ -1864,6 +1986,7 @@ function createTooltipContent(h) {
         <span style="color:#64748b">Mean Duration:</span>
         <span style="color:#0f172a;font-weight:600">${h.mean.toFixed(1)} min</span>
        </div>`;
+  }
 
   return `
     <div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.45;min-width:180px">
@@ -1918,10 +2041,18 @@ function selectSingleHexagon(h, polygon) {
 
   const boxInspHa = document.getElementById('boxInspHa');
   const boxInspMean = document.getElementById('boxInspMean');
+  const boxInspShare = document.getElementById('boxInspShare');
   if (boxInspHa && boxInspMean) {
     boxInspHa.classList.toggle('active-metric-box', state.colorMetric === 'ha');
     boxInspMean.classList.toggle('active-metric-box', state.colorMetric === 'mean');
   }
+  if (boxInspShare) {
+    boxInspShare.classList.toggle('active-metric-box', state.colorMetric === 'share');
+  }
+
+  const sharePct = getHexSharePct(h);
+  const inspShareEl = document.getElementById('inspSharePct');
+  if (inspShareEl) inspShareEl.textContent = `${sharePct.toFixed(1)}%`;
 
   inspector.classList.add('active');
 }
@@ -2011,11 +2142,20 @@ function renderMergedSelection() {
     </span>
   `).join('');
 
+  const totalCitySlow = getCityTotalSlow();
+  const mergedSharePct = totalCitySlow > 0 ? (totalSlow / totalCitySlow * 100) : 0;
+  const mergedShareEl = document.getElementById('mergedSharePct');
+  if (mergedShareEl) mergedShareEl.textContent = `${mergedSharePct.toFixed(1)}%`;
+
   const boxMergedHa = document.getElementById('boxMergedHa');
   const boxMergedMean = document.getElementById('boxMergedMean');
+  const boxMergedShare = document.getElementById('boxMergedShare');
   if (boxMergedHa && boxMergedMean) {
     boxMergedHa.classList.toggle('active-metric-box', state.colorMetric === 'ha');
     boxMergedMean.classList.toggle('active-metric-box', state.colorMetric === 'mean');
+  }
+  if (boxMergedShare) {
+    boxMergedShare.classList.toggle('active-metric-box', state.colorMetric === 'share');
   }
 
   panel.classList.add('active');
@@ -2192,15 +2332,17 @@ function showKmlToast(message) {
   }, 3500);
 }
 
-// Color Metric Switcher (HA30 vs Mean Duration)
+// Color Metric Switcher (HA30 vs Mean Duration vs City HA Share)
 function setColorMetric(metric) {
   state.colorMetric = metric;
   document.getElementById('btnMetricHa').classList.toggle('active', metric === 'ha');
   document.getElementById('btnMetricMean').classList.toggle('active', metric === 'mean');
+  const btnShare = document.getElementById('btnMetricShare');
+  if (btnShare) btnShare.classList.toggle('active', metric === 'share');
 
   state.polygons.forEach(item => {
     const isSelected = state.selectedHexes.has(item.h.hex);
-    const color = metric === 'ha' ? item.h.color_ha : item.h.color_mean;
+    const color = getHexFillColor(item.h);
     item.polygon.setStyle({
       fillColor: color,
       color: isSelected ? '#06b6d4' : '#ffffff'
@@ -2215,20 +2357,31 @@ function setColorMetric(metric) {
 
   const headerThresh = document.getElementById('headerThresholdLabel');
   if (headerThresh) {
-    headerThresh.textContent = metric === 'ha' ? `HA${state.threshold}%` : 'MEAN DURATION';
+    if (metric === 'ha') headerThresh.textContent = `HA${state.threshold}%`;
+    else if (metric === 'mean') headerThresh.textContent = 'MEAN DURATION';
+    else headerThresh.textContent = 'CITY HA% SHARE';
   }
 
   const boxInspHa = document.getElementById('boxInspHa');
   const boxInspMean = document.getElementById('boxInspMean');
+  const boxInspShare = document.getElementById('boxInspShare');
   if (boxInspHa && boxInspMean) {
     boxInspHa.classList.toggle('active-metric-box', metric === 'ha');
     boxInspMean.classList.toggle('active-metric-box', metric === 'mean');
   }
+  if (boxInspShare) {
+    boxInspShare.classList.toggle('active-metric-box', metric === 'share');
+  }
+
   const boxMergedHa = document.getElementById('boxMergedHa');
   const boxMergedMean = document.getElementById('boxMergedMean');
+  const boxMergedShare = document.getElementById('boxMergedShare');
   if (boxMergedHa && boxMergedMean) {
     boxMergedHa.classList.toggle('active-metric-box', metric === 'ha');
     boxMergedMean.classList.toggle('active-metric-box', metric === 'mean');
+  }
+  if (boxMergedShare) {
+    boxMergedShare.classList.toggle('active-metric-box', metric === 'share');
   }
 
   if (state.data) {
@@ -2303,35 +2456,56 @@ function renderLabels() {
   const anchorX = boxWPx / 2;
   const anchorY = boxHPx / 2;
   const isHa = state.colorMetric === 'ha';
+  const isShare = state.colorMetric === 'share';
 
   state.polygons.forEach(item => {
     const h = item.h;
     // Only render label if cell passes active metric and orders filters
-    const passesMetric = isHa
-      ? (h.pct >= state.minBreachFilter)
-      : (h.mean >= (state.minMeanFilter || 0));
+    let passesMetric = true;
+    if (isHa) {
+      passesMetric = h.pct >= state.minBreachFilter;
+    } else if (state.colorMetric === 'mean') {
+      passesMetric = h.mean >= (state.minMeanFilter || 0);
+    } else {
+      passesMetric = getHexSharePct(h) >= (state.minShareFilter || 0);
+    }
     if (!passesMetric || h.orders < state.minOrdersFilter) return;
-
-    // Display metric in each cell:
-    // When HA mode: HA percentage (e.g. 14.2%)
-    // When Mean Duration mode: Mean duration in minutes (e.g. 18.4m or 18.4 min)
-    const metricText = isHa
-      ? `${h.pct.toFixed(1)}%`
-      : (radiusPx < 14 ? `${h.mean.toFixed(1)}m` : `${h.mean.toFixed(1)} min`);
 
     let htmlContent;
 
-    if (state.cellLabelMode === 'orders_only') {
-      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.orders.toLocaleString()}</span>`;
-    } else if (state.cellLabelMode === 'ha_only' || radiusPx < 11) {
-      // Primary metric only (HA% or Mean Duration)
-      htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>`;
+    if (isShare) {
+      const sharePct = getHexSharePct(h);
+      const metricText = `${sharePct.toFixed(1)}%`;
+
+      if (state.cellLabelMode === 'orders_only') {
+        // Hyper act orders count only (NOT total orders!)
+        htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.slow.toLocaleString()} HA</span>`;
+      } else if (state.cellLabelMode === 'ha_only' || radiusPx < 11) {
+        // City share percentage only
+        htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>`;
+      } else {
+        // City share percentage prominent, plus hyper act orders count underneath (no total orders!)
+        htmlContent = `
+          <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>
+          <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.slow.toLocaleString()} HA ord</span>
+        `;
+      }
     } else {
-      // Default: Metric prominent, plus orders volume underneath
-      htmlContent = `
-        <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>
-        <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.orders.toLocaleString()} ord</span>
-      `;
+      // Default HA or Mean mode
+      const metricText = isHa
+        ? `${h.pct.toFixed(1)}%`
+        : (radiusPx < 14 ? `${h.mean.toFixed(1)}m` : `${h.mean.toFixed(1)} min`);
+
+      if (state.cellLabelMode === 'orders_only') {
+        htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.orders.toLocaleString()}</span>`;
+      } else if (state.cellLabelMode === 'ha_only' || radiusPx < 11) {
+        htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>`;
+      } else {
+        htmlContent = `
+          <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>
+          <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.orders.toLocaleString()} ord</span>
+        `;
+      }
     }
 
     const icon = L.divIcon({
@@ -2351,14 +2525,19 @@ function updateLabelsVisibility() {
   }
 }
 
-// Filter hexagons by breach rate or mean duration and orders slider: completely hides non-matching cells
+// Filter hexagons by breach rate, mean duration, or city HA share and orders slider
 function filterHexagons() {
   const isHa = state.colorMetric === 'ha';
 
   state.polygons.forEach(item => {
-    const passesMetric = isHa
-      ? (item.h.pct >= state.minBreachFilter)
-      : (item.h.mean >= (state.minMeanFilter || 0));
+    let passesMetric = true;
+    if (isHa) {
+      passesMetric = item.h.pct >= state.minBreachFilter;
+    } else if (state.colorMetric === 'mean') {
+      passesMetric = item.h.mean >= (state.minMeanFilter || 0);
+    } else {
+      passesMetric = getHexSharePct(item.h) >= (state.minShareFilter || 0);
+    }
     const isVisible = passesMetric && (item.h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(item.h.hex);
 
@@ -2402,11 +2581,17 @@ function updateLegend() {
     subEl.textContent = `Orders exceeding ${state.threshold} min contractual accept`;
     minEl.textContent = `${s.vmin.toFixed(0)}% (Fast)`;
     maxEl.textContent = `${s.vmax.toFixed(0)}% (Slow)`;
-  } else {
+  } else if (state.colorMetric === 'mean') {
     titleEl.textContent = `Mean Accept Duration (minutes)`;
     subEl.textContent = `Average time from order creation to courier accept`;
     minEl.textContent = `${s.mmin.toFixed(0)} min (Fastest)`;
     maxEl.textContent = `${s.mmax.toFixed(0)} min (Slowest)`;
+  } else {
+    titleEl.textContent = `Citywide HA${state.threshold}% Order Share`;
+    subEl.textContent = `Percentage of whole city's hyper act orders`;
+    minEl.textContent = `0.0% (Low Share)`;
+    const smaxVal = s.smax || 5.0;
+    maxEl.textContent = `${smaxVal.toFixed(1)}% (High Share)`;
   }
 
   document.getElementById('legendMinOrders').textContent = state.minOrders;

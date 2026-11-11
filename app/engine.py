@@ -146,6 +146,29 @@ def compute_mean_scale(tables: List[pd.DataFrame], low_q: float = 0.05, high_q: 
     return round(mmin, 1), round(mmax, 1)
 
 
+def compute_share_scale(tables: List[pd.DataFrame], total_slow: int, high_q: float = 0.95) -> Tuple[float, float]:
+    """Compute share scale (0.0 to 95th percentile of citywide HA order share across cells)."""
+    if total_slow <= 0:
+        return 0.0, 5.0
+    shares = []
+    for t in tables:
+        if len(t) > 0 and "slow" in t.columns:
+            s = (t["slow"].to_numpy(dtype=float) / total_slow) * 100.0
+            shares.append(s)
+    if not shares:
+        return 0.0, 5.0
+    all_shares = np.concatenate(shares)
+    pos = all_shares[all_shares > 0]
+    if len(pos) >= 2:
+        smax = float(np.quantile(pos, high_q))
+        smax = round(max(smax, 1.0), 1)
+    elif len(pos) == 1:
+        smax = round(max(float(pos[0]) * 1.2, 1.0), 1)
+    else:
+        smax = 5.0
+    return 0.0, smax
+
+
 def hexes_to_dict(
     g: pd.DataFrame,
     vmin: float,
@@ -153,13 +176,17 @@ def hexes_to_dict(
     mmin: float,
     mmax: float,
     threshold: int,
+    total_city_slow: int = 0,
+    smin: float = 0.0,
+    smax: float = 5.0,
 ) -> List[Dict[str, Any]]:
-    """Convert hexagon DataFrame into rich JSON objects with dual colors (HA30 and Mean)."""
+    """Convert hexagon DataFrame into rich JSON objects with multiple colors (HA30, Mean, and City Share)."""
     if len(g) == 0:
         return []
 
     span_ha = (vmax - vmin) or 1.0
     span_mean = (mmax - mmin) or 1.0
+    span_share = (smax - smin) or 1.0
 
     orders_arr = g["orders"].to_numpy()
     p80_orders = np.percentile(orders_arr, 80) if len(orders_arr) else 10
@@ -176,16 +203,20 @@ def hexes_to_dict(
         with_value = int(row.with_value)
         mean_val = float(row.mean)
         status = str(row.status)
+        share_pct = round((slow / total_city_slow * 100.0), 2) if total_city_slow > 0 else 0.0
 
-        # HA30 Color Ramp
+        # Ramped Colors
         if reliable:
             t_ha = (pct - vmin) / span_ha
             color_ha = hexcolor(ha_ramp(t_ha))
             t_mean = (mean_val - mmin) / span_mean
             color_mean = hexcolor(ha_ramp(t_mean))
+            t_share = (share_pct - smin) / span_share
+            color_share = hexcolor(ha_ramp(t_share))
         else:
             color_ha = hexcolor(GREY)
             color_mean = hexcolor(GREY)
+            color_share = hexcolor(GREY)
 
         if orders >= p80_orders:
             vol_tier = "high"
@@ -207,9 +238,11 @@ def hexes_to_dict(
             "with_value": with_value,
             "pct": round(pct, 2),
             "mean": round(mean_val, 1),
+            "share_pct": share_pct,
             "color": color_ha,        # Default to HA30
             "color_ha": color_ha,     # Color by HA30%
             "color_mean": color_mean, # Color by Mean duration
+            "color_share": color_share, # Color by Share of citywide HA orders
             "reliable": reliable,
             "status": status,
             "vol_tier": vol_tier,
@@ -267,25 +300,29 @@ def analyze_city_orders(
 
         vmin, vmax = compute_ha_scale([tbl_src, tbl_dest], low_q, high_q)
         mmin, mmax = compute_mean_scale([tbl_src, tbl_dest], low_q, high_q)
+        smin, smax = compute_share_scale([tbl_src, tbl_dest], total_slow, high_q)
 
         scale_info = {
             "vmin": vmin,
             "vmax": vmax,
             "mmin": mmin,
             "mmax": mmax,
+            "smin": smin,
+            "smax": smax,
             "threshold": threshold,
             "min_orders": min_orders,
+            "total_city_slow": total_slow,
         }
 
         layers_dict["source"]["res"][str(r)] = {
             "scale": scale_info,
-            "hexes": hexes_to_dict(tbl_src, vmin, vmax, mmin, mmax, threshold),
+            "hexes": hexes_to_dict(tbl_src, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax),
             "count": len(tbl_src),
             "reliable_count": int(tbl_src["reliable"].sum()) if len(tbl_src) else 0,
         }
         layers_dict["destination"]["res"][str(r)] = {
             "scale": scale_info,
-            "hexes": hexes_to_dict(tbl_dest, vmin, vmax, mmin, mmax, threshold),
+            "hexes": hexes_to_dict(tbl_dest, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax),
             "count": len(tbl_dest),
             "reliable_count": int(tbl_dest["reliable"].sum()) if len(tbl_dest) else 0,
         }
