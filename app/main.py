@@ -19,6 +19,7 @@ from app.data_source import fetch_orders, parse_csv_orders, get_dates_between, c
 from app.engine import analyze_city_orders
 from app.export_html import build_standalone_html
 from app.export_kml import build_kml_boundaries
+from app.file_cache import save_df_to_file, load_df_from_file, clear_file_cache
 
 app = FastAPI(
     title="Fleet HexMap Analytics",
@@ -57,6 +58,13 @@ def generate_fallback_orders(
     if force_refresh:
         for d in all_dates:
             FALLBACK_DAY_CACHE.pop((city_key, d), None)
+    else:
+        for d in all_dates:
+            key = (city_key, d)
+            if key not in FALLBACK_DAY_CACHE:
+                cached_file_df = load_df_from_file("fallback", key)
+                if cached_file_df is not None:
+                    FALLBACK_DAY_CACHE[key] = cached_file_df
 
     missing_dates = [d for d in all_dates if (city_key, d) not in FALLBACK_DAY_CACHE]
 
@@ -91,6 +99,7 @@ def generate_fallback_orders(
                 "created_date": d_str
             })
             FALLBACK_DAY_CACHE[(city_key, d_str)] = day_df
+            save_df_to_file("fallback", (city_key, d_str), day_df)
 
     # Assemble all requested dates from cache
     dfs = [FALLBACK_DAY_CACHE[(city_key, d)] for d in all_dates if (city_key, d) in FALLBACK_DAY_CACHE]
@@ -231,11 +240,12 @@ def get_city_data(
 
 @app.post("/api/cache/clear")
 def clear_all_caches():
-    """Clear both ClickHouse query cache and fallback cache."""
+    """Clear both ClickHouse query cache, fallback cache, and disk file cache."""
     from app.data_source import clear_day_cache
     clear_day_cache()
     FALLBACK_DAY_CACHE.clear()
-    return {"status": "ok", "message": "All date caches cleared"}
+    clear_file_cache()
+    return {"status": "ok", "message": "All date caches cleared (memory & disk)"}
 
 
 @app.get("/api/export-html")

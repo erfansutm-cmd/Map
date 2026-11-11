@@ -860,14 +860,29 @@ html, body {
 /* Clean Map Only Mode Styles */
 body.map-only-mode .map-controls-panel,
 body.map-only-mode .citywide-kpi-bar,
-body.map-only-mode #mapLegend,
-body.map-only-mode #inspectorPanel,
-body.map-only-mode #mergedSelectionPanel {
+body.map-only-mode #mapLegend {
   opacity: 0 !important;
   pointer-events: none !important;
   transform: translateY(-8px) scale(0.98) !important;
   transition: opacity 0.22s ease, transform 0.22s ease !important;
   visibility: hidden !important;
+}
+
+/* In Map Only mode, selection controls (merged panel and inspector) remain visible when active */
+body.map-only-mode #mergedSelectionPanel:not(.active),
+body.map-only-mode #inspectorPanel:not(.active) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+body.map-only-mode #mergedSelectionPanel.active,
+body.map-only-mode #inspectorPanel.active {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) scale(1) !important;
+  visibility: visible !important;
+  display: block !important;
 }
 
 .btn-exit-map-only {
@@ -1556,6 +1571,26 @@ body.map-only-mode .btn-exit-map-only {
   border-color: #065f46 !important;
   color: #ffffff !important;
   transform: translateY(-1px);
+}
+
+.small-num-input {
+  width: 58px;
+  height: 22px;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.small-num-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 /* Initialization Modal Dialog Styles */

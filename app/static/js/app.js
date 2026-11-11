@@ -114,7 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function initMap() {
   map = L.map('map', {
     zoomControl: false,
-    preferCanvas: true
+    preferCanvas: true,
+    doubleClickZoom: false
   }).setView([35.6892, 51.3890], 12);
 
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
@@ -199,23 +200,53 @@ function setupEventListeners() {
     filterHexagons();
   });
 
-  // Dynamic SLA breach filter slider
+  // Dynamic SLA breach filter slider & number input
   const sliderBreach = document.getElementById('sliderBreachFilter');
+  const numBreach = document.getElementById('numBreachFilter');
   if (sliderBreach) {
     sliderBreach.addEventListener('input', (e) => {
       state.minBreachFilter = parseFloat(e.target.value) || 0;
+      if (numBreach) numBreach.value = state.minBreachFilter;
       updateFilterLabels();
       filterHexagons();
     });
   }
+  if (numBreach) {
+    ['input', 'change'].forEach(evt => {
+      numBreach.addEventListener(evt, (e) => {
+        let val = parseFloat(e.target.value) || 0;
+        const maxVal = parseFloat(sliderBreach?.dataset.dataMax || sliderBreach?.max) || 100;
+        val = Math.max(0, Math.min(val, maxVal));
+        state.minBreachFilter = val;
+        if (sliderBreach) sliderBreach.value = val;
+        updateFilterLabels();
+        filterHexagons();
+      });
+    });
+  }
 
-  // Dynamic Min Orders filter slider
+  // Dynamic Min Orders filter slider & number input
   const sliderOrders = document.getElementById('sliderOrdersFilter');
+  const numOrders = document.getElementById('numOrdersFilter');
   if (sliderOrders) {
     sliderOrders.addEventListener('input', (e) => {
       state.minOrdersFilter = parseInt(e.target.value, 10) || 0;
+      if (numOrders) numOrders.value = state.minOrdersFilter;
       updateFilterLabels();
       filterHexagons();
+    });
+  }
+  if (numOrders) {
+    ['input', 'change'].forEach(evt => {
+      numOrders.addEventListener(evt, (e) => {
+        let val = parseInt(e.target.value, 10) || 0;
+        const maxVal = parseInt(sliderOrders?.dataset.dataMax || sliderOrders?.max, 10) || 10000;
+        val = Math.max(0, Math.min(val, maxVal));
+        state.minOrdersFilter = val;
+        if (sliderOrders) sliderOrders.value = val;
+        updateFilterLabels();
+        filterHexagons();
+      });
     });
   }
 
@@ -311,8 +342,16 @@ function setupEventListeners() {
     document.querySelectorAll('.btn-preset-chip').forEach(chip => {
       chip.addEventListener('click', (e) => {
         e.stopPropagation();
-        const sDate = chip.dataset.start;
-        const eDate = chip.dataset.end;
+        let sDate = chip.dataset.start;
+        let eDate = chip.dataset.end;
+
+        if (chip.dataset.relative) {
+          const days = parseInt(chip.dataset.relative, 10);
+          const rng = getRelativeDateRange(days);
+          sDate = rng.start;
+          eDate = rng.end;
+        }
+
         if (sDate && eDate) {
           calState.startDate = sDate;
           calState.endDate = eDate;
@@ -511,6 +550,27 @@ function formatDateReadable(dateStr) {
   return `${monthName} ${parseInt(parts[2], 10)}`;
 }
 
+// Compute relative dynamic date ranges ending yesterday
+function getRelativeDateRange(daysCount) {
+  // End date is yesterday
+  const end = new Date();
+  end.setDate(end.getDate() - 1);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (daysCount - 1));
+
+  const toYMD = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  return {
+    start: toYMD(start),
+    end: toYMD(end)
+  };
+}
+
 function updateCalendarTriggerLabel() {
   const lbl = document.getElementById('calendarTriggerLabel');
   if (!lbl) return;
@@ -589,8 +649,16 @@ function initSessionDialog() {
       e.preventDefault();
       presetButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      if (startDateInput) startDateInput.value = btn.dataset.start;
-      if (endDateInput) endDateInput.value = btn.dataset.end;
+
+      if (btn.dataset.relative) {
+        const days = parseInt(btn.dataset.relative, 10);
+        const rng = getRelativeDateRange(days);
+        if (startDateInput) startDateInput.value = rng.start;
+        if (endDateInput) endDateInput.value = rng.end;
+      } else if (btn.dataset.start && btn.dataset.end) {
+        if (startDateInput) startDateInput.value = btn.dataset.start;
+        if (endDateInput) endDateInput.value = btn.dataset.end;
+      }
       updateDaysBadge();
     });
   });
@@ -1113,16 +1181,26 @@ function resizeFilterSliders() {
 function updateFilterLabels() {
   const breachSlider = document.getElementById('sliderBreachFilter');
   const breachVal = document.getElementById('valBreachFilter');
-  if (breachSlider && breachVal) {
+  const breachNum = document.getElementById('numBreachFilter');
+  if (breachSlider) {
     const maxVal = breachSlider.dataset.dataMax || breachSlider.max;
-    breachVal.textContent = `${state.minBreachFilter}% (max: ${maxVal}%)`;
+    if (breachVal) breachVal.textContent = `% (max: ${maxVal}%)`;
+    if (breachNum) {
+      breachNum.value = state.minBreachFilter;
+      breachNum.max = maxVal;
+    }
   }
 
   const ordersSlider = document.getElementById('sliderOrdersFilter');
   const ordersVal = document.getElementById('valOrdersFilter');
-  if (ordersSlider && ordersVal) {
+  const ordersNum = document.getElementById('numOrdersFilter');
+  if (ordersSlider) {
     const maxVal = ordersSlider.dataset.dataMax || ordersSlider.max;
-    ordersVal.textContent = `${state.minOrdersFilter} (max: ${maxVal})`;
+    if (ordersVal) ordersVal.textContent = `(max: ${Number(maxVal).toLocaleString()})`;
+    if (ordersNum) {
+      ordersNum.value = state.minOrdersFilter;
+      ordersNum.max = maxVal;
+    }
   }
 }
 
@@ -1300,7 +1378,17 @@ function renderMapHexagons() {
       });
     });
 
+    polygon.on('dblclick', (e) => {
+      if (e.originalEvent) {
+        L.DomEvent.stopPropagation(e.originalEvent);
+        L.DomEvent.preventDefault(e.originalEvent);
+      }
+    });
+
     polygon.on('click', (e) => {
+      if (e.originalEvent) {
+        L.DomEvent.stopPropagation(e.originalEvent);
+      }
       const isShift = (e.originalEvent && e.originalEvent.shiftKey) || state.multiSelectMode;
       if (isShift) {
         toggleMultiSelectHex(h, polygon);

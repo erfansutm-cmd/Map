@@ -156,14 +156,13 @@
         <div class="cal-popover-body">
           <!-- Left Column: Quick Presets & Cache Summary -->
           <div class="cal-sidebar">
-            <div class="popover-label">Quick Presets</div>
+            <div class="popover-label">Quick Presets (Ending Yesterday)</div>
             <div class="cal-presets-list">
-              <button type="button" class="btn-preset-chip" data-preset="default" data-start="2026-10-22" data-end="2026-11-05">Default 2 Weeks</button>
-              <button type="button" class="btn-preset-chip" data-preset="last7" data-start="2026-10-30" data-end="2026-11-05">Last 7 Days</button>
-              <button type="button" class="btn-preset-chip" data-preset="preceding7" data-start="2026-10-15" data-end="2026-10-21">Preceding 7 Days</button>
-              <button type="button" class="btn-preset-chip" data-preset="month30" data-start="2026-10-07" data-end="2026-11-05">Full 30 Days</button>
+              <button type="button" class="btn-preset-chip" data-preset="last_week" data-relative="7">Last Week (to Yesterday)</button>
+              <button type="button" class="btn-preset-chip" data-preset="last_2_weeks" data-relative="14">Last 2 Weeks (to Yesterday)</button>
+              <button type="button" class="btn-preset-chip" data-preset="last_month" data-relative="30">Last Month (to Yesterday)</button>
+              <button type="button" class="btn-preset-chip active" data-preset="default" data-start="2026-10-22" data-end="2026-11-05">Oct 22 – Nov 05 (Dataset)</button>
               <button type="button" class="btn-preset-chip" data-preset="oct" data-start="2026-10-01" data-end="2026-10-31">October 2026</button>
-              <button type="button" class="btn-preset-chip" data-preset="sep" data-start="2026-09-01" data-end="2026-09-30">September 2026</button>
             </div>
 
             <div class="cal-cache-card">
@@ -364,18 +363,24 @@
 
         <!-- Dynamic Min SLA Breach Filter -->
         <div class="control-slider-group">
-          <div class="slider-label-row">
-            <span>Min SLA Breach Filter</span>
-            <span id="valBreachFilter">0%</span>
+          <div class="slider-label-row" style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-weight:600">Min SLA Breach Filter</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" id="numBreachFilter" class="small-num-input" min="0" max="100" step="1" value="0" title="Type minimum SLA breach percentage">
+              <span id="valBreachFilter" style="font-size:10.5px;color:#64748b">% (max: 100%)</span>
+            </div>
           </div>
           <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="100" step="1" value="0">
         </div>
 
         <!-- Dynamic Min Orders in Cell Filter -->
         <div class="control-slider-group">
-          <div class="slider-label-row">
-            <span>Min Orders in Cell</span>
-            <span id="valOrdersFilter">0</span>
+          <div class="slider-label-row" style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-weight:600">Min Orders in Cell</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" id="numOrdersFilter" class="small-num-input" min="0" max="100" step="1" value="0" title="Type minimum orders count">
+              <span id="valOrdersFilter" style="font-size:10px;color:#64748b">(max: 0)</span>
+            </div>
           </div>
           <input type="range" id="sliderOrdersFilter" class="range-slider" min="0" max="100" step="1" value="0">
         </div>
@@ -647,14 +652,17 @@
 
         <!-- Presets -->
         <div class="init-period-presets">
-          <button type="button" class="init-preset-btn active" data-start="2026-10-22" data-end="2026-11-05">
-            Full Period (Oct 22 – Nov 05)
+          <button type="button" class="init-preset-btn" data-preset="last_week" data-relative="7" title="7 days ending yesterday">
+            Last Week
           </button>
-          <button type="button" class="init-preset-btn" data-start="2026-10-30" data-end="2026-11-05">
-            Last 7 Days (Oct 30 – Nov 05)
+          <button type="button" class="init-preset-btn" data-preset="last_2_weeks" data-relative="14" title="14 days ending yesterday">
+            Last 2 Weeks
           </button>
-          <button type="button" class="init-preset-btn" data-start="2026-10-22" data-end="2026-10-28">
-            Week 1 (Oct 22 – Oct 28)
+          <button type="button" class="init-preset-btn" data-preset="last_month" data-relative="30" title="30 days ending yesterday">
+            Last Month
+          </button>
+          <button type="button" class="init-preset-btn active" data-preset="oct22_nov05" data-start="2026-10-22" data-end="2026-11-05">
+            Oct 22 – Nov 05
           </button>
         </div>
 

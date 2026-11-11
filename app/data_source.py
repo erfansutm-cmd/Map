@@ -14,6 +14,7 @@ import pandas as pd
 
 from app.config import settings
 from app.cities import normalize_city_name
+from app.file_cache import save_df_to_file, load_df_from_file, clear_file_cache
 
 # Daily in-memory partition cache: (clean_city, status, customer_id, date_str) -> pd.DataFrame
 DAY_CACHE: Dict[Tuple[str, str, int, str], pd.DataFrame] = {}
@@ -23,9 +24,10 @@ QUERIED_DATES: Set[Tuple[str, str, int, str]] = set()
 
 
 def clear_day_cache():
-    """Clear the in-memory cache."""
+    """Clear both in-memory cache and disk file cache."""
     DAY_CACHE.clear()
     QUERIED_DATES.clear()
+    clear_file_cache()
 
 
 def try_get_clickhouse_client():
@@ -157,6 +159,15 @@ def fetch_orders(
         for d in all_target_dates:
             DAY_CACHE.pop((clean_city, status, customer_id, d), None)
             QUERIED_DATES.discard((clean_city, status, customer_id, d))
+    else:
+        # Check disk cache for any dates not in memory
+        for d in all_target_dates:
+            key = (clean_city, status, customer_id, d)
+            if key not in DAY_CACHE:
+                cached_file_df = load_df_from_file("clickhouse", key)
+                if cached_file_df is not None:
+                    DAY_CACHE[key] = cached_file_df
+                    QUERIED_DATES.add(key)
 
     # Identify which of the requested dates do not have data in cache
     missing_dates = [
@@ -243,21 +254,25 @@ LIMIT 1 BY order_id
             if len(raw_df) > 0 and "created_date" not in raw_df.columns:
                 raw_df["created_date"] = max_d
 
-        # Partition returned rows into DAY_CACHE
+        # Partition returned rows into DAY_CACHE and file cache
         if len(raw_df) > 0 and "created_date" in raw_df.columns:
             for d_val, grp in raw_df.groupby("created_date"):
                 d_key = str(d_val)[:10]
-                DAY_CACHE[(clean_city, status, customer_id, d_key)] = grp.copy()
+                day_copy = grp.copy()
+                DAY_CACHE[(clean_city, status, customer_id, d_key)] = day_copy
                 QUERIED_DATES.add((clean_city, status, customer_id, d_key))
+                save_df_to_file("clickhouse", (clean_city, status, customer_id, d_key), day_copy)
 
         # Mark missing dates with no orders as queried with empty DataFrame
         for d in missing_dates:
             if (clean_city, status, customer_id, d) not in DAY_CACHE:
-                DAY_CACHE[(clean_city, status, customer_id, d)] = pd.DataFrame(columns=[
+                empty_df = pd.DataFrame(columns=[
                     "order_id", "source_latitude", "source_longitude",
                     "destination_latitude", "destination_longitude",
                     "create_to_accept_contractual", "created_date"
                 ])
+                DAY_CACHE[(clean_city, status, customer_id, d)] = empty_df
+                save_df_to_file("clickhouse", (clean_city, status, customer_id, d), empty_df)
             QUERIED_DATES.add((clean_city, status, customer_id, d))
 
         if force_refresh:
@@ -268,7 +283,7 @@ LIMIT 1 BY order_id
         else:
             data_source_label = f"ClickHouse Live ({len(raw_df)} orders fetched for {len(missing_dates)} days)"
     else:
-        data_source_label = f"Cached In-Memory ({len(all_target_dates)} days cached)"
+        data_source_label = f"⚡ File & Memory Cached ({len(all_target_dates)} days cached)"
 
     # Combine all target dates from DAY_CACHE
     day_frames = [
