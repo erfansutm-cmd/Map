@@ -7,7 +7,7 @@
 
 // Application State
 const state = {
-  city: 'tehran',
+  city: 'isfahan',
   status: 'DELIVERED',
   customerId: 2,
   startDate: '2026-10-22',
@@ -116,7 +116,7 @@ function initMap() {
     zoomControl: false,
     preferCanvas: true,
     doubleClickZoom: false
-  }).setView([35.6892, 51.3890], 12);
+  }).setView([32.6546, 51.6680], 12);
 
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
@@ -590,6 +590,221 @@ const calState = {
   hoverDate: null
 };
 
+// Initial Modal Calendar State
+const initCalState = {
+  viewYear: 2026,
+  viewMonth: 9, // 0-indexed (9 = October)
+  startDate: '2026-10-22',
+  endDate: '2026-11-05',
+  pickingState: 'none', // 'none' or 'picking_end'
+  hoverDate: null
+};
+
+function renderInitCalendarGrid() {
+  const container = document.getElementById('initCalDaysGrid');
+  const monthTitle = document.getElementById('initCalMonthTitle');
+  if (!container || !monthTitle) return;
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  monthTitle.textContent = `${monthNames[initCalState.viewMonth]} ${initCalState.viewYear}`;
+
+  container.innerHTML = '';
+
+  const y = initCalState.viewYear;
+  const m = initCalState.viewMonth;
+
+  // First day of month (0 = Sun, 1 = Mon ... 6 = Sat)
+  const firstDay = new Date(y, m, 1);
+  let startDayOfWeek = firstDay.getDay();
+  // Monday is 0, Sunday is 6
+  let firstCol = (startDayOfWeek + 6) % 7;
+
+  // Days in current and previous months
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prevMonthDays = new Date(y, m, 0).getDate();
+
+  // Trailing days from previous month
+  for (let i = firstCol - 1; i >= 0; i--) {
+    const dayNum = prevMonthDays - i;
+    const prevMonthIdx = m === 0 ? 11 : m - 1;
+    const prevYear = m === 0 ? y - 1 : y;
+    const dateStr = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    container.appendChild(createInitCalendarCell(dayNum, dateStr, true));
+  }
+
+  // Days in current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    container.appendChild(createInitCalendarCell(d, dateStr, false));
+  }
+
+  // Remaining slots to fill up grid row (multiples of 7)
+  const totalCells = firstCol + daysInMonth;
+  const nextMonthSlots = (7 - (totalCells % 7)) % 7;
+  for (let n = 1; n <= nextMonthSlots; n++) {
+    const nextMonthIdx = m === 11 ? 0 : m + 1;
+    const nextYear = m === 11 ? y + 1 : y;
+    const dateStr = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
+    container.appendChild(createInitCalendarCell(n, dateStr, true));
+  }
+
+  updateInitCalHintAndBadge();
+}
+
+function createInitCalendarCell(dayNum, dateStr, isOtherMonth) {
+  const cell = document.createElement('div');
+  cell.className = 'cal-day-cell';
+  cell.dataset.date = dateStr;
+
+  if (isOtherMonth) {
+    cell.classList.add('other-month');
+  }
+
+  cell.textContent = dayNum;
+
+  const s = initCalState.startDate;
+  const e = initCalState.endDate;
+
+  const minD = (s && e) ? (s < e ? s : e) : (s || e);
+  const maxD = (s && e) ? (s < e ? e : s) : (s || e);
+
+  if (dateStr === initCalState.startDate) {
+    cell.classList.add('range-start');
+  }
+  if (dateStr === initCalState.endDate && initCalState.pickingState !== 'picking_end') {
+    cell.classList.add('range-end');
+  }
+  if (initCalState.startDate && (!initCalState.endDate || initCalState.pickingState === 'picking_end') && dateStr === initCalState.startDate) {
+    cell.classList.add('single-day');
+  }
+  if (minD && maxD && dateStr >= minD && dateStr <= maxD && initCalState.pickingState !== 'picking_end') {
+    cell.classList.add('in-range');
+  }
+
+  cell.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    // Clear active status on presets
+    document.querySelectorAll('.init-preset-btn').forEach(b => b.classList.remove('active'));
+
+    if (initCalState.pickingState === 'none' || !initCalState.startDate) {
+      initCalState.startDate = dateStr;
+      initCalState.endDate = null;
+      initCalState.pickingState = 'picking_end';
+      initCalState.hoverDate = null;
+      renderInitCalendarGrid();
+    } else {
+      if (dateStr < initCalState.startDate) {
+        initCalState.endDate = initCalState.startDate;
+        initCalState.startDate = dateStr;
+      } else {
+        initCalState.endDate = dateStr;
+      }
+      initCalState.pickingState = 'none';
+      initCalState.hoverDate = null;
+      renderInitCalendarGrid();
+    }
+  });
+
+  cell.addEventListener('mouseenter', () => {
+    if (initCalState.pickingState === 'picking_end' && initCalState.startDate) {
+      updateInitHoverRange(dateStr);
+    }
+  });
+
+  return cell;
+}
+
+function updateInitHoverRange(hoverDateStr) {
+  if (initCalState.pickingState !== 'picking_end' || !initCalState.startDate) return;
+
+  const minD = hoverDateStr < initCalState.startDate ? hoverDateStr : initCalState.startDate;
+  const maxD = hoverDateStr < initCalState.startDate ? initCalState.startDate : hoverDateStr;
+
+  const container = document.getElementById('initCalDaysGrid');
+  if (!container) return;
+
+  container.querySelectorAll('.cal-day-cell').forEach(c => {
+    const d = c.dataset.date;
+    if (!d) return;
+    const inRange = d >= minD && d <= maxD;
+    c.classList.toggle('in-range', inRange);
+
+    if (d === minD && d === maxD) {
+      c.classList.add('range-start', 'single-day');
+      c.classList.remove('range-end');
+    } else if (d === minD) {
+      c.classList.add('range-start');
+      c.classList.remove('range-end', 'single-day');
+    } else if (d === maxD) {
+      c.classList.add('range-end');
+      c.classList.remove('range-start', 'single-day');
+    } else {
+      c.classList.remove('range-start', 'range-end', 'single-day');
+    }
+  });
+
+  const hintEl = document.getElementById('initCalSelectionHint');
+  if (hintEl) {
+    hintEl.textContent = `Click to select end date: ${formatDateReadable(minD)} → ${formatDateReadable(maxD)}`;
+    hintEl.style.color = '#38bdf8';
+  }
+}
+
+function clearInitHoverRange() {
+  if (initCalState.pickingState !== 'picking_end' || !initCalState.startDate) return;
+
+  const container = document.getElementById('initCalDaysGrid');
+  if (!container) return;
+
+  container.querySelectorAll('.cal-day-cell').forEach(c => {
+    const d = c.dataset.date;
+    const isStart = d === initCalState.startDate;
+    c.classList.toggle('range-start', isStart);
+    c.classList.toggle('single-day', isStart);
+    c.classList.remove('range-end');
+    c.classList.remove('in-range');
+  });
+
+  updateInitCalHintAndBadge();
+}
+
+function updateInitCalHintAndBadge() {
+  const hintEl = document.getElementById('initCalSelectionHint');
+  const badgeEl = document.getElementById('initPeriodDaysBadge');
+
+  const s = initCalState.startDate;
+  const e = initCalState.endDate;
+
+  if (hintEl) {
+    if (initCalState.pickingState === 'picking_end') {
+      hintEl.textContent = `Start date selected (${formatDateReadable(s)}). Now click a date to select end date.`;
+      hintEl.style.color = '#38bdf8';
+    } else if (s && e) {
+      hintEl.textContent = `Selected: ${formatDateReadable(s)} – ${formatDateReadable(e)}`;
+      hintEl.style.color = '#cbd5e1';
+    } else if (s) {
+      hintEl.textContent = `Selected: ${formatDateReadable(s)}`;
+      hintEl.style.color = '#cbd5e1';
+    } else {
+      hintEl.textContent = 'Click start date, then click end date';
+      hintEl.style.color = '#94a3b8';
+    }
+  }
+
+  if (badgeEl && s) {
+    const activeE = e || s;
+    const minD = s < activeE ? s : activeE;
+    const maxD = s < activeE ? activeE : s;
+    const d1 = new Date(minD);
+    const d2 = new Date(maxD);
+    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+    badgeEl.textContent = `${formatDateReadable(minD)} – ${formatDateReadable(maxD)} (${diff} Day${diff > 1 ? 's' : ''})`;
+  }
+}
+
 // Initial City & Period Setup Modal Logic
 function initSessionDialog() {
   const modal = document.getElementById('initSessionModal');
@@ -598,101 +813,154 @@ function initSessionDialog() {
   const customCityInput = document.getElementById('initCustomCityInput');
   const selectedLabel = document.getElementById('initSelectedCityLabel');
   const presetButtons = document.querySelectorAll('.init-preset-btn');
-  const startDateInput = document.getElementById('initStartDate');
-  const endDateInput = document.getElementById('initEndDate');
-  const daysBadge = document.getElementById('initPeriodDaysBadge');
+  const prevBtn = document.getElementById('initCalPrevMonth');
+  const nextBtn = document.getElementById('initCalNextMonth');
+  const grid = document.getElementById('initCalDaysGrid');
   const btnClose = document.getElementById('btnCloseInitModal');
   const btnOpenModal = document.getElementById('btnOpenInitModal');
 
   if (!modal || !form) return;
 
-  let currentChosenCity = state.city || 'tehran';
+  let currentChosenCity = state.city || 'isfahan';
 
-  function updateDaysBadge() {
-    const s = startDateInput ? startDateInput.value : '';
-    const e = endDateInput ? endDateInput.value : '';
-    if (s && e) {
-      const d1 = new Date(s);
-      const d2 = new Date(e);
-      const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
-      if (daysBadge) {
-        daysBadge.textContent = diff > 0 ? `${diff} Days Selected` : 'Invalid Range';
-        daysBadge.style.color = diff > 0 ? '#2563eb' : '#dc2626';
-      }
-    }
-  }
-
+  // Wire up the 4 primary cities
   cityButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       cityButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentChosenCity = btn.dataset.city;
-      if (selectedLabel) selectedLabel.textContent = btn.querySelector('.city-en').textContent;
+      const cityName = btn.querySelector('.city-name') ? btn.querySelector('.city-name').textContent : btn.dataset.city;
+      if (selectedLabel) selectedLabel.textContent = cityName;
       if (customCityInput) customCityInput.value = '';
     });
   });
 
+  // Wire up custom city input
   if (customCityInput) {
     customCityInput.addEventListener('input', () => {
       const val = customCityInput.value.trim();
       if (val) {
         cityButtons.forEach(b => b.classList.remove('active'));
-        currentChosenCity = val;
+        currentChosenCity = val.toLowerCase();
         if (selectedLabel) selectedLabel.textContent = val;
+      } else {
+        // Fall back to active button if any
+        const activeBtn = document.querySelector('.init-city-btn.active');
+        if (activeBtn) {
+          currentChosenCity = activeBtn.dataset.city;
+          const cityName = activeBtn.querySelector('.city-name') ? activeBtn.querySelector('.city-name').textContent : activeBtn.dataset.city;
+          if (selectedLabel) selectedLabel.textContent = cityName;
+        } else {
+          // Select isfahan by default
+          const isfahanBtn = document.querySelector('.init-city-btn[data-city="isfahan"]');
+          if (isfahanBtn) isfahanBtn.classList.add('active');
+          currentChosenCity = 'isfahan';
+          if (selectedLabel) selectedLabel.textContent = 'Isfahan';
+        }
       }
     });
   }
 
+  // Wire up visual calendar navigation
+  if (prevBtn) {
+    prevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      initCalState.viewMonth--;
+      if (initCalState.viewMonth < 0) {
+        initCalState.viewMonth = 11;
+        initCalState.viewYear--;
+      }
+      renderInitCalendarGrid();
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      initCalState.viewMonth++;
+      if (initCalState.viewMonth > 11) {
+        initCalState.viewMonth = 0;
+        initCalState.viewYear++;
+      }
+      renderInitCalendarGrid();
+    });
+  }
+
+  if (grid) {
+    grid.addEventListener('mouseleave', () => {
+      clearInitHoverRange();
+    });
+  }
+
+  // Wire up presets
   presetButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       presetButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
+      let sDate = btn.dataset.start;
+      let eDate = btn.dataset.end;
+
       if (btn.dataset.relative) {
         const days = parseInt(btn.dataset.relative, 10);
         const rng = getRelativeDateRange(days);
-        if (startDateInput) startDateInput.value = rng.start;
-        if (endDateInput) endDateInput.value = rng.end;
-      } else if (btn.dataset.start && btn.dataset.end) {
-        if (startDateInput) startDateInput.value = btn.dataset.start;
-        if (endDateInput) endDateInput.value = btn.dataset.end;
+        sDate = rng.start;
+        eDate = rng.end;
       }
-      updateDaysBadge();
+
+      if (sDate && eDate) {
+        initCalState.startDate = sDate;
+        initCalState.endDate = eDate;
+        initCalState.pickingState = 'none';
+        initCalState.hoverDate = null;
+        const parts = sDate.split('-');
+        initCalState.viewYear = parseInt(parts[0], 10);
+        initCalState.viewMonth = parseInt(parts[1], 10) - 1;
+        renderInitCalendarGrid();
+      }
     });
   });
 
-  if (startDateInput) startDateInput.addEventListener('change', updateDaysBadge);
-  if (endDateInput) endDateInput.addEventListener('change', updateDaysBadge);
-  updateDaysBadge();
+  // Render initial calendar
+  renderInitCalendarGrid();
 
+  // Form submit -> Load data & open map
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    let s = (startDateInput && startDateInput.value) || '2026-10-22';
-    let end = (endDateInput && endDateInput.value) || '2026-11-05';
-    if (s > end) {
-      const tmp = s; s = end; end = tmp;
-    }
+    const s = initCalState.startDate || '2026-10-22';
+    const end = initCalState.endDate || initCalState.startDate || '2026-11-05';
+    const minD = s < end ? s : end;
+    const maxD = s < end ? end : s;
 
     state.city = currentChosenCity;
-    state.startDate = s;
-    state.endDate = end;
+    state.startDate = minD;
+    state.endDate = maxD;
     state.selectedDates = [];
 
-    // Sync other UI inputs & labels
+    // Sync calState for the top-bar calendar popover
+    calState.startDate = minD;
+    calState.endDate = maxD;
+    calState.pickingState = 'none';
+    calState.hoverDate = null;
+    const parts = minD.split('-');
+    calState.viewYear = parseInt(parts[0], 10);
+    calState.viewMonth = parseInt(parts[1], 10) - 1;
+
+    // Sync input fields & trigger label
     const cityInp = document.getElementById('cityInput');
     if (cityInp) cityInp.value = currentChosenCity;
     const inpStart = document.getElementById('inputStartDate');
-    if (inpStart) inpStart.value = s;
+    if (inpStart) inpStart.value = minD;
     const inpEnd = document.getElementById('inputEndDate');
-    if (inpEnd) inpEnd.value = end;
+    if (inpEnd) inpEnd.value = maxD;
 
     updateCalendarTriggerLabel();
 
     modal.classList.remove('open');
 
-    // Fetch city data and open the map
+    // Fetch city fleet data and open map
     loadCityData(state.city, true);
   });
 
@@ -700,24 +968,36 @@ function initSessionDialog() {
     btnOpenModal.addEventListener('click', (e) => {
       e.preventDefault();
       // Sync dialog with current state before opening
-      if (startDateInput) startDateInput.value = state.startDate || '2026-10-22';
-      if (endDateInput) endDateInput.value = state.endDate || '2026-11-05';
-      updateDaysBadge();
+      initCalState.startDate = state.startDate || '2026-10-22';
+      initCalState.endDate = state.endDate || '2026-11-05';
+      initCalState.pickingState = 'none';
+      initCalState.hoverDate = null;
+      if (state.startDate) {
+        const parts = state.startDate.split('-');
+        initCalState.viewYear = parseInt(parts[0], 10);
+        initCalState.viewMonth = parseInt(parts[1], 10) - 1;
+      }
+      renderInitCalendarGrid();
 
       let matched = false;
       cityButtons.forEach(b => {
         if (b.dataset.city.toLowerCase() === (state.city || '').toLowerCase()) {
           b.classList.add('active');
           matched = true;
-          if (selectedLabel) selectedLabel.textContent = b.querySelector('.city-en').textContent;
+          const cityName = b.querySelector('.city-name') ? b.querySelector('.city-name').textContent : b.dataset.city;
+          if (selectedLabel) selectedLabel.textContent = cityName;
         } else {
           b.classList.remove('active');
         }
       });
+
       if (!matched && customCityInput) {
         customCityInput.value = state.city || '';
-        if (selectedLabel) selectedLabel.textContent = state.city || 'Tehran';
+        if (selectedLabel) selectedLabel.textContent = state.city || '';
+      } else if (customCityInput) {
+        customCityInput.value = '';
       }
+
       modal.classList.add('open');
     });
   }
@@ -726,7 +1006,7 @@ function initSessionDialog() {
     btnClose.addEventListener('click', () => {
       modal.classList.remove('open');
       if (!state.data) {
-        loadCityData(state.city || 'tehran', true);
+        loadCityData(state.city || 'isfahan', true);
       }
     });
   }
