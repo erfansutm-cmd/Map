@@ -315,9 +315,9 @@ function openInspector(h) {
 
   content.innerHTML =
     '<div style="margin-bottom:8px">' + statusBadge + '</div>' +
-    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + '%</span><span class="metric-val" style="color:#e11d48">' + h.pct.toFixed(1) + '%</span></div>' +
+    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + '%</span><span class="metric-val">' + h.pct.toFixed(1) + '%</span></div>' +
     '<div class="metric-row"><span class="metric-label">Total Orders</span><span class="metric-val">' + h.orders + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + ' Orders Count</span><span class="metric-val" style="color:#e11d48">' + h.slow + ' (' + h.slow + ' of ' + h.with_value + ')</span></div>' +
+    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + ' Orders Count</span><span class="metric-val">' + h.slow + ' (' + h.slow + ' of ' + h.with_value + ')</span></div>' +
     '<div style="font-size:10px;color:#94a3b8;margin-bottom:6px">(create to accept time &ge; ' + THRESHOLD + ' min)</div>' +
     '<div class="metric-row"><span class="metric-label">Mean Duration</span><span class="metric-val">' + h.mean.toFixed(1) + ' min</span></div>' +
     '<div class="metric-row"><span class="metric-label">H3 Hex ID</span><span class="metric-val" style="font-size:10px">' + h.hex + '</span></div>' +
@@ -348,9 +348,9 @@ function renderMergedSelection() {
 
   content.innerHTML =
     '<div style="margin-bottom:8px"><span class="badge badge-warning">MERGED REGION</span></div>' +
-    '<div class="metric-row"><span class="metric-label">Combined HA' + THRESHOLD + '%</span><span class="metric-val" style="color:#e11d48">' + mergedPct.toFixed(1) + '%</span></div>' +
+    '<div class="metric-row"><span class="metric-label">Combined HA' + THRESHOLD + '%</span><span class="metric-val">' + mergedPct.toFixed(1) + '%</span></div>' +
     '<div class="metric-row"><span class="metric-label">Combined Orders</span><span class="metric-val">' + totalOrders + '</span></div>' +
-    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + ' Orders Count</span><span class="metric-val" style="color:#e11d48">' + totalSlow + ' (' + totalSlow + ' of ' + totalWithValue + ')</span></div>' +
+    '<div class="metric-row"><span class="metric-label">HA' + THRESHOLD + ' Orders Count</span><span class="metric-val">' + totalSlow + ' (' + totalSlow + ' of ' + totalWithValue + ')</span></div>' +
     '<div style="font-size:10px;color:#94a3b8;margin-bottom:6px">(create to accept time &ge; ' + THRESHOLD + ' min)</div>' +
     '<div class="metric-row"><span class="metric-label">Weighted Mean</span><span class="metric-val">' + mergedMean.toFixed(1) + ' min</span></div>' +
     '<button onclick="clearHexSelection()" style="width:100%;margin-top:10px;padding:6px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-weight:600">Clear Selection</button>';

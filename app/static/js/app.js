@@ -1901,7 +1901,7 @@ function selectSingleHexagon(h, polygon) {
     }
   }
   document.getElementById('inspHaPct').textContent = `${h.pct.toFixed(1)}%`;
-  document.getElementById('inspHaPct').style.color = h.pct > 25 ? '#dc2626' : '#16a34a';
+  document.getElementById('inspHaPct').style.color = '';
   document.getElementById('inspTotalOrders').textContent = h.orders;
 
   const slowEl = document.getElementById('inspSlowOrders');
@@ -1988,7 +1988,7 @@ function renderMergedSelection() {
 
   document.getElementById('mergedTitleText').textContent = `Merged Region (${state.selectedHexes.size} Cells)`;
   document.getElementById('mergedHaPct').textContent = `${mergedPct.toFixed(1)}%`;
-  document.getElementById('mergedHaPct').style.color = mergedPct > 25 ? '#dc2626' : '#16a34a';
+  document.getElementById('mergedHaPct').style.color = '';
 
   const deltaBadge = document.getElementById('mergedDeltaBadge');
   deltaBadge.textContent = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}% vs City Avg`;
