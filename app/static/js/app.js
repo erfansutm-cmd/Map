@@ -548,6 +548,105 @@ function setupEventListeners() {
       }
     });
   }
+
+  // Setup redesigned Control Panel Tabs, Collapse & Presets
+  setupControlPanelTabs();
+}
+
+// Redesigned Control Panel Tabs, Collapse & Filter Presets
+function setupControlPanelTabs() {
+  const tabs = document.querySelectorAll('.ctrl-tab-btn');
+  const sections = document.querySelectorAll('.ctrl-section');
+  const panel = document.getElementById('controlPanel');
+  const headerBar = document.getElementById('panelHeaderBar');
+  const btnCollapse = document.getElementById('btnToggleCollapsePanel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const target = tab.dataset.tab;
+      tabs.forEach(t => t.classList.toggle('active', t === tab));
+
+      sections.forEach(sec => {
+        if (target === 'all') {
+          sec.style.display = 'block';
+        } else {
+          sec.style.display = sec.dataset.section === target ? 'block' : 'none';
+        }
+      });
+
+      // If panel was collapsed, expand it when clicking a tab
+      if (panel && panel.classList.contains('is-collapsed')) {
+        panel.classList.remove('is-collapsed');
+      }
+    });
+  });
+
+  // Collapse / Expand toggle
+  function togglePanelCollapse(e) {
+    if (e) e.stopPropagation();
+    if (panel) {
+      panel.classList.toggle('is-collapsed');
+    }
+  }
+
+  if (btnCollapse) {
+    btnCollapse.addEventListener('click', togglePanelCollapse);
+  }
+  if (headerBar) {
+    headerBar.addEventListener('click', (e) => {
+      // Don't trigger if clicked on hide button or other action buttons
+      if (e.target.closest('#btnHideControlsFromPanel') || e.target.closest('#btnToggleCollapsePanel')) return;
+      togglePanelCollapse(e);
+    });
+  }
+
+  // Reset all filters button
+  const btnResetAll = document.getElementById('btnResetAllFilters');
+  if (btnResetAll) {
+    btnResetAll.addEventListener('click', () => {
+      state.minBreachFilter = 0;
+      state.minMeanFilter = 0;
+      state.minOrdersFilter = 0;
+      const sliderBreach = document.getElementById('sliderBreachFilter');
+      const numBreach = document.getElementById('numBreachFilter');
+      const sliderOrders = document.getElementById('sliderOrdersFilter');
+      const numOrders = document.getElementById('numOrdersFilter');
+      if (sliderBreach) sliderBreach.value = 0;
+      if (numBreach) numBreach.value = 0;
+      if (sliderOrders) sliderOrders.value = 0;
+      if (numOrders) numOrders.value = 0;
+      updateFilterLabels();
+      filterHexagons();
+    });
+  }
+
+  // Preset chips for Breach and Orders filters
+  document.querySelectorAll('.preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const filterType = chip.dataset.filter;
+      const val = parseFloat(chip.dataset.val) || 0;
+      if (filterType === 'breach') {
+        if (state.colorMetric === 'ha') {
+          state.minBreachFilter = val;
+        } else {
+          state.minMeanFilter = val;
+        }
+        const s = document.getElementById('sliderBreachFilter');
+        const n = document.getElementById('numBreachFilter');
+        if (s) s.value = val;
+        if (n) n.value = val;
+      } else if (filterType === 'orders') {
+        state.minOrdersFilter = val;
+        const s = document.getElementById('sliderOrdersFilter');
+        const n = document.getElementById('numOrdersFilter');
+        if (s) s.value = val;
+        if (n) n.value = val;
+      }
+      updateFilterLabels();
+      filterHexagons();
+    });
+  });
 }
 
 // Format date nicely: YYYY-MM-DD -> "Oct 22, 2026"
@@ -1543,6 +1642,24 @@ function updateFilterLabels() {
   if (labelCheckboxText) {
     labelCheckboxText.textContent = isHa ? 'Cell Numbers (HA% & Orders)' : 'Cell Numbers (Mean & Orders)';
   }
+
+  // Update indicator dot on filters tab
+  const tabFilterDot = document.getElementById('tabFilterDot');
+  const activeMetricVal = isHa ? state.minBreachFilter : state.minMeanFilter;
+  const isFiltered = (activeMetricVal > 0) || (state.minOrdersFilter > 0);
+  if (tabFilterDot) {
+    tabFilterDot.style.display = isFiltered ? 'inline-block' : 'none';
+  }
+
+  // Sync preset chips active state
+  document.querySelectorAll('#presetChipsBreach .preset-chip').forEach(chip => {
+    const val = parseFloat(chip.dataset.val) || 0;
+    chip.classList.toggle('active', Math.abs(activeMetricVal - val) < 0.001);
+  });
+  document.querySelectorAll('#presetChipsOrders .preset-chip').forEach(chip => {
+    const val = parseInt(chip.dataset.val, 10) || 0;
+    chip.classList.toggle('active', state.minOrdersFilter === val);
+  });
 }
 
 // Update Top Floating Citywide HA30 Overview & KPI Cards
@@ -2421,6 +2538,16 @@ function centerAndZoomMap(animate = true) {
 // Render Bottlenecks drawer
 function renderBottlenecks(bottlenecks) {
   const container = document.getElementById('bottlenecksList');
+  const badge = document.getElementById('tabHotspotBadge');
+  if (badge) {
+    if (bottlenecks && bottlenecks.length > 0) {
+      badge.textContent = bottlenecks.length;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
   if (!container) return;
   if (!bottlenecks || bottlenecks.length === 0) {
     container.innerHTML = '<div style="font-size:11px;color:#94a3b8;padding:8px">No critical bottlenecks detected.</div>';

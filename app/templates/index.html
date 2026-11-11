@@ -303,137 +303,229 @@
 
       <!-- Left Map Controls Panel -->
       <div id="controlPanel" class="map-controls-panel">
-        <div class="panel-header-bar">
-          <span class="panel-header-title">Map Controls</span>
-          <button id="btnHideControlsFromPanel" class="btn-hide-panel" title="Hide control values (Map Only mode)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            Hide
-          </button>
-        </div>
-        <div class="panel-section-title">
-          <span>Hexagon Layer</span>
-        </div>
-        <div class="pill-segmented">
-          <button id="btnLayerSrc" class="pill-item active">Pickup (Source)</button>
-          <button id="btnLayerDest" class="pill-item">Dropoff (Dest)</button>
-        </div>
-
-        <!-- Color by HA30 vs Mean Toggle -->
-        <div class="panel-section-title">
-          <span>Hexagon Color Metric</span>
-        </div>
-        <div class="color-metric-toggle">
-          <button id="btnMetricHa" class="color-metric-btn active">HA30% Breach</button>
-          <button id="btnMetricMean" class="color-metric-btn">Mean Duration (min)</button>
-        </div>
-
-        <div class="panel-section-title">
-          <span>H3 Resolution</span>
-        </div>
-        <div class="res-stepper-box">
-          <button id="btnResMinus" class="btn-res-step" title="Coarser / Bigger Hexagons">&minus;</button>
-          <div>
-            <div id="resValMain" class="res-label-main">Resolution 8</div>
-            <div id="resValArea" class="res-label-sub">~0.74 km² per hex</div>
-          </div>
-          <button id="btnResPlus" class="btn-res-step" title="Finer / Smaller Hexagons">+</button>
-        </div>
-
-        <label class="checkbox-label">
-          <input type="checkbox" id="checkAutoRes">
-          <span>Auto-adjust resolution with zoom</span>
-        </label>
-
-        <div class="panel-section-title" style="margin-top:10px">
-          <span>Display &amp; Styling</span>
-          <button id="btnFitBounds" style="border:none;background:transparent;color:#2563eb;font-weight:600;font-size:11px;cursor:pointer">Center Map</button>
-        </div>
-
-        <div class="control-slider-group">
-          <div class="slider-label-row">
-            <span>Hexagon Opacity</span>
-            <span id="valOpacity">65%</span>
-          </div>
-          <input type="range" id="sliderOpacity" class="range-slider" min="0.1" max="1.0" step="0.05" value="0.65">
-        </div>
-
-        <!-- Dynamic Metric Filter (HA30% or Mean Duration) -->
-        <div class="filter-control-card">
-          <div class="filter-card-header">
-            <span class="filter-title" id="titleMetricFilter">Min SLA Breach Filter</span>
-            <div class="filter-val-badge">
-              <input type="number" id="numBreachFilter" class="filter-num-input" min="0" max="100" step="1" value="0" title="Type minimum value">
-              <span id="unitBreachFilter" class="filter-unit-tag">%</span>
-            </div>
-          </div>
-          <div class="filter-slider-container">
-            <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="100" step="1" value="0">
-          </div>
-          <div class="filter-scale-footer">
-            <span id="minScaleMetricFilter">0%</span>
-            <span id="valBreachFilter">max: 100%</span>
-          </div>
-        </div>
-
-        <!-- Dynamic Min Orders in Cell Filter -->
-        <div class="filter-control-card">
-          <div class="filter-card-header">
-            <span class="filter-title">Min Orders in Cell</span>
-            <div class="filter-val-badge">
-              <input type="number" id="numOrdersFilter" class="filter-num-input" min="0" max="100" step="1" value="0" title="Type minimum orders count">
-              <span class="filter-unit-tag">ord</span>
-            </div>
-          </div>
-          <div class="filter-slider-container">
-            <input type="range" id="sliderOrdersFilter" class="range-slider" min="0" max="100" step="1" value="0">
-          </div>
-          <div class="filter-scale-footer">
-            <span>0 ord</span>
-            <span id="valOrdersFilter">max: 0 ord</span>
-          </div>
-        </div>
-
-        <!-- Cell Numbers Toggle & Display Modes -->
-        <div class="filter-control-card">
-          <label class="checkbox-label" style="margin-bottom:6px">
-            <input type="checkbox" id="checkShowLabels" checked>
-            <span style="font-weight:600" id="labelCheckboxText">Cell Numbers (HA% &amp; Orders)</span>
-          </label>
-          <div class="pill-segmented pill-cell-labels">
-            <button id="btnLabelOrdersHa" class="pill-item active" type="button" title="Show metric and order count in cell views">HA% + Orders</button>
-            <button id="btnLabelHaOnly" class="pill-item" type="button" title="Show only metric in cell views">HA% Only</button>
-            <button id="btnLabelOrdersOnly" class="pill-item" type="button" title="Show only orders count in cell views">Orders Only</button>
-          </div>
-        </div>
-
-        <label class="checkbox-label">
-          <input type="checkbox" id="checkMultiSelectMode">
-          <span>Multi-Select Cells (or hold <kbd style="background:#e2e8f0;padding:1px 4px;border-radius:3px">Shift</kbd>)</span>
-        </label>
-        <div id="multiSelectControlsKml" style="display:none;margin-top:6px">
-          <button id="btnExportKmlFromControls" class="btn-action btn-kml-export" style="width:100%;background:#059669;color:#fff;border-color:#047857;font-weight:600;justify-content:center;padding:5px 8px;font-size:11px" title="Output selected cells boundaries as KML file">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:4px">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
+        <!-- Panel Header -->
+        <div class="panel-header-bar" id="panelHeaderBar" title="Click to minimize or expand controls">
+          <div class="panel-header-title-group">
+            <svg class="panel-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <line x1="4" y1="21" x2="4" y2="14"></line>
+              <line x1="4" y1="10" x2="4" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="3"></line>
+              <line x1="20" y1="21" x2="20" y2="16"></line>
+              <line x1="20" y1="12" x2="20" y2="3"></line>
+              <line x1="1" y1="14" x2="7" y2="14"></line>
+              <line x1="9" y1="8" x2="15" y2="8"></line>
+              <line x1="17" y1="16" x2="23" y2="16"></line>
             </svg>
-            Output KML (<span id="multiKmlCountText">0</span> Selected)
-          </button>
+            <span class="panel-header-title">Map Controls</span>
+          </div>
+          <div class="panel-header-actions">
+            <button id="btnToggleCollapsePanel" class="btn-panel-action" type="button" title="Minimize / Expand controls">
+              <svg id="collapsePanelIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </button>
+            <button id="btnHideControlsFromPanel" class="btn-hide-panel" type="button" title="Hide controls completely (Map Only mode)">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              Hide
+            </button>
+          </div>
         </div>
 
-        <div class="panel-section-title" style="margin-top:10px">
-          <span>Basemap Style</span>
-        </div>
-        <div class="basemap-grid">
-          <button class="basemap-btn active" data-basemap="voyager">Voyager</button>
-          <button class="basemap-btn" data-basemap="osm">OpenStreetMap</button>
-          <button class="basemap-btn" data-basemap="satellite">Satellite</button>
-        </div>
+        <div id="panelContentWrapper" class="panel-content-wrapper">
+          <!-- Control Category Tabs Bar -->
+          <div class="ctrl-tabs-bar" role="tablist">
+            <button type="button" class="ctrl-tab-btn active" data-tab="all" title="View all controls in one unified panel">
+              <span>All</span>
+            </button>
+            <button type="button" class="ctrl-tab-btn" data-tab="layer" title="Hexagon layer &amp; resolution">
+              <span>Layer</span>
+            </button>
+            <button type="button" class="ctrl-tab-btn" data-tab="filters" title="SLA breach &amp; min orders filter">
+              <span>Filters</span>
+              <span id="tabFilterDot" class="tab-indicator-dot" style="display:none" title="Filters active"></span>
+            </button>
+            <button type="button" class="ctrl-tab-btn" data-tab="display" title="Styling, basemap &amp; opacity">
+              <span>Display</span>
+            </button>
+            <button type="button" class="ctrl-tab-btn" data-tab="hotspots" title="Critical bottlenecks">
+              <span>Hotspots</span>
+              <span id="tabHotspotBadge" class="tab-badge-count" style="display:none">0</span>
+            </button>
+          </div>
 
-        <div class="panel-section-title" style="margin-top:12px">
-          <span>Critical Bottlenecks</span>
+          <!-- Section 1: Hexagon Layer & Metric (tab: layer) -->
+          <div class="ctrl-section" data-section="layer">
+            <div class="ctrl-card">
+              <div class="ctrl-card-header">
+                <span class="ctrl-card-title">Hexagon Layer</span>
+              </div>
+              <div class="pill-segmented">
+                <button id="btnLayerSrc" class="pill-item active" type="button">Pickup (Source)</button>
+                <button id="btnLayerDest" class="pill-item" type="button">Dropoff (Dest)</button>
+              </div>
+
+              <div class="ctrl-card-header" style="margin-top:8px">
+                <span class="ctrl-card-title">Color Metric</span>
+              </div>
+              <div class="color-metric-toggle">
+                <button id="btnMetricHa" class="color-metric-btn active" type="button">HA30% Breach</button>
+                <button id="btnMetricMean" class="color-metric-btn" type="button">Mean Duration (min)</button>
+              </div>
+
+              <div class="ctrl-card-header" style="margin-top:8px">
+                <span class="ctrl-card-title">H3 Resolution</span>
+              </div>
+              <div class="res-stepper-box">
+                <button id="btnResMinus" class="btn-res-step" title="Coarser / Bigger Hexagons" type="button">&minus;</button>
+                <div>
+                  <div id="resValMain" class="res-label-main">Resolution 8</div>
+                  <div id="resValArea" class="res-label-sub">~0.74 km² per hex</div>
+                </div>
+                <button id="btnResPlus" class="btn-res-step" title="Finer / Smaller Hexagons" type="button">+</button>
+              </div>
+
+              <label class="checkbox-label" style="margin-top:7px;margin-bottom:0">
+                <input type="checkbox" id="checkAutoRes">
+                <span>Auto-adjust resolution with zoom</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Section 2: Filters (tab: filters) -->
+          <div class="ctrl-section" data-section="filters">
+            <div class="ctrl-card">
+              <div class="ctrl-card-header">
+                <span class="ctrl-card-title">Threshold &amp; Order Filters</span>
+                <button type="button" id="btnResetAllFilters" class="btn-ctrl-subaction" title="Reset both filters to 0">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:2px"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                  Reset
+                </button>
+              </div>
+
+              <!-- Dynamic Metric Filter (HA30% or Mean Duration) -->
+              <div class="filter-control-card">
+                <div class="filter-card-header">
+                  <span class="filter-title" id="titleMetricFilter">Min SLA Breach Filter</span>
+                  <div class="filter-val-badge">
+                    <input type="number" id="numBreachFilter" class="filter-num-input" min="0" max="100" step="1" value="0" title="Type minimum value">
+                    <span id="unitBreachFilter" class="filter-unit-tag">%</span>
+                  </div>
+                </div>
+                <div class="filter-slider-container">
+                  <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="100" step="1" value="0">
+                </div>
+                <div class="filter-scale-footer">
+                  <span id="minScaleMetricFilter">0%</span>
+                  <span id="valBreachFilter">max: 100%</span>
+                </div>
+                <div class="filter-preset-chips" id="presetChipsBreach">
+                  <button type="button" class="preset-chip active" data-filter="breach" data-val="0">All</button>
+                  <button type="button" class="preset-chip" data-filter="breach" data-val="15">&gt;15%</button>
+                  <button type="button" class="preset-chip" data-filter="breach" data-val="25">&gt;25%</button>
+                  <button type="button" class="preset-chip" data-filter="breach" data-val="35">&gt;35%</button>
+                </div>
+              </div>
+
+              <!-- Dynamic Min Orders in Cell Filter -->
+              <div class="filter-control-card" style="margin-bottom:0">
+                <div class="filter-card-header">
+                  <span class="filter-title">Min Orders in Cell</span>
+                  <div class="filter-val-badge">
+                    <input type="number" id="numOrdersFilter" class="filter-num-input" min="0" max="100" step="1" value="0" title="Type minimum orders count">
+                    <span class="filter-unit-tag">ord</span>
+                  </div>
+                </div>
+                <div class="filter-slider-container">
+                  <input type="range" id="sliderOrdersFilter" class="range-slider" min="0" max="100" step="1" value="0">
+                </div>
+                <div class="filter-scale-footer">
+                  <span>0 ord</span>
+                  <span id="valOrdersFilter">max: 0 ord</span>
+                </div>
+                <div class="filter-preset-chips" id="presetChipsOrders">
+                  <button type="button" class="preset-chip active" data-filter="orders" data-val="0">All</button>
+                  <button type="button" class="preset-chip" data-filter="orders" data-val="10">&gt;10</button>
+                  <button type="button" class="preset-chip" data-filter="orders" data-val="50">&gt;50</button>
+                  <button type="button" class="preset-chip" data-filter="orders" data-val="100">&gt;100</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Display & Styling (tab: display) -->
+          <div class="ctrl-section" data-section="display">
+            <div class="ctrl-card">
+              <div class="ctrl-card-header">
+                <span class="ctrl-card-title">Map Appearance</span>
+                <button id="btnFitBounds" type="button" class="btn-ctrl-subaction" title="Center map to fit current data hexagons">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:2px"><circle cx="12" cy="12" r="10"></circle><polyline points="12 8 12 12 14 14"></polyline></svg>
+                  Center Map
+                </button>
+              </div>
+
+              <!-- Hexagon Opacity -->
+              <div class="control-slider-group">
+                <div class="slider-label-row">
+                  <span>Hexagon Opacity</span>
+                  <span id="valOpacity" style="font-weight:700;color:#2563eb">65%</span>
+                </div>
+                <input type="range" id="sliderOpacity" class="range-slider" min="0.1" max="1.0" step="0.05" value="0.65">
+              </div>
+
+              <!-- Cell Numbers Toggle & Display Modes -->
+              <div class="filter-control-card" style="margin-top:8px">
+                <label class="checkbox-label" style="margin-bottom:6px">
+                  <input type="checkbox" id="checkShowLabels" checked>
+                  <span style="font-weight:600" id="labelCheckboxText">Cell Numbers (HA% &amp; Orders)</span>
+                </label>
+                <div class="pill-segmented pill-cell-labels">
+                  <button id="btnLabelOrdersHa" class="pill-item active" type="button" title="Show metric and order count in cell views">HA% + Orders</button>
+                  <button id="btnLabelHaOnly" class="pill-item" type="button" title="Show only metric in cell views">HA% Only</button>
+                  <button id="btnLabelOrdersOnly" class="pill-item" type="button" title="Show only orders count in cell views">Orders Only</button>
+                </div>
+              </div>
+
+              <!-- Basemap Style -->
+              <div class="ctrl-card-header" style="margin-top:8px">
+                <span class="ctrl-card-title">Basemap Style</span>
+              </div>
+              <div class="basemap-grid">
+                <button class="basemap-btn active" data-basemap="voyager" type="button">Voyager</button>
+                <button class="basemap-btn" data-basemap="osm" type="button">OpenStreetMap</button>
+                <button class="basemap-btn" data-basemap="satellite" type="button">Satellite</button>
+              </div>
+
+              <!-- Multi-Select Tool -->
+              <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0">
+                <label class="checkbox-label" style="margin-bottom:0">
+                  <input type="checkbox" id="checkMultiSelectMode">
+                  <span>Multi-Select Cells (or hold <kbd style="background:#e2e8f0;padding:1px 4px;border-radius:3px">Shift</kbd>)</span>
+                </label>
+                <div id="multiSelectControlsKml" style="display:none;margin-top:6px">
+                  <button id="btnExportKmlFromControls" class="btn-action btn-kml-export" style="width:100%;background:#059669;color:#fff;border-color:#047857;font-weight:600;justify-content:center;padding:5px 8px;font-size:11px" title="Output selected cells boundaries as KML file" type="button">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:4px">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Output KML (<span id="multiKmlCountText">0</span> Selected)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4: Bottlenecks (tab: hotspots) -->
+          <div class="ctrl-section" data-section="hotspots">
+            <div class="ctrl-card">
+              <div class="ctrl-card-header">
+                <span class="ctrl-card-title">Critical Bottlenecks</span>
+              </div>
+              <div id="bottlenecksList" class="bottlenecks-list"></div>
+            </div>
+          </div>
         </div>
-        <div id="bottlenecksList" class="bottlenecks-list"></div>
       </div>
 
       <!-- Bottom-Right Legend Card -->
