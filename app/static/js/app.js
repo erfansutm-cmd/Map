@@ -291,6 +291,14 @@ function setupEventListeners() {
   if (btnLblHaOnly) btnLblHaOnly.addEventListener('click', () => setCellLabelMode('ha_only'));
   if (btnLblOnly) btnLblOnly.addEventListener('click', () => setCellLabelMode('orders_only'));
 
+  // Quick toggle between HA% and Mean Duration for cell views
+  const btnToggleCellMetric = document.getElementById('btnToggleCellMetric');
+  if (btnToggleCellMetric) {
+    btnToggleCellMetric.addEventListener('click', () => {
+      setColorMetric(state.colorMetric === 'ha' ? 'mean' : 'ha');
+    });
+  }
+
   // Multi-select mode checkbox
   const checkMulti = document.getElementById('checkMultiSelectMode');
   if (checkMulti) {
@@ -1529,10 +1537,12 @@ function updateFilterLabels() {
     }
   }
 
-  // Update cell numbers button labels and checkbox text
+  // Update cell numbers button labels, badge, and checkbox text
   const btnLabelOrdersHa = document.getElementById('btnLabelOrdersHa');
   const btnLabelHaOnly = document.getElementById('btnLabelHaOnly');
   const labelCheckboxText = document.getElementById('labelCheckboxText');
+  const btnToggleCellMetric = document.getElementById('btnToggleCellMetric');
+
   if (btnLabelOrdersHa) {
     btnLabelOrdersHa.textContent = isHa ? 'HA% + Orders' : 'Mean + Orders';
   }
@@ -1542,12 +1552,19 @@ function updateFilterLabels() {
   if (labelCheckboxText) {
     labelCheckboxText.textContent = isHa ? 'Cell Numbers (HA% & Orders)' : 'Cell Numbers (Mean & Orders)';
   }
+  if (btnToggleCellMetric) {
+    btnToggleCellMetric.textContent = isHa ? 'HA30%' : 'Mean (min)';
+    btnToggleCellMetric.className = 'cell-metric-badge ' + (isHa ? '' : 'metric-mean');
+    btnToggleCellMetric.title = isHa
+      ? 'Currently showing HA30% in cell views. Click to switch cell views to Mean Duration.'
+      : 'Currently showing Mean Duration in cell views. Click to switch cell views to HA30%.';
+  }
 }
 
 // Update Top Floating Citywide HA30 Overview & KPI Cards
 function updateKpis(kpis, city, dataSource) {
   document.getElementById('headerCityLabel').textContent = `${city.toUpperCase()}`;
-  document.getElementById('headerThresholdLabel').textContent = `HA${kpis.threshold}%`;
+  document.getElementById('headerThresholdLabel').textContent = state.colorMetric === 'ha' ? `HA${kpis.threshold}%` : 'MEAN DURATION';
   document.getElementById('kpiThresholdVal').textContent = kpis.threshold;
 
   // Citywide HA30 Overview Card
@@ -1837,6 +1854,13 @@ function selectSingleHexagon(h, polygon) {
   document.getElementById('inspMeanDuration').textContent = `${h.mean.toFixed(1)} min`;
   document.getElementById('inspCoords').textContent = `${h.center[0]}, ${h.center[1]}`;
 
+  const boxInspHa = document.getElementById('boxInspHa');
+  const boxInspMean = document.getElementById('boxInspMean');
+  if (boxInspHa && boxInspMean) {
+    boxInspHa.classList.toggle('active-metric-box', state.colorMetric === 'ha');
+    boxInspMean.classList.toggle('active-metric-box', state.colorMetric === 'mean');
+  }
+
   inspector.classList.add('active');
 }
 
@@ -1924,6 +1948,13 @@ function renderMergedSelection() {
       <span class="hex-cell-remove" onclick="removeSingleSelectedHex('${item.h.hex}')">&times;</span>
     </span>
   `).join('');
+
+  const boxMergedHa = document.getElementById('boxMergedHa');
+  const boxMergedMean = document.getElementById('boxMergedMean');
+  if (boxMergedHa && boxMergedMean) {
+    boxMergedHa.classList.toggle('active-metric-box', state.colorMetric === 'ha');
+    boxMergedMean.classList.toggle('active-metric-box', state.colorMetric === 'mean');
+  }
 
   panel.classList.add('active');
 }
@@ -2119,6 +2150,24 @@ function setColorMetric(metric) {
   filterHexagons();
   updateLegend();
   renderLabels();
+
+  const headerThresh = document.getElementById('headerThresholdLabel');
+  if (headerThresh) {
+    headerThresh.textContent = metric === 'ha' ? `HA${state.threshold}%` : 'MEAN DURATION';
+  }
+
+  const boxInspHa = document.getElementById('boxInspHa');
+  const boxInspMean = document.getElementById('boxInspMean');
+  if (boxInspHa && boxInspMean) {
+    boxInspHa.classList.toggle('active-metric-box', metric === 'ha');
+    boxInspMean.classList.toggle('active-metric-box', metric === 'mean');
+  }
+  const boxMergedHa = document.getElementById('boxMergedHa');
+  const boxMergedMean = document.getElementById('boxMergedMean');
+  if (boxMergedHa && boxMergedMean) {
+    boxMergedHa.classList.toggle('active-metric-box', metric === 'ha');
+    boxMergedMean.classList.toggle('active-metric-box', metric === 'mean');
+  }
 
   if (state.data) {
     const layerData = state.data.layers?.[state.currentLayer]?.res?.[state.currentRes];
