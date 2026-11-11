@@ -291,7 +291,6 @@ function curLayer() { return DATA.layers[layerKey].res[res]; }
 function getStatusBadge(status) {
   if (status === 'critical') return '<span class="badge badge-critical">Critical SLA Breach</span>';
   if (status === 'warning') return '<span class="badge badge-warning">Elevated Risk</span>';
-  if (status === 'acceptable') return '<span class="badge badge-acceptable">Acceptable</span>';
   if (status === 'low_sample' || status === 'low') return '<span class="badge badge-low">Low Sample (&lt;' + MIN_ORDERS + ')</span>';
   return '';
 }

@@ -1772,8 +1772,6 @@ function createTooltipContent(h) {
     statusBadgeHtml = '<div style="font-size:10.5px;color:#dc2626;font-weight:700;margin:3px 0 2px">🔴 Critical SLA Breach (&gt;35%)</div>';
   } else if (h.status === 'warning') {
     statusBadgeHtml = '<div style="font-size:10.5px;color:#f59e0b;font-weight:700;margin:3px 0 2px">🟠 Elevated SLA Risk (25-35%)</div>';
-  } else if (h.status === 'acceptable') {
-    statusBadgeHtml = '<div style="font-size:10.5px;color:#ca8a04;font-weight:600;margin:3px 0 2px">🟡 Acceptable SLA (15-25%)</div>';
   } else if (h.status === 'low_sample') {
     statusBadgeHtml = '<div style="font-size:10px;color:#94a3b8;margin:3px 0 2px">⚪ Low Order Volume (&lt;5)</div>';
   }
