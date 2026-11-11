@@ -119,13 +119,13 @@ class TestEngine(unittest.TestCase):
         self.assertIn("slow", first_hex)
         self.assertIn("ha30_count", first_hex)
 
-    def test_bottlenecks_ranking_by_hyperact_percentage(self):
+    def test_bottlenecks_ranking_by_city_hyper_share(self):
         df = make_sample_orders_df("isfahan", n_orders=300)
         analysis = analyze_city_orders(df, threshold=30, min_orders=2, res_min=6, res_max=8, res_default=7)
         bottlenecks = analysis["bottlenecks"]
         self.assertTrue(len(bottlenecks) > 0)
-        pcts = [b["pct"] for b in bottlenecks]
-        self.assertEqual(pcts, sorted(pcts, reverse=True))
+        shares = [b["share_pct"] for b in bottlenecks]
+        self.assertEqual(shares, sorted(shares, reverse=True))
         for b in bottlenecks:
             self.assertIn("pct", b)
             self.assertIn("share_pct", b)

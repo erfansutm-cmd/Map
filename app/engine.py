@@ -328,14 +328,15 @@ def analyze_city_orders(
         }
         areas[str(r)] = f"~{h3.average_hexagon_area(r, 'km^2'):.2g} km\u00b2"
 
-    # Identify critical operational bottlenecks at default resolution ranked by percentage of hyperact orders
+    # Identify critical operational bottlenecks at default resolution ranked by share of hyperact orders in city
     default_src_tbl = rollup(base_src, res_default, min_orders, res_max)
     bottlenecks = []
     best_performers = []
     if len(default_src_tbl) > 0:
         reliable_src = default_src_tbl[default_src_tbl["reliable"]].copy()
         if len(reliable_src) > 0:
-            sorted_bottlenecks = reliable_src.sort_values(by=["pct_slow", "orders"], ascending=[False, False]).head(8)
+            reliable_src["share_pct"] = (reliable_src["slow"] / total_slow * 100.0) if total_slow > 0 else 0.0
+            sorted_bottlenecks = reliable_src.sort_values(by=["share_pct", "slow", "orders"], ascending=[False, False, False]).head(8)
             for row in sorted_bottlenecks.itertuples():
                 c_lat, c_lng = h3.cell_to_latlng(row.hex)
                 share_pct = round(float(row.slow) / float(total_slow) * 100.0, 2) if total_slow > 0 else 0.0

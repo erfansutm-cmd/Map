@@ -2701,25 +2701,29 @@ function renderBottlenecks(bottlenecks) {
     return;
   }
 
-  // Rank bottlenecks by percentage of hyperact orders (highest % first)
+  // Rank bottlenecks by share of hyperact orders in city (highest city HA share first)
   const sorted = [...bottlenecks].sort((a, b) => {
-    const pctA = a.pct !== undefined ? a.pct : 0;
-    const pctB = b.pct !== undefined ? b.pct : 0;
-    if (pctB !== pctA) return pctB - pctA;
+    const shareA = getHexSharePct(a);
+    const shareB = getHexSharePct(b);
+    if (shareB !== shareA) return shareB - shareA;
+    if ((b.slow || 0) !== (a.slow || 0)) return (b.slow || 0) - (a.slow || 0);
     return (b.orders || 0) - (a.orders || 0);
   });
 
   const thresh = state.threshold || 30;
 
-  container.innerHTML = sorted.map((b, i) => `
-    <div class="bottleneck-row" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
-      <div style="min-width:0;flex:1">
-        <div style="font-weight:700">#${i + 1} ${b.hex.substring(0, 8)}...</div>
-        <div style="font-size:9.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(b.orders || 0).toLocaleString()} orders &bull; ${(b.slow || 0).toLocaleString()} HA${thresh} &bull; ${b.mean ? b.mean.toFixed(1) : 0}m avg</div>
+  container.innerHTML = sorted.map((b, i) => {
+    const sharePct = getHexSharePct(b);
+    return `
+      <div class="bottleneck-row" onclick="flyToHexagon('${b.hex}', [${b.center[0]}, ${b.center[1]}])">
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:700">#${i + 1} ${b.hex.substring(0, 8)}...</div>
+          <div style="font-size:9.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(b.orders || 0).toLocaleString()} orders &bull; ${(b.slow || 0).toLocaleString()} HA${thresh} &bull; ${b.mean ? b.mean.toFixed(1) : 0}m avg</div>
+        </div>
+        <div style="font-weight:800;font-size:12.5px;color:#dc2626;margin-left:8px;flex-shrink:0" title="${sharePct.toFixed(1)}% share of whole city HA${thresh} orders">${sharePct.toFixed(1)}%</div>
       </div>
-      <div style="font-weight:800;font-size:12.5px;color:#dc2626;margin-left:8px;flex-shrink:0">${b.pct ? b.pct.toFixed(1) : '0.0'}%</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 window.flyToHexagon = function(hexId, center) {
