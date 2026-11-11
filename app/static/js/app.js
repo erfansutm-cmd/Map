@@ -7,7 +7,7 @@
 
 // Application State
 const state = {
-  city: 'isfahan',
+  city: 'tehran',
   status: 'DELIVERED',
   customerId: 2,
   startDate: '2026-10-22',
@@ -108,15 +108,14 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   initCalendarUI();
   probeVoyagerApiKey();
-  // Load default days at first in one query
-  loadCityData('isfahan', true);
+  initSessionDialog();
 });
 
 function initMap() {
   map = L.map('map', {
     zoomControl: false,
     preferCanvas: true
-  }).setView([32.6546, 51.6680], 13.5);
+  }).setView([35.6892, 51.3890], 12);
 
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
@@ -530,6 +529,140 @@ const calState = {
   pickingState: 'none', // 'none' or 'picking_end'
   hoverDate: null
 };
+
+// Initial City & Period Setup Modal Logic
+function initSessionDialog() {
+  const modal = document.getElementById('initSessionModal');
+  const form = document.getElementById('initSessionForm');
+  const cityButtons = document.querySelectorAll('.init-city-btn');
+  const customCityInput = document.getElementById('initCustomCityInput');
+  const selectedLabel = document.getElementById('initSelectedCityLabel');
+  const presetButtons = document.querySelectorAll('.init-preset-btn');
+  const startDateInput = document.getElementById('initStartDate');
+  const endDateInput = document.getElementById('initEndDate');
+  const daysBadge = document.getElementById('initPeriodDaysBadge');
+  const btnClose = document.getElementById('btnCloseInitModal');
+  const btnOpenModal = document.getElementById('btnOpenInitModal');
+
+  if (!modal || !form) return;
+
+  let currentChosenCity = state.city || 'tehran';
+
+  function updateDaysBadge() {
+    const s = startDateInput ? startDateInput.value : '';
+    const e = endDateInput ? endDateInput.value : '';
+    if (s && e) {
+      const d1 = new Date(s);
+      const d2 = new Date(e);
+      const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+      if (daysBadge) {
+        daysBadge.textContent = diff > 0 ? `${diff} Days Selected` : 'Invalid Range';
+        daysBadge.style.color = diff > 0 ? '#2563eb' : '#dc2626';
+      }
+    }
+  }
+
+  cityButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      cityButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentChosenCity = btn.dataset.city;
+      if (selectedLabel) selectedLabel.textContent = btn.querySelector('.city-en').textContent;
+      if (customCityInput) customCityInput.value = '';
+    });
+  });
+
+  if (customCityInput) {
+    customCityInput.addEventListener('input', () => {
+      const val = customCityInput.value.trim();
+      if (val) {
+        cityButtons.forEach(b => b.classList.remove('active'));
+        currentChosenCity = val;
+        if (selectedLabel) selectedLabel.textContent = val;
+      }
+    });
+  }
+
+  presetButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      presetButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (startDateInput) startDateInput.value = btn.dataset.start;
+      if (endDateInput) endDateInput.value = btn.dataset.end;
+      updateDaysBadge();
+    });
+  });
+
+  if (startDateInput) startDateInput.addEventListener('change', updateDaysBadge);
+  if (endDateInput) endDateInput.addEventListener('change', updateDaysBadge);
+  updateDaysBadge();
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    let s = (startDateInput && startDateInput.value) || '2026-10-22';
+    let end = (endDateInput && endDateInput.value) || '2026-11-05';
+    if (s > end) {
+      const tmp = s; s = end; end = tmp;
+    }
+
+    state.city = currentChosenCity;
+    state.startDate = s;
+    state.endDate = end;
+    state.selectedDates = [];
+
+    // Sync other UI inputs & labels
+    const cityInp = document.getElementById('cityInput');
+    if (cityInp) cityInp.value = currentChosenCity;
+    const inpStart = document.getElementById('inputStartDate');
+    if (inpStart) inpStart.value = s;
+    const inpEnd = document.getElementById('inputEndDate');
+    if (inpEnd) inpEnd.value = end;
+
+    updateCalendarTriggerLabel();
+
+    modal.classList.remove('open');
+
+    // Fetch city data and open the map
+    loadCityData(state.city, true);
+  });
+
+  if (btnOpenModal) {
+    btnOpenModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Sync dialog with current state before opening
+      if (startDateInput) startDateInput.value = state.startDate || '2026-10-22';
+      if (endDateInput) endDateInput.value = state.endDate || '2026-11-05';
+      updateDaysBadge();
+
+      let matched = false;
+      cityButtons.forEach(b => {
+        if (b.dataset.city.toLowerCase() === (state.city || '').toLowerCase()) {
+          b.classList.add('active');
+          matched = true;
+          if (selectedLabel) selectedLabel.textContent = b.querySelector('.city-en').textContent;
+        } else {
+          b.classList.remove('active');
+        }
+      });
+      if (!matched && customCityInput) {
+        customCityInput.value = state.city || '';
+        if (selectedLabel) selectedLabel.textContent = state.city || 'Tehran';
+      }
+      modal.classList.add('open');
+    });
+  }
+
+  if (btnClose) {
+    btnClose.addEventListener('click', () => {
+      modal.classList.remove('open');
+      if (!state.data) {
+        loadCityData(state.city || 'tehran', true);
+      }
+    });
+  }
+}
 
 function initCalendarUI() {
   calState.startDate = state.startDate;
@@ -1410,6 +1543,13 @@ function generateKmlForHexes(hexItems, docTitle) {
     const ring = h.ring;
     if (!ring || ring.length < 3) return '';
 
+    const pct = typeof h.pct === 'number' ? h.pct : 0;
+    const orders = typeof h.orders === 'number' ? h.orders : 0;
+    const slow = typeof (h.ha30_count != null ? h.ha30_count : h.slow) === 'number'
+      ? (h.ha30_count != null ? h.ha30_count : h.slow)
+      : 0;
+    const mean = typeof h.mean === 'number' ? h.mean : 0;
+
     // Convert [lat, lng] to "longitude,latitude,altitude" (KML requires lng,lat,alt)
     const coordPairs = ring.map(pt => `${Number(pt[1]).toFixed(6)},${Number(pt[0]).toFixed(6)},0`);
 
@@ -1422,10 +1562,32 @@ function generateKmlForHexes(hexItems, docTitle) {
     }
 
     const coordsStr = coordPairs.join(' ');
+    const safeHex = escapeXml(hexId);
+    const placemarkName = `${safeHex} — HA30: ${pct.toFixed(1)}% (${orders.toLocaleString()} ord)`;
+
+    const descHtml = `<![CDATA[
+<div style="font-family:sans-serif;font-size:12px;line-height:1.5;">
+  <h4 style="margin:0 0 6px 0;color:#0e7490;">H3 Cell: ${safeHex}</h4>
+  <table style="border-collapse:collapse;width:100%;font-size:12px;">
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>HA30 Breach Rate:</b></td><td style="padding:2px 0;font-weight:700;color:${pct > 25 ? '#dc2626' : '#16a34a'};">${pct.toFixed(1)}%</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Total Orders:</b></td><td style="padding:2px 0;font-weight:700;">${orders.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>HA30 Orders Count:</b></td><td style="padding:2px 0;">${slow.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Mean Duration:</b></td><td style="padding:2px 0;">${mean.toFixed(1)} min</td></tr>
+  </table>
+</div>
+]]>`;
 
     return `    <Placemark>
-      <name>${escapeXml(hexId)}</name>
+      <name>${placemarkName}</name>
+      <description>${descHtml}</description>
       <styleUrl>#cellBoundary</styleUrl>
+      <ExtendedData>
+        <Data name="h3_index"><value>${safeHex}</value></Data>
+        <Data name="ha30_pct"><value>${pct.toFixed(1)}</value></Data>
+        <Data name="orders"><value>${orders}</value></Data>
+        <Data name="ha30_orders"><value>${slow}</value></Data>
+        <Data name="mean_duration_min"><value>${mean.toFixed(1)}</value></Data>
+      </ExtendedData>
       <Polygon>
         <outerBoundaryIs>
           <LinearRing>
@@ -1440,7 +1602,7 @@ function generateKmlForHexes(hexItems, docTitle) {
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>${escapeXml(docTitle || 'Selected Cell Boundaries')}</name>
-    <description>H3 cell boundaries exported from Fleet HexMap</description>
+    <description>H3 cell boundaries with HA30 breach rates and order counts exported from Fleet HexMap</description>
     <Style id="cellBoundary">
       <LineStyle>
         <color>ffd4b606</color>

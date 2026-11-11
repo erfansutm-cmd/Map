@@ -77,6 +77,20 @@ class TestKmlExport(unittest.TestCase):
         root = ET.fromstring(res.text)
         self.assertTrue(root.tag.endswith("kml"))
 
+    def test_api_export_kml_post_with_stats(self):
+        cells_with_stats = [
+            {"hex": "881f18b321fffff", "pct": 28.5, "orders": 1250, "ha30_count": 356, "mean": 21.4},
+            {"hex": "881f18b323fffff", "pct": 14.2, "orders": 890, "ha30_count": 126, "mean": 17.8},
+        ]
+        res = self.client.post(
+            "/api/export-kml",
+            json={"cells": cells_with_stats, "filename": "stats_cells.kml"}
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("HA30: 28.5%", res.text)
+        self.assertIn("1,250 ord", res.text)
+        self.assertIn("stats_cells.kml", res.headers.get("content-disposition"))
+
     def test_api_export_kml_empty_cells_error(self):
         res = self.client.get("/api/export-kml?cells=")
         self.assertEqual(res.status_code, 400)

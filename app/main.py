@@ -324,7 +324,12 @@ def export_kml_post(payload: Dict[str, Any]):
     if isinstance(raw_cells, str):
         cell_list = [c.strip() for c in raw_cells.split(",") if c.strip()]
     elif isinstance(raw_cells, list):
-        cell_list = [str(c).strip() for c in raw_cells if str(c).strip()]
+        cell_list = []
+        for c in raw_cells:
+            if isinstance(c, dict):
+                cell_list.append(c)
+            elif str(c).strip():
+                cell_list.append(str(c).strip())
     else:
         cell_list = []
 
