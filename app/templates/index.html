@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.2.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -812,7 +812,7 @@
       </div>
       <div class="stat-box">
         <div class="stat-box-label">Avg Active Cells / Biker (Period)</div>
-        <div id="modalCityAvgCellsPerBiker" class="stat-box-val" style="color:#2563eb">0.0</div>
+        <div id="modalCityAvgCellsPerBiker" class="stat-box-val" style="color:#2563eb">-</div>
       </div>
     </div>
 
@@ -920,6 +920,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js"></script>
+<script src="/static/js/app.js?v=2.2.1"></script>
 </body>
 </html>

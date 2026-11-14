@@ -178,25 +178,17 @@ def fetch_orders(
         # Check disk cache for any dates not in memory (must contain biker_id)
         for d in all_target_dates:
             key = (clean_city, status, customer_id, d)
-            if key in DAY_CACHE and "biker_id" not in DAY_CACHE[key].columns:
-                DAY_CACHE.pop(key, None)
-                QUERIED_DATES.discard(key)
-
-            if key not in DAY_CACHE:
+            if key in DAY_CACHE:
+                if len(DAY_CACHE[key]) > 0 and "biker_id" not in DAY_CACHE[key].columns:
+                    DAY_CACHE.pop(key, None)
+                    QUERIED_DATES.discard(key)
+            else:
                 cached_file_df = load_df_from_file("clickhouse", key)
                 if cached_file_df is not None:
-                    if "biker_id" in cached_file_df.columns:
-                        DAY_CACHE[key] = cached_file_df
-                        QUERIED_DATES.add(key)
-                    else:
-                        try:
-                            from app.file_cache import _cache_filename, CACHE_DIR
-                            fn = _cache_filename("clickhouse", key)
-                            fp = os.path.join(CACHE_DIR, fn)
-                            if os.path.exists(fp):
-                                os.remove(fp)
-                        except Exception:
-                            pass
+                    DAY_CACHE[key] = cached_file_df
+                    QUERIED_DATES.add(key)
+                else:
+                    QUERIED_DATES.discard(key)
 
     # Identify which of the requested dates do not have data in cache
     missing_dates = [
@@ -268,7 +260,8 @@ SELECT
     source_longitude,
     destination_latitude,
     destination_longitude,
-    create_to_accept_contractual
+    create_to_accept_contractual,
+    created_date
 FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
@@ -299,8 +292,8 @@ LIMIT 1 BY order_id
         for d in missing_dates:
             if (clean_city, status, customer_id, d) not in DAY_CACHE:
                 empty_df = pd.DataFrame(columns=[
-                    "order_id", "source_latitude", "source_longitude",
-                    "destination_latitude", "destination_longitude",
+                    "order_id", "biker_id", "source_latitude", "source_longitude",
+                    "source_hexagon", "destination_latitude", "destination_longitude",
                     "create_to_accept_contractual", "created_date"
                 ])
                 DAY_CACHE[(clean_city, status, customer_id, d)] = empty_df

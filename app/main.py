@@ -27,6 +27,16 @@ app = FastAPI(
     version="2.2.0",
 )
 
+
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -256,7 +266,7 @@ def get_city_data(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/cache/clear")
+@app.api_route("/api/cache/clear", methods=["GET", "POST"])
 def clear_all_caches():
     """Clear both ClickHouse query cache, fallback cache, and disk file cache."""
     from app.data_source import clear_day_cache

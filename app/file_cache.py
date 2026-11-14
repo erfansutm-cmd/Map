@@ -44,12 +44,21 @@ def save_df_to_file(namespace: str, key_tuple: Tuple, df: pd.DataFrame) -> bool:
 
 
 def load_df_from_file(namespace: str, key_tuple: Tuple) -> Optional[pd.DataFrame]:
-    """Load a DataFrame from disk cache if present."""
+    """Load a DataFrame from disk cache if present and valid."""
     try:
         filename = _cache_filename(namespace, key_tuple)
         filepath = os.path.join(CACHE_DIR, filename)
         if os.path.exists(filepath):
-            return pd.read_pickle(filepath)
+            df = pd.read_pickle(filepath)
+            # Invalidate and remove any legacy order cache file that lacks the biker_id column
+            if namespace in ("clickhouse", "fallback") and df is not None and len(df) > 0:
+                if "biker_id" not in df.columns:
+                    try:
+                        os.remove(filepath)
+                    except Exception:
+                        pass
+                    return None
+            return df
     except Exception:
         pass
     return None

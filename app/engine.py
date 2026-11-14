@@ -49,31 +49,27 @@ def get_order_cells_series(df: pd.DataFrame) -> pd.Series:
     if len(df) == 0:
         return pd.Series([], dtype=object)
 
-    has_hex = "source_hexagon" in df.columns
-    has_lat = "source_latitude" in df.columns
-    has_lng = "source_longitude" in df.columns
+    # 1. First preference: compute H3 res 8 directly from source coordinates
+    # This guarantees exact correspondence with the map hexagons
+    if "source_latitude" in df.columns and "source_longitude" in df.columns:
+        lats = df["source_latitude"].values
+        lngs = df["source_longitude"].values
+        cells = []
+        for i in range(len(df)):
+            cells.append(to_cell(lats[i], lngs[i], 8))
+        s_series = pd.Series(cells, index=df.index, dtype=object)
+        if s_series.notna().any():
+            return s_series
 
-    if not has_hex and not (has_lat and has_lng):
-        return pd.Series([None] * len(df), index=df.index, dtype=object)
+    # 2. Second preference: source_hexagon, biker_cell, or customer_cell
+    for col in ["source_hexagon", "biker_cell", "customer_cell"]:
+        if col in df.columns:
+            vals = df[col].astype(str).str.strip()
+            mask_v = vals.notna() & (vals != "") & (vals != "0") & (vals != "0.0") & (~vals.str.lower().isin(["nan", "none", "null"]))
+            if mask_v.any():
+                return vals
 
-    hex_vals = df["source_hexagon"].values if has_hex else None
-    lats = df["source_latitude"].values if has_lat else None
-    lngs = df["source_longitude"].values if has_lng else None
-
-    cells = []
-    for i in range(len(df)):
-        c = None
-        if hex_vals is not None:
-            raw_h = hex_vals[i]
-            if raw_h is not None and not pd.isna(raw_h):
-                s = str(raw_h).strip()
-                if s and s != "0" and s.lower() not in ("nan", "none", "null"):
-                    c = s
-        if c is None and lats is not None and lngs is not None:
-            c = to_cell(lats[i], lngs[i], 8)
-        cells.append(c)
-
-    return pd.Series(cells, index=df.index, dtype=object)
+    return pd.Series([None] * len(df), index=df.index, dtype=object)
 
 
 def compute_biker_active_cells_avg(df: pd.DataFrame) -> float:
@@ -84,7 +80,16 @@ def compute_biker_active_cells_avg(df: pd.DataFrame) -> float:
     3. For each biker, count the number of unique active cells they operated in.
     4. Compute and return the average across all active bikers.
     """
-    if df is None or len(df) == 0 or "biker_id" not in df.columns:
+    if df is None or len(df) == 0:
+        return 0.0
+
+    biker_col = None
+    for c in df.columns:
+        if c.lower() in ("biker_id", "courier_id", "driver_id", "rider_id", "biker", "courier"):
+            biker_col = c
+            break
+
+    if biker_col is None:
         return 0.0
 
     if "_active_cell" in df.columns:
@@ -92,7 +97,7 @@ def compute_biker_active_cells_avg(df: pd.DataFrame) -> float:
     else:
         cells = get_order_cells_series(df)
 
-    bikers = df["biker_id"]
+    bikers = df[biker_col]
 
     b_series = pd.Series(bikers.values, index=df.index)
     c_series = pd.Series(cells.values, index=df.index)
@@ -101,7 +106,7 @@ def compute_biker_active_cells_avg(df: pd.DataFrame) -> float:
     c_str = c_series.astype(str).str.strip()
 
     invalid_biker = b_series.isna() | (b_str == "") | (b_str == "0") | (b_str == "0.0") | b_str.str.lower().isin(["nan", "none", "null"])
-    invalid_cell = c_series.isna() | (c_str == "") | (c_str == "0") | c_str.str.lower().isin(["nan", "none", "null"])
+    invalid_cell = c_series.isna() | (c_str == "") | (c_str == "0") | (c_str == "0.0") | c_str.str.lower().isin(["nan", "none", "null"])
 
     valid_mask = (~invalid_biker) & (~invalid_cell)
     if not valid_mask.any():
