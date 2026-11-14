@@ -49,60 +49,70 @@ def get_order_cells_series(df: pd.DataFrame) -> pd.Series:
     if len(df) == 0:
         return pd.Series([], dtype=object)
 
-    if "source_hexagon" in df.columns:
-        hex_s = df["source_hexagon"].astype(str).str.strip()
-        mask_valid = hex_s.notna() & (hex_s != "") & (hex_s != "0") & (hex_s.str.lower() != "nan") & (hex_s.str.lower() != "none")
-        if mask_valid.all():
-            return hex_s
-        if "source_latitude" in df.columns and "source_longitude" in df.columns:
-            lats = df["source_latitude"].values
-            lngs = df["source_longitude"].values
-            cells = []
-            for i, is_v in enumerate(mask_valid.values):
-                if is_v:
-                    cells.append(hex_s.iloc[i])
-                else:
-                    cells.append(to_cell(lats[i], lngs[i], 8))
-            return pd.Series(cells, index=df.index)
-        return hex_s
+    has_hex = "source_hexagon" in df.columns
+    has_lat = "source_latitude" in df.columns
+    has_lng = "source_longitude" in df.columns
 
-    if "source_latitude" in df.columns and "source_longitude" in df.columns:
-        lats = df["source_latitude"].values
-        lngs = df["source_longitude"].values
-        return pd.Series([to_cell(a, b, 8) for a, b in zip(lats, lngs)], index=df.index)
+    if not has_hex and not (has_lat and has_lng):
+        return pd.Series([None] * len(df), index=df.index, dtype=object)
 
-    return pd.Series([None] * len(df), index=df.index)
+    hex_vals = df["source_hexagon"].values if has_hex else None
+    lats = df["source_latitude"].values if has_lat else None
+    lngs = df["source_longitude"].values if has_lng else None
+
+    cells = []
+    for i in range(len(df)):
+        c = None
+        if hex_vals is not None:
+            raw_h = hex_vals[i]
+            if raw_h is not None and not pd.isna(raw_h):
+                s = str(raw_h).strip()
+                if s and s != "0" and s.lower() not in ("nan", "none", "null"):
+                    c = s
+        if c is None and lats is not None and lngs is not None:
+            c = to_cell(lats[i], lngs[i], 8)
+        cells.append(c)
+
+    return pd.Series(cells, index=df.index, dtype=object)
 
 
 def compute_biker_active_cells_avg(df: pd.DataFrame) -> float:
     """
     Calculate average active cells per biker:
-    First count unique active cells for each biker, then average across all active bikers.
+    1. Filter orders where biker_id is present and valid (not null, not 0, not empty).
+    2. Identify the active cell (H3 resolution 8 hexagon) for each order.
+    3. For each biker, count the number of unique active cells they operated in.
+    4. Compute and return the average across all active bikers.
     """
     if df is None or len(df) == 0 or "biker_id" not in df.columns:
         return 0.0
 
-    b_ids = df["biker_id"]
-    mask = b_ids.notna() & (b_ids != 0) & (b_ids != "0") & (b_ids != "") & (b_ids.astype(str).str.lower() != "nan")
-    valid_df = df[mask]
-    if len(valid_df) == 0:
-        return 0.0
-
-    if "_active_cell" in valid_df.columns:
-        cells = valid_df["_active_cell"]
+    if "_active_cell" in df.columns:
+        cells = df["_active_cell"]
     else:
-        cells = get_order_cells_series(valid_df)
+        cells = get_order_cells_series(df)
 
-    valid_cells_mask = cells.notna() & (cells != "")
-    if not valid_cells_mask.any():
+    bikers = df["biker_id"]
+
+    b_series = pd.Series(bikers.values, index=df.index)
+    c_series = pd.Series(cells.values, index=df.index)
+
+    b_str = b_series.astype(str).str.strip()
+    c_str = c_series.astype(str).str.strip()
+
+    invalid_biker = b_series.isna() | (b_str == "") | (b_str == "0") | (b_str == "0.0") | b_str.str.lower().isin(["nan", "none", "null"])
+    invalid_cell = c_series.isna() | (c_str == "") | (c_str == "0") | c_str.str.lower().isin(["nan", "none", "null"])
+
+    valid_mask = (~invalid_biker) & (~invalid_cell)
+    if not valid_mask.any():
         return 0.0
 
-    biker_cells_df = pd.DataFrame({
-        "biker_id": valid_df.loc[valid_cells_mask, "biker_id"],
-        "cell": cells.loc[valid_cells_mask],
+    clean_df = pd.DataFrame({
+        "biker_id": b_str[valid_mask],
+        "cell": c_str[valid_mask]
     })
 
-    cells_per_biker = biker_cells_df.groupby("biker_id")["cell"].nunique()
+    cells_per_biker = clean_df.groupby("biker_id")["cell"].nunique()
     if len(cells_per_biker) == 0:
         return 0.0
 

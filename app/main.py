@@ -61,10 +61,22 @@ def generate_fallback_orders(
     else:
         for d in all_dates:
             key = (city_key, d)
+            if key in FALLBACK_DAY_CACHE and "biker_id" not in FALLBACK_DAY_CACHE[key].columns:
+                FALLBACK_DAY_CACHE.pop(key, None)
             if key not in FALLBACK_DAY_CACHE:
                 cached_file_df = load_df_from_file("fallback", key)
                 if cached_file_df is not None:
-                    FALLBACK_DAY_CACHE[key] = cached_file_df
+                    if "biker_id" in cached_file_df.columns:
+                        FALLBACK_DAY_CACHE[key] = cached_file_df
+                    else:
+                        try:
+                            from app.file_cache import _cache_filename, CACHE_DIR
+                            fn = _cache_filename("fallback", key)
+                            fp = os.path.join(CACHE_DIR, fn)
+                            if os.path.exists(fp):
+                                os.remove(fp)
+                        except Exception:
+                            pass
 
     missing_dates = [d for d in all_dates if (city_key, d) not in FALLBACK_DAY_CACHE]
 

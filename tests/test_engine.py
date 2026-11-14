@@ -195,6 +195,24 @@ class TestEngine(unittest.TestCase):
             fetch_orders("isfahan", start_date="2026-09-15", end_date="2026-09-15")
         self.assertIn("ClickHouse", str(ctx.exception))
 
+    def test_cache_invalidation_when_biker_id_missing(self):
+        from app.data_source import DAY_CACHE, QUERIED_DATES, clear_day_cache
+
+        clear_day_cache()
+        sample_df = make_sample_orders_df("isfahan", n_orders=20)
+        # Drop biker_id to simulate old cache
+        old_cache_df = sample_df.drop(columns=["biker_id"])
+
+        DAY_CACHE[("isfahan", "DELIVERED", 2, "2026-10-22")] = old_cache_df
+        QUERIED_DATES.add(("isfahan", "DELIVERED", 2, "2026-10-22"))
+
+        # fetch_orders should detect that biker_id is missing, evict it, and attempt DB fetch
+        with self.assertRaises(RuntimeError) as ctx:
+            fetch_orders("isfahan", start_date="2026-10-22", end_date="2026-10-22")
+        self.assertIn("ClickHouse", str(ctx.exception))
+        # Ensure it was evicted from cache
+        self.assertNotIn(("isfahan", "DELIVERED", 2, "2026-10-22"), DAY_CACHE)
+
 
 if __name__ == "__main__":
     unittest.main()

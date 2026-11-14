@@ -175,14 +175,28 @@ def fetch_orders(
             DAY_CACHE.pop((clean_city, status, customer_id, d), None)
             QUERIED_DATES.discard((clean_city, status, customer_id, d))
     else:
-        # Check disk cache for any dates not in memory
+        # Check disk cache for any dates not in memory (must contain biker_id)
         for d in all_target_dates:
             key = (clean_city, status, customer_id, d)
+            if key in DAY_CACHE and "biker_id" not in DAY_CACHE[key].columns:
+                DAY_CACHE.pop(key, None)
+                QUERIED_DATES.discard(key)
+
             if key not in DAY_CACHE:
                 cached_file_df = load_df_from_file("clickhouse", key)
                 if cached_file_df is not None:
-                    DAY_CACHE[key] = cached_file_df
-                    QUERIED_DATES.add(key)
+                    if "biker_id" in cached_file_df.columns:
+                        DAY_CACHE[key] = cached_file_df
+                        QUERIED_DATES.add(key)
+                    else:
+                        try:
+                            from app.file_cache import _cache_filename, CACHE_DIR
+                            fn = _cache_filename("clickhouse", key)
+                            fp = os.path.join(CACHE_DIR, fn)
+                            if os.path.exists(fp):
+                                os.remove(fp)
+                        except Exception:
+                            pass
 
     # Identify which of the requested dates do not have data in cache
     missing_dates = [
@@ -249,6 +263,7 @@ LIMIT 1 BY order_id
             sql_fallback = f"""
 SELECT
     order_id,
+    biker_id,
     source_latitude,
     source_longitude,
     destination_latitude,
@@ -339,6 +354,18 @@ def parse_csv_orders(csv_bytes: bytes) -> pd.DataFrame:
 
     if "order_id" not in df.columns:
         df["order_id"] = [f"CSV-{i}" for i in range(len(df))]
+
+    if "biker_id" not in df.columns:
+        for alias in ["courier_id", "driver_id", "rider_id", "biker", "courier"]:
+            if alias in df.columns:
+                df["biker_id"] = df[alias]
+                break
+
+    if "source_hexagon" not in df.columns:
+        for alias in ["hex", "hexagon", "h3", "source_hex"]:
+            if alias in df.columns:
+                df["source_hexagon"] = df[alias]
+                break
 
     if "destination_latitude" not in df.columns:
         df["destination_latitude"] = df["source_latitude"]
