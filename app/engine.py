@@ -44,6 +44,71 @@ def to_cell(lat: Any, lng: Any, res: int) -> Optional[str]:
     return h3.latlng_to_cell(lat, lng, res)
 
 
+def get_order_cells_series(df: pd.DataFrame) -> pd.Series:
+    """Resolve active cell (H3 resolution 8) for each order in df."""
+    if len(df) == 0:
+        return pd.Series([], dtype=object)
+
+    if "source_hexagon" in df.columns:
+        hex_s = df["source_hexagon"].astype(str).str.strip()
+        mask_valid = hex_s.notna() & (hex_s != "") & (hex_s != "0") & (hex_s.str.lower() != "nan") & (hex_s.str.lower() != "none")
+        if mask_valid.all():
+            return hex_s
+        if "source_latitude" in df.columns and "source_longitude" in df.columns:
+            lats = df["source_latitude"].values
+            lngs = df["source_longitude"].values
+            cells = []
+            for i, is_v in enumerate(mask_valid.values):
+                if is_v:
+                    cells.append(hex_s.iloc[i])
+                else:
+                    cells.append(to_cell(lats[i], lngs[i], 8))
+            return pd.Series(cells, index=df.index)
+        return hex_s
+
+    if "source_latitude" in df.columns and "source_longitude" in df.columns:
+        lats = df["source_latitude"].values
+        lngs = df["source_longitude"].values
+        return pd.Series([to_cell(a, b, 8) for a, b in zip(lats, lngs)], index=df.index)
+
+    return pd.Series([None] * len(df), index=df.index)
+
+
+def compute_biker_active_cells_avg(df: pd.DataFrame) -> float:
+    """
+    Calculate average active cells per biker:
+    First count unique active cells for each biker, then average across all active bikers.
+    """
+    if df is None or len(df) == 0 or "biker_id" not in df.columns:
+        return 0.0
+
+    b_ids = df["biker_id"]
+    mask = b_ids.notna() & (b_ids != 0) & (b_ids != "0") & (b_ids != "") & (b_ids.astype(str).str.lower() != "nan")
+    valid_df = df[mask]
+    if len(valid_df) == 0:
+        return 0.0
+
+    if "_active_cell" in valid_df.columns:
+        cells = valid_df["_active_cell"]
+    else:
+        cells = get_order_cells_series(valid_df)
+
+    valid_cells_mask = cells.notna() & (cells != "")
+    if not valid_cells_mask.any():
+        return 0.0
+
+    biker_cells_df = pd.DataFrame({
+        "biker_id": valid_df.loc[valid_cells_mask, "biker_id"],
+        "cell": cells.loc[valid_cells_mask],
+    })
+
+    cells_per_biker = biker_cells_df.groupby("biker_id")["cell"].nunique()
+    if len(cells_per_biker) == 0:
+        return 0.0
+
+    return round(float(cells_per_biker.mean()), 1)
+
+
 def prepare_base(df: pd.DataFrame, lat_col: str, lng_col: str, threshold: int, res_max: int = 10) -> pd.DataFrame:
     """Aggregate orders per finest-level hexagon (RES_MAX)."""
     d = df.copy()
@@ -368,6 +433,7 @@ def analyze_city_orders(
 
     center_lat = float(df["source_latitude"].mean()) if len(df) else 32.6546
     center_lng = float(df["source_longitude"].mean()) if len(df) else 51.6680
+    avg_cells_per_biker = compute_biker_active_cells_avg(df)
 
     return {
         "kpis": {
@@ -382,6 +448,7 @@ def analyze_city_orders(
             "sla_health": sla_health,
             "threshold": threshold,
             "min_orders": min_orders,
+            "avg_cells_per_biker": avg_cells_per_biker,
         },
         "center": [round(center_lat, 5), round(center_lng, 5)],
         "res_min": res_min,

@@ -15,6 +15,7 @@ import pandas as pd
 from app.config import settings
 from app.cities import normalize_city_name
 from app.file_cache import save_df_to_file, load_df_from_file, clear_file_cache
+from app.engine import compute_biker_active_cells_avg, get_order_cells_series
 
 # Daily in-memory partition cache: (clean_city, status, customer_id, date_str) -> pd.DataFrame
 DAY_CACHE: Dict[Tuple[str, str, int, str], pd.DataFrame] = {}
@@ -78,7 +79,7 @@ def get_dates_between(start_date: str, end_date: str) -> List[str]:
 
 
 def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: int) -> List[Dict[str, Any]]:
-    """Compute daily HA30, orders, and duration statistics for each date in the period."""
+    """Compute daily HA30, orders, duration statistics, and avg active cells per biker for each date."""
     if len(df) == 0:
         return []
 
@@ -87,6 +88,10 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
 
     if "created_date" not in df.columns:
         return []
+
+    # Pre-compute order cells once for fast daily aggregation
+    df = df.copy()
+    df["_active_cell"] = get_order_cells_series(df)
 
     grouped = df.groupby("created_date")
     agg_dict = {}
@@ -98,12 +103,14 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
         ha30_count = int((v >= threshold).sum())
         pct = round(ha30_count / with_val * 100, 1) if with_val > 0 else 0.0
         mean = round(float(v.mean()), 1) if with_val > 0 else 0.0
+        avg_cells = compute_biker_active_cells_avg(g)
         agg_dict[d_key] = {
             "orders": total,
             "ha30_count": ha30_count,
             "with_value": with_val,
             "pct": pct,
             "mean": mean,
+            "avg_cells_per_biker": avg_cells,
         }
 
     for d_str in all_dates:
@@ -115,7 +122,14 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             day_name = ""
             short_label = d_str
 
-        info = agg_dict.get(d_str, {"orders": 0, "ha30_count": 0, "with_value": 0, "pct": 0.0, "mean": 0.0})
+        info = agg_dict.get(d_str, {
+            "orders": 0,
+            "ha30_count": 0,
+            "with_value": 0,
+            "pct": 0.0,
+            "mean": 0.0,
+            "avg_cells_per_biker": 0.0,
+        })
         daily_stats.append({
             "date": d_str,
             "day_name": day_name,
@@ -124,6 +138,7 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             "ha30_count": info["ha30_count"],
             "pct": info["pct"],
             "mean": info["mean"],
+            "avg_cells_per_biker": info.get("avg_cells_per_biker", 0.0),
         })
 
     return daily_stats
@@ -204,8 +219,10 @@ def fetch_orders(
         sql = f"""
 SELECT
     order_id,
+    biker_id,
     source_latitude,
     source_longitude,
+    source_hexagon,
     destination_latitude,
     destination_longitude,
     create_to_accept_contractual,
@@ -295,8 +312,8 @@ LIMIT 1 BY order_id
         target_full_df = pd.concat(day_frames, ignore_index=True)
     else:
         target_full_df = pd.DataFrame(columns=[
-            "order_id", "source_latitude", "source_longitude",
-            "destination_latitude", "destination_longitude",
+            "order_id", "biker_id", "source_latitude", "source_longitude",
+            "source_hexagon", "destination_latitude", "destination_longitude",
             "create_to_accept_contractual", "created_date"
         ])
 

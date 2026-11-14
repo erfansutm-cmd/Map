@@ -806,9 +806,13 @@
         <div class="stat-box-label">Total Delivered Orders</div>
         <div id="modalCityTotalOrders" class="stat-box-val" style="font-size:20px">0</div>
       </div>
-      <div class="stat-box" style="grid-column: span 2">
-        <div class="stat-box-label">HA30 Orders Count (create to accept time &ge; 30 min)</div>
+      <div class="stat-box">
+        <div class="stat-box-label">HA30 Orders Count (&ge; 30 min)</div>
         <div id="modalCitySlowOrders" class="stat-box-val" style="color:#dc2626">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Avg Active Cells / Biker (Period)</div>
+        <div id="modalCityAvgCellsPerBiker" class="stat-box-val" style="color:#2563eb">0.0</div>
       </div>
     </div>
 
@@ -842,6 +846,7 @@
             <th style="padding:6px 8px">HA30 Orders (&ge;30 min)</th>
             <th style="padding:6px 8px">HA30%</th>
             <th style="padding:6px 8px">Mean</th>
+            <th style="padding:6px 8px">Avg Active Cells / Biker</th>
           </tr>
         </thead>
         <tbody id="modalDailyTableBody"></tbody>

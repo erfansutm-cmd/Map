@@ -2755,6 +2755,12 @@ function openCityModal() {
   document.getElementById('modalCityP90').textContent = `${kpis.p90_duration || 0} min`;
   document.getElementById('modalCityP95').textContent = `${kpis.p95_duration || 0} min`;
 
+  const modalAvgCells = document.getElementById('modalCityAvgCellsPerBiker');
+  if (modalAvgCells) {
+    const val = kpis.avg_cells_per_biker !== undefined ? kpis.avg_cells_per_biker : (kpis.avg_active_cells_per_biker || 0);
+    modalAvgCells.textContent = val > 0 ? `${val.toFixed(1)} cells` : '-';
+  }
+
   // Daily Table
   const tbody = document.getElementById('modalDailyTableBody');
   if (state.dailyStats && state.dailyStats.length > 0) {
@@ -2769,11 +2775,12 @@ function openCityModal() {
           <td style="padding:5px 8px;color:#dc2626">${(d.ha30_count !== undefined ? d.ha30_count : (d.slow || 0)).toLocaleString()}</td>
           <td style="padding:5px 8px;font-weight:700;color:${color}">${d.pct.toFixed(1)}%</td>
           <td style="padding:5px 8px">${d.mean.toFixed(1)} min</td>
+          <td style="padding:5px 8px;font-weight:600;color:#2563eb">${d.avg_cells_per_biker !== undefined && d.avg_cells_per_biker > 0 ? d.avg_cells_per_biker.toFixed(1) : '-'}</td>
         </tr>
       `;
     }).join('');
   } else {
-    tbody.innerHTML = '<tr><td colspan="5" style="padding:8px;text-align:center;color:#94a3b8">No daily records available</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:8px;text-align:center;color:#94a3b8">No daily records available</td></tr>';
   }
 
   document.getElementById('citywideModal').classList.add('open');
