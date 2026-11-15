@@ -1928,28 +1928,17 @@ function renderMapHexagons() {
 }
 
 function createTooltipContent(h) {
-  let statusBadgeHtml = '';
-  if (h.status === 'critical') {
-    statusBadgeHtml = '<div style="font-size:10.5px;color:#dc2626;font-weight:700;margin:3px 0 2px">🔴 Critical SLA Breach (&gt;35%)</div>';
-  } else if (h.status === 'warning') {
-    statusBadgeHtml = '<div style="font-size:10.5px;color:#f59e0b;font-weight:700;margin:3px 0 2px">🟠 Elevated SLA Risk (25-35%)</div>';
-  } else if (h.status === 'low_sample') {
-    statusBadgeHtml = '<div style="font-size:10px;color:#94a3b8;margin:3px 0 2px">⚪ Low Order Volume (&lt;5)</div>';
-  }
-
   const isMean = state.colorMetric === 'mean';
   const isShare = state.colorMetric === 'share';
   let topMetricHtml;
 
   if (isShare) {
-    const totalCitySlow = getCityTotalSlow();
     const sharePct = getHexSharePct(h);
     topMetricHtml = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
         <span style="font-size:13.5px;color:#0f172a"><b>City HA Share: ${sharePct.toFixed(1)}%</b></span>
-        <span style="font-size:12px;font-weight:600;color:#2563eb">${h.slow.toLocaleString()} HA ord</span>
+        <span style="font-size:12px;font-weight:600;color:#2563eb">${h.orders.toLocaleString()} orders</span>
       </div>
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px">${h.slow.toLocaleString()} of ${totalCitySlow.toLocaleString()} citywide delayed orders</div>
       <div style="display:flex;justify-content:space-between;margin:2px 0">
         <span style="color:#64748b">Cell HA${state.threshold}% Breach:</span>
         <span style="color:#0f172a;font-weight:600">${h.pct.toFixed(1)}%</span>
@@ -1966,22 +1955,22 @@ function createTooltipContent(h) {
     topMetricHtml = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
         <span style="font-size:13.5px;color:#0f172a"><b>Mean: ${h.mean.toFixed(1)} min</b></span>
-        <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
+        <span style="font-size:12px;font-weight:400;color:#475569">${h.orders.toLocaleString()} orders</span>
        </div>
        <div style="display:flex;justify-content:space-between;margin:2px 0">
         <span style="color:#64748b">HA${state.threshold}% Breach:</span>
-        <span style="color:#dc2626;font-weight:700">${h.pct.toFixed(1)}% (${h.slow} ord)</span>
+        <span style="color:#dc2626;font-weight:700">${h.pct.toFixed(1)}% (${h.slow.toLocaleString()} ord)</span>
        </div>
        <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept average: ${h.mean.toFixed(1)} min)</div>`;
   } else {
     topMetricHtml = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
         <span style="font-size:13.5px;color:#0f172a"><b>HA${state.threshold}%: ${h.pct.toFixed(1)}%</b></span>
-        <span style="font-size:12px;font-weight:400;color:#475569">${h.orders} orders</span>
+        <span style="font-size:12px;font-weight:400;color:#475569">${h.orders.toLocaleString()} orders</span>
        </div>
        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
         <span style="color:#64748b">HA${state.threshold} Orders Count:</span>
-        <b style="color:#dc2626">${h.slow}</b>
+        <b style="color:#dc2626">${h.slow.toLocaleString()}</b>
        </div>
        <div style="font-size:9.5px;color:#94a3b8;margin-bottom:4px">(create to accept time &ge; ${state.threshold} min)</div>
        <div style="display:flex;justify-content:space-between;margin:2px 0">
@@ -1993,7 +1982,6 @@ function createTooltipContent(h) {
   return `
     <div style="font-family:Inter,sans-serif;font-size:12px;line-height:1.45;min-width:180px">
       ${topMetricHtml}
-      ${statusBadgeHtml}
       <div style="margin-top:4px;font-size:9.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:3px">Hex: ${h.hex}</div>
     </div>
   `;
@@ -2477,16 +2465,13 @@ function renderLabels() {
       const metricText = `${sharePct.toFixed(1)}%`;
 
       if (state.cellLabelMode === 'orders_only') {
-        // Hyper act orders count only (NOT total orders!)
-        htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.slow.toLocaleString()} HA</span>`;
+        htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.orders.toLocaleString()}</span>`;
       } else if (state.cellLabelMode === 'ha_only' || radiusPx < 11) {
-        // City share percentage only
         htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>`;
       } else {
-        // City share percentage prominent, plus hyper act orders count underneath (no total orders!)
         htmlContent = `
           <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>
-          <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.slow.toLocaleString()} HA ord</span>
+          <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.orders.toLocaleString()} ord</span>
         `;
       }
     } else {
