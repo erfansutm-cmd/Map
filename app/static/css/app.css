@@ -2202,123 +2202,522 @@ body.map-only-mode .btn-exit-map-only {
 }
 
 .biker-form-label {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
-  color: #334155;
+  color: #1e293b;
   display: block;
 }
 
-.biker-label-hint {
-  font-size: 9.5px;
-  color: #94a3b8;
-  font-weight: 500;
-}
-
-.biker-pill-tag {
+.biker-hint-badge {
   font-size: 9.5px;
   font-weight: 700;
   color: #64748b;
   background: #f1f5f9;
-  padding: 1px 5px;
-  border-radius: 3px;
-}
-
-.biker-date-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.biker-date-item {
-  display: flex;
-  align-items: center;
-  border: 1px solid #cbd5e1;
+  padding: 1.5px 6px;
   border-radius: 4px;
-  background: #f8fafc;
-  overflow: hidden;
+  border: 1px solid #e2e8f0;
 }
 
-.biker-date-prefix {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #64748b;
-  padding: 0 5px;
-  background: #f1f5f9;
-  border-right: 1px solid #e2e8f0;
-  height: 100%;
+/* Modern Stepper Input */
+.biker-input-stepper-wrap {
   display: flex;
   align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 8px;
+  height: 33px;
+  transition: all 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.biker-date-input {
+.biker-input-stepper-wrap:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.biker-modern-input {
   border: none;
   background: transparent;
-  padding: 4px;
-  font-size: 10.5px;
   width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
   outline: none;
   font-family: inherit;
 }
 
-.biker-number-input {
-  width: 100%;
-  padding: 4px 8px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 11px;
-  font-family: inherit;
-  outline: none;
-}
-.biker-number-input:focus {
-  border-color: #2563eb;
+.biker-input-unit-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 4px;
+  white-space: nowrap;
 }
 
-.biker-rule-grid {
+/* Modern Segmented Control & Percentage */
+.biker-segmented-row {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  margin-top: 3px;
 }
 
-.biker-segmented {
+.biker-modern-segmented {
   display: inline-flex;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #fff;
+  padding: 2.5px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  flex: 1;
+}
+
+.biker-seg-pill {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.biker-seg-pill:hover:not(.active) {
+  color: #1e293b;
+}
+
+.biker-seg-pill.active {
+  background: #ffffff;
+  color: #1d4ed8;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.biker-pct-input-wrap {
+  position: relative;
+  width: 75px;
   flex-shrink: 0;
 }
 
-.biker-seg-btn {
-  padding: 4px 8px;
-  font-size: 10.5px;
+.biker-modern-pct-input {
+  width: 100%;
+  padding: 5px 22px 5px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 11.5px;
   font-weight: 700;
-  border: none;
+  color: #0f172a;
+  outline: none;
+  background: #ffffff;
+  height: 33px;
+  transition: all 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.biker-modern-pct-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.biker-pct-symbol {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  pointer-events: none;
+}
+
+/* Better Biker Action Buttons */
+.biker-actions-container {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-biker-preview-modern {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border: 1px solid #1e40af;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+.btn-biker-preview-modern:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+}
+
+.btn-biker-preview-modern:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.btn-biker-export-modern {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  border: 1px solid #065f46;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
+}
+
+.btn-biker-export-modern:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.4);
+}
+
+.btn-biker-export-modern:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25);
+}
+
+/* Interactive Calendar Trigger Card */
+.biker-cal-trigger-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.biker-cal-trigger-card:hover {
+  border-color: #2563eb;
+  background: #f8fafc;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+}
+
+.biker-cal-trigger-card:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.biker-cal-trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.biker-cal-trigger-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.biker-cal-trigger-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.biker-cal-trigger-dates {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.biker-cal-trigger-sub {
+  font-size: 9.5px;
+  color: #64748b;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+
+.biker-cal-trigger-arrow {
+  color: #64748b;
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+
+.biker-cal-trigger-card:hover .biker-cal-trigger-arrow {
+  color: #2563eb;
+}
+
+/* Better Biker Preset Buttons */
+.biker-preset-strip {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.biker-preset-chip {
+  flex: 1;
+  padding: 5px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
+}
+
+.biker-preset-chip:hover {
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.biker-preset-chip.active {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border-color: #1e40af;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.3);
+}
+
+/* Biker Visual Calendar Popover */
+.biker-calendar-popover {
+  position: fixed;
+  z-index: 3200;
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25), 0 1px 3px rgba(15, 23, 42, 0.1);
+  padding: 14px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  color: #0f172a;
+  font-family: inherit;
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.biker-calendar-popover.open {
+  display: flex;
+}
+
+.biker-cal-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+}
+
+.biker-cal-presets-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.biker-cal-preset-pill {
+  padding: 3px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   background: #f8fafc;
   color: #475569;
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.biker-seg-btn.active {
+
+.biker-cal-preset-pill:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.biker-cal-preset-pill.active {
   background: #2563eb;
   color: #ffffff;
+  border-color: #1d4ed8;
+  font-weight: 700;
 }
 
-.biker-pct-wrap {
+.biker-cal-nav-bar {
   display: flex;
   align-items: center;
-  flex: 1;
-  position: relative;
+  justify-content: space-between;
+  padding: 4px 0;
 }
 
-.biker-pct-input {
-  width: 100%;
-  padding: 4px 20px 4px 7px;
+.biker-cal-nav-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.biker-cal-nav-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.biker-cal-month-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.biker-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.biker-cal-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.biker-day-cell {
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.biker-day-cell:hover:not(.other-month) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.biker-day-cell.other-month {
+  color: #cbd5e1;
+  cursor: default;
+}
+
+.biker-day-cell.in-range {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+  border-radius: 0 !important;
+}
+
+.biker-day-cell.range-start {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 6px 0 0 6px !important;
+}
+
+.biker-day-cell.range-end {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 0 6px 6px 0 !important;
+}
+
+.biker-day-cell.range-start.range-end,
+.biker-day-cell.single-day {
+  border-radius: 6px !important;
+}
+
+.biker-cal-hint-text {
+  font-size: 10px;
+  color: #64748b;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.biker-cal-popover-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+}
+
+.biker-cal-footer-preview {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.biker-cal-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 2px 6px;
   border-radius: 4px;
-  font-size: 11px;
-  outline: none;
-  font-family: inherit;
+}
+
+.biker-cal-days-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 2px 5px;
+  border-radius: 4px;
 }
 .biker-pct-input:focus {
   border-color: #2563eb;
@@ -2384,51 +2783,6 @@ body.map-only-mode .btn-exit-map-only {
   color: #64748b;
   text-align: center;
   margin-top: 5px;
-}
-
-/* Biker Preset Chips & Date Display */
-.biker-preset-strip {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-}
-
-.biker-preset-chip {
-  padding: 3px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  line-height: 1.2;
-}
-
-.biker-preset-chip:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-  background: #eff6ff;
-}
-
-.biker-preset-chip.active {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
-}
-
-.biker-date-display-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #1d4ed8;
 }
 
 /* Modal Styling for Biker Boundary Analysis */

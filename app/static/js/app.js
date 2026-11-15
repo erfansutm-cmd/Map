@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap();
   setupEventListeners();
   initCalendarUI();
+  initBikerCalendarUI();
   probeVoyagerApiKey();
   initSessionDialog();
 });
@@ -2491,12 +2492,439 @@ function formatBikerDate(ymd) {
   return `${monthNames[m] || parts[1]} ${d}, ${parts[0]}`;
 }
 
+function getBikerDaysDiff(s, e) {
+  if (!s || !e) return 1;
+  const d1 = new Date(s);
+  const d2 = new Date(e);
+  const diffTime = Math.abs(d2 - d1);
+  return Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1);
+}
+
 function updateBikerPeriodDisplay(startDate, endDate) {
   const s = startDate || state.startDate;
   const e = endDate || state.endDate;
-  const el = document.getElementById('bikerCardPeriodText');
-  if (el && s && e) {
-    el.textContent = `${formatBikerDate(s)} – ${formatBikerDate(e)}`;
+  const days = getBikerDaysDiff(s, e);
+  const formatted = `${formatBikerDate(s)} – ${formatBikerDate(e)}`;
+  const subText = `${days} day${days > 1 ? 's' : ''} selected • Click to open calendar`;
+
+  // Front card
+  const cardText = document.getElementById('bikerCardPeriodText');
+  const cardSub = document.getElementById('bikerCardPeriodSub');
+  if (cardText) cardText.textContent = formatted;
+  if (cardSub) cardSub.textContent = subText;
+
+  // Modal
+  const modalText = document.getElementById('bikerModalPeriodText');
+  const modalSub = document.getElementById('bikerModalPeriodSub');
+  if (modalText) modalText.textContent = formatted;
+  if (modalSub) modalSub.textContent = subText;
+
+  // Inputs
+  const cardStart = document.getElementById('bikerExportStartDate');
+  const cardEnd = document.getElementById('bikerExportEndDate');
+  if (cardStart && s) cardStart.value = s;
+  if (cardEnd && e) cardEnd.value = e;
+
+  const modalStart = document.getElementById('bikerModalStartDate');
+  const modalEnd = document.getElementById('bikerModalEndDate');
+  if (modalStart && s) modalStart.value = s;
+  if (modalEnd && e) modalEnd.value = e;
+}
+
+const bikerCalState = {
+  startDate: null,
+  endDate: null,
+  viewYear: 2026,
+  viewMonth: 9, // October (0-indexed)
+  pickingState: 'none',
+  hoverDate: null,
+  activeSource: 'card',
+};
+
+function initBikerCalendarUI() {
+  const popover = document.getElementById('bikerCalendarPopover');
+  if (!popover) return;
+
+  const btnPrev = document.getElementById('bikerCalPrevMonth');
+  const btnNext = document.getElementById('bikerCalNextMonth');
+  if (btnPrev) {
+    btnPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bikerCalState.viewMonth--;
+      if (bikerCalState.viewMonth < 0) {
+        bikerCalState.viewMonth = 11;
+        bikerCalState.viewYear--;
+      }
+      renderBikerCalendarGrid();
+    });
+  }
+  if (btnNext) {
+    btnNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bikerCalState.viewMonth++;
+      if (bikerCalState.viewMonth > 11) {
+        bikerCalState.viewMonth = 0;
+        bikerCalState.viewYear++;
+      }
+      renderBikerCalendarGrid();
+    });
+  }
+
+  // Preset buttons inside popover
+  popover.querySelectorAll('[data-bcal-preset]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const p = btn.dataset.bcalPreset;
+      let sDate = state.startDate;
+      let eDate = state.endDate;
+
+      if (p === 'active') {
+        sDate = state.startDate;
+        eDate = state.endDate;
+      } else if (p === 'yesterday') {
+        const rng = getRelativeDateRange(1);
+        sDate = rng.start;
+        eDate = rng.end;
+      } else if (p === '3') {
+        const rng = getRelativeDateRange(3);
+        sDate = rng.start;
+        eDate = rng.end;
+      } else if (p === '7') {
+        const rng = getRelativeDateRange(7);
+        sDate = rng.start;
+        eDate = rng.end;
+      } else if (p === '14') {
+        const rng = getRelativeDateRange(14);
+        sDate = rng.start;
+        eDate = rng.end;
+      }
+
+      bikerCalState.startDate = sDate;
+      bikerCalState.endDate = eDate;
+      bikerCalState.pickingState = 'none';
+      bikerCalState.hoverDate = null;
+      if (sDate) {
+        const parts = sDate.split('-');
+        bikerCalState.viewYear = parseInt(parts[0], 10);
+        bikerCalState.viewMonth = parseInt(parts[1], 10) - 1;
+      }
+      popover.querySelectorAll('[data-bcal-preset]').forEach(b => b.classList.toggle('active', b === btn));
+      renderBikerCalendarGrid();
+    });
+  });
+
+  // Cancel and Close buttons
+  const btnClose = document.getElementById('btnCloseBikerCalendar');
+  const btnCancel = document.getElementById('btnCancelBikerCalendar');
+  [btnClose, btnCancel].forEach(b => {
+    if (b) {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeBikerCalendarPopover();
+      });
+    }
+  });
+
+  // Apply button
+  const btnApply = document.getElementById('btnApplyBikerCalendar');
+  if (btnApply) {
+    btnApply.addEventListener('click', (e) => {
+      e.stopPropagation();
+      applyBikerCalendarRange();
+    });
+  }
+
+  // Mouseleave on days grid to clear hover preview
+  const daysGrid = document.getElementById('bikerCalDaysGrid');
+  if (daysGrid) {
+    daysGrid.addEventListener('mouseleave', () => {
+      clearBikerHoverRange();
+    });
+  }
+
+  // Document click outside to close popover
+  document.addEventListener('click', (e) => {
+    if (!popover.classList.contains('open')) return;
+    const triggerCard = document.getElementById('btnBikerCalTrigger');
+    const triggerModal = document.getElementById('btnBikerModalCalTrigger');
+    if (!popover.contains(e.target) &&
+        (!triggerCard || !triggerCard.contains(e.target)) &&
+        (!triggerModal || !triggerModal.contains(e.target))) {
+      closeBikerCalendarPopover();
+    }
+  });
+
+  // Trigger from Card
+  const btnCardTrigger = document.getElementById('btnBikerCalTrigger');
+  if (btnCardTrigger) {
+    btnCardTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (popover.classList.contains('open') && bikerCalState.activeSource === 'card') {
+        closeBikerCalendarPopover();
+      } else {
+        openBikerCalendarPopover('card', btnCardTrigger);
+      }
+    });
+  }
+
+  // Trigger from Modal
+  const btnModalTrigger = document.getElementById('btnBikerModalCalTrigger');
+  if (btnModalTrigger) {
+    btnModalTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (popover.classList.contains('open') && bikerCalState.activeSource === 'modal') {
+        closeBikerCalendarPopover();
+      } else {
+        openBikerCalendarPopover('modal', btnModalTrigger);
+      }
+    });
+  }
+}
+
+function openBikerCalendarPopover(source, anchorEl) {
+  const popover = document.getElementById('bikerCalendarPopover');
+  if (!popover) return;
+
+  bikerCalState.activeSource = source;
+
+  const currentStart = (source === 'modal'
+    ? document.getElementById('bikerModalStartDate')?.value
+    : document.getElementById('bikerExportStartDate')?.value) || state.startDate;
+
+  const currentEnd = (source === 'modal'
+    ? document.getElementById('bikerModalEndDate')?.value
+    : document.getElementById('bikerExportEndDate')?.value) || state.endDate;
+
+  bikerCalState.startDate = currentStart;
+  bikerCalState.endDate = currentEnd;
+  bikerCalState.pickingState = 'none';
+  bikerCalState.hoverDate = null;
+
+  if (currentStart) {
+    const parts = currentStart.split('-');
+    bikerCalState.viewYear = parseInt(parts[0], 10);
+    bikerCalState.viewMonth = parseInt(parts[1], 10) - 1;
+  }
+
+  // Position popover
+  if (anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const popWidth = 320;
+    const popHeight = 350;
+
+    let left = rect.left;
+    if (left + popWidth > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - popWidth - 12);
+    }
+
+    let top = rect.bottom + 6;
+    if (top + popHeight > window.innerHeight - 12) {
+      top = Math.max(12, rect.top - popHeight - 6);
+    }
+
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+  }
+
+  renderBikerCalendarGrid();
+  popover.classList.add('open');
+}
+
+function closeBikerCalendarPopover() {
+  const popover = document.getElementById('bikerCalendarPopover');
+  if (popover) {
+    popover.classList.remove('open');
+    bikerCalState.pickingState = 'none';
+    bikerCalState.hoverDate = null;
+  }
+}
+
+function renderBikerCalendarGrid() {
+  const container = document.getElementById('bikerCalDaysGrid');
+  const monthTitle = document.getElementById('bikerCalMonthTitle');
+  if (!container || !monthTitle) return;
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  monthTitle.textContent = `${monthNames[bikerCalState.viewMonth]} ${bikerCalState.viewYear}`;
+
+  container.innerHTML = '';
+
+  const y = bikerCalState.viewYear;
+  const m = bikerCalState.viewMonth;
+
+  // First day of month (Monday = 0, Sunday = 6)
+  const firstDay = new Date(y, m, 1);
+  const startDayOfWeek = firstDay.getDay();
+  const firstCol = (startDayOfWeek + 6) % 7;
+
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prevMonthDays = new Date(y, m, 0).getDate();
+
+  // Trailing days from previous month
+  for (let i = firstCol - 1; i >= 0; i--) {
+    const dayNum = prevMonthDays - i;
+    const prevMonthIdx = m === 0 ? 11 : m - 1;
+    const prevYear = m === 0 ? y - 1 : y;
+    const dateStr = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const cell = createBikerCalDayCell(dayNum, dateStr, true);
+    container.appendChild(cell);
+  }
+
+  // Days in current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const cell = createBikerCalDayCell(d, dateStr, false);
+    container.appendChild(cell);
+  }
+
+  // Trailing days for next month
+  const totalCells = firstCol + daysInMonth;
+  const nextMonthSlots = (7 - (totalCells % 7)) % 7;
+  for (let n = 1; n <= nextMonthSlots; n++) {
+    const nextMonthIdx = m === 11 ? 0 : m + 1;
+    const nextYear = m === 11 ? y + 1 : y;
+    const dateStr = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
+    const cell = createBikerCalDayCell(n, dateStr, true);
+    container.appendChild(cell);
+  }
+
+  updateBikerCalFooter();
+}
+
+function createBikerCalDayCell(dayNum, dateStr, isOtherMonth) {
+  const cell = document.createElement('div');
+  cell.className = 'biker-day-cell';
+  cell.dataset.date = dateStr;
+  cell.textContent = dayNum;
+
+  if (isOtherMonth) {
+    cell.classList.add('other-month');
+    return cell;
+  }
+
+  const s = bikerCalState.startDate;
+  const e = bikerCalState.endDate;
+  const minD = (s && e) ? (s < e ? s : e) : (s || e);
+  const maxD = (s && e) ? (s < e ? e : s) : (s || e);
+
+  if (dateStr === bikerCalState.startDate) {
+    cell.classList.add('range-start');
+  }
+  if (dateStr === bikerCalState.endDate && bikerCalState.pickingState !== 'picking_end') {
+    cell.classList.add('range-end');
+  }
+  if (bikerCalState.startDate && (!bikerCalState.endDate || bikerCalState.pickingState === 'picking_end') && dateStr === bikerCalState.startDate) {
+    cell.classList.add('single-day');
+  }
+  if (minD && maxD && dateStr >= minD && dateStr <= maxD && bikerCalState.pickingState !== 'picking_end') {
+    cell.classList.add('in-range');
+  }
+
+  cell.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (bikerCalState.pickingState === 'none' || !bikerCalState.startDate) {
+      bikerCalState.startDate = dateStr;
+      bikerCalState.endDate = null;
+      bikerCalState.pickingState = 'picking_end';
+      bikerCalState.hoverDate = null;
+      renderBikerCalendarGrid();
+    } else {
+      if (dateStr < bikerCalState.startDate) {
+        bikerCalState.endDate = bikerCalState.startDate;
+        bikerCalState.startDate = dateStr;
+      } else {
+        bikerCalState.endDate = dateStr;
+      }
+      bikerCalState.pickingState = 'none';
+      bikerCalState.hoverDate = null;
+      renderBikerCalendarGrid();
+    }
+  });
+
+  cell.addEventListener('mouseenter', () => {
+    if (bikerCalState.pickingState === 'picking_end' && bikerCalState.startDate) {
+      updateBikerCalHoverRange(dateStr);
+    }
+  });
+
+  return cell;
+}
+
+function updateBikerCalHoverRange(hoverDateStr) {
+  if (bikerCalState.pickingState !== 'picking_end' || !bikerCalState.startDate) return;
+
+  const minD = hoverDateStr < bikerCalState.startDate ? hoverDateStr : bikerCalState.startDate;
+  const maxD = hoverDateStr < bikerCalState.startDate ? bikerCalState.startDate : hoverDateStr;
+
+  const cells = document.querySelectorAll('#bikerCalDaysGrid .biker-day-cell:not(.other-month)');
+  cells.forEach(cell => {
+    const d = cell.dataset.date;
+    cell.classList.toggle('in-range', d >= minD && d <= maxD);
+    cell.classList.toggle('range-start', d === minD);
+    cell.classList.toggle('range-end', d === maxD && minD !== maxD);
+    cell.classList.toggle('single-day', minD === maxD && d === minD);
+  });
+
+  // Update preview in footer
+  const preview = document.getElementById('bikerCalRangePreviewText');
+  const daysBadge = document.getElementById('bikerCalRangeDaysText');
+  if (preview) preview.textContent = `${minD} → ${maxD}`;
+  if (daysBadge) {
+    const count = getBikerDaysDiff(minD, maxD);
+    daysBadge.textContent = `${count} day${count > 1 ? 's' : ''}`;
+  }
+}
+
+function clearBikerHoverRange() {
+  if (bikerCalState.pickingState === 'picking_end') {
+    renderBikerCalendarGrid();
+  }
+}
+
+function updateBikerCalFooter() {
+  const s = bikerCalState.startDate;
+  const e = bikerCalState.endDate || s;
+  const preview = document.getElementById('bikerCalRangePreviewText');
+  const daysBadge = document.getElementById('bikerCalRangeDaysText');
+  const hint = document.getElementById('bikerCalSelectionHint');
+
+  if (s && e) {
+    if (preview) preview.textContent = `${s} → ${e}`;
+    if (daysBadge) {
+      const count = getBikerDaysDiff(s, e);
+      daysBadge.textContent = `${count} day${count > 1 ? 's' : ''}`;
+    }
+  } else if (s) {
+    if (preview) preview.textContent = `${s} → ...`;
+    if (daysBadge) daysBadge.textContent = '1 day';
+  } else {
+    if (preview) preview.textContent = 'No dates chosen';
+    if (daysBadge) daysBadge.textContent = '0 days';
+  }
+
+  if (hint) {
+    hint.textContent = bikerCalState.pickingState === 'picking_end'
+      ? 'Now click on your end date'
+      : 'Click start date, then click end date';
+  }
+}
+
+function applyBikerCalendarRange() {
+  const s = bikerCalState.startDate;
+  const e = bikerCalState.endDate || s;
+  if (!s) {
+    alert('Please select a date range on the calendar.');
+    return;
+  }
+
+  updateBikerPeriodDisplay(s, e);
+  closeBikerCalendarPopover();
+
+  if (bikerCalState.activeSource === 'modal') {
+    loadBikerModalPreview();
   }
 }
 
@@ -2507,6 +2935,10 @@ function handleBikerPresetClick(preset, source) {
   if (preset === 'active') {
     sDate = state.startDate;
     eDate = state.endDate;
+  } else if (preset === 'yesterday') {
+    const rng = getRelativeDateRange(1);
+    sDate = rng.start;
+    eDate = rng.end;
   } else if (preset === '3') {
     const rng = getRelativeDateRange(3);
     sDate = rng.start;
@@ -2515,25 +2947,20 @@ function handleBikerPresetClick(preset, source) {
     const rng = getRelativeDateRange(7);
     sDate = rng.start;
     eDate = rng.end;
+  } else if (preset === '14') {
+    const rng = getRelativeDateRange(14);
+    sDate = rng.start;
+    eDate = rng.end;
   }
-
-  // Update card inputs
-  const cardStart = document.getElementById('bikerExportStartDate');
-  const cardEnd = document.getElementById('bikerExportEndDate');
-  if (cardStart) cardStart.value = sDate;
-  if (cardEnd) cardEnd.value = eDate;
-
-  // Update modal inputs
-  const modalStart = document.getElementById('bikerModalStartDate');
-  const modalEnd = document.getElementById('bikerModalEndDate');
-  if (modalStart) modalStart.value = sDate;
-  if (modalEnd) modalEnd.value = eDate;
 
   updateBikerPeriodDisplay(sDate, eDate);
 
-  // Sync active states on chips across card and modal
+  // Sync active states on chips across card, modal and calendar popover
   document.querySelectorAll('[data-biker-preset]').forEach(chip => {
     chip.classList.toggle('active', chip.dataset.bikerPreset === preset);
+  });
+  document.querySelectorAll('[data-bcal-preset]').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.bcalPreset === preset);
   });
 
   if (source === 'modal') {

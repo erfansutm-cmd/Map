@@ -700,67 +700,76 @@
             </button>
 
             <div id="bikerExportBody" class="biker-card-body" style="display:none">
-              <!-- Period with Quick Presets and Dates -->
+              <!-- Period with Quick Presets and Interactive Calendar Button -->
               <div class="biker-form-group">
                 <div class="biker-form-label-row">
-                  <span class="biker-form-label">Analysis Period:</span>
+                  <span class="biker-form-label">Analysis Period</span>
+                  <span class="biker-hint-badge">Visual Calendar</span>
                 </div>
                 <!-- Quick presets pills -->
-                <div class="biker-preset-strip" style="margin-bottom:6px">
+                <div class="biker-preset-strip">
                   <button type="button" class="biker-preset-chip active" data-biker-preset="active" title="Sync with current map date range">Active Range</button>
                   <button type="button" class="biker-preset-chip" data-biker-preset="3" title="Last 3 days">Last 3d</button>
                   <button type="button" class="biker-preset-chip" data-biker-preset="7" title="Last 7 days">Last 7d</button>
+                  <button type="button" class="biker-preset-chip" data-biker-preset="14" title="Last 14 days">Last 14d</button>
                 </div>
-                <!-- Formatted Date Range Display -->
-                <div class="biker-date-display-badge" id="bikerCardPeriodDisplay">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>
-                  <span id="bikerCardPeriodText">Oct 22 &ndash; Nov 05, 2026</span>
-                </div>
-                <div class="biker-date-grid" style="margin-top:6px">
-                  <div class="biker-date-item">
-                    <span class="biker-date-prefix">From</span>
-                    <input type="date" id="bikerExportStartDate" class="biker-date-input">
+
+                <!-- Interactive Styled Calendar Trigger Button -->
+                <button type="button" id="btnBikerCalTrigger" class="biker-cal-trigger-card" title="Click to open visual calendar date range picker">
+                  <div class="biker-cal-trigger-left">
+                    <span class="biker-cal-trigger-icon">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    </span>
+                    <div class="biker-cal-trigger-info">
+                      <span class="biker-cal-trigger-dates" id="bikerCardPeriodText">Oct 22 &ndash; Nov 05, 2026</span>
+                      <span class="biker-cal-trigger-sub" id="bikerCardPeriodSub">15 days selected &bull; Click to open calendar</span>
+                    </div>
                   </div>
-                  <div class="biker-date-item">
-                    <span class="biker-date-prefix">To</span>
-                    <input type="date" id="bikerExportEndDate" class="biker-date-input">
-                  </div>
-                </div>
+                  <span class="biker-cal-trigger-arrow">&#9662;</span>
+                </button>
+                <input type="hidden" id="bikerExportStartDate">
+                <input type="hidden" id="bikerExportEndDate">
               </div>
 
               <!-- Min Rides Input -->
               <div class="biker-form-group">
                 <div class="biker-form-label-row">
-                  <label for="bikerExportMinRides" class="biker-form-label">Min Total Rides / Biker</label>
-                  <span class="biker-pill-tag">&ge; 0</span>
+                  <label for="bikerExportMinRides" class="biker-form-label">Min Total Rides in Period</label>
+                  <span class="biker-hint-badge">&ge; 0 rides</span>
                 </div>
-                <input type="number" id="bikerExportMinRides" class="biker-number-input" min="0" step="1" value="5" placeholder="5">
+                <div class="biker-input-stepper-wrap">
+                  <input type="number" id="bikerExportMinRides" class="biker-modern-input" min="0" step="1" value="5" placeholder="5">
+                  <span class="biker-input-unit-tag">rides / biker</span>
+                </div>
               </div>
 
               <!-- Boundary Ride Share % Rule -->
               <div class="biker-form-group">
-                <span class="biker-form-label">Rides in Boundary %</span>
-                <div class="biker-rule-grid">
-                  <div class="biker-segmented">
-                    <button type="button" id="btnToggleLess" class="biker-seg-btn active" title="Bikers with less than or equal to this % of rides in boundary">&le; Less</button>
-                    <button type="button" id="btnToggleMore" class="biker-seg-btn" title="Bikers with more than or equal to this % of rides in boundary">&ge; More</button>
+                <div class="biker-form-label-row">
+                  <span class="biker-form-label">Boundary Ride Share Target</span>
+                  <span class="biker-hint-badge">% of rides</span>
+                </div>
+                <div class="biker-segmented-row">
+                  <div class="biker-modern-segmented">
+                    <button type="button" id="btnToggleLess" class="biker-seg-pill active" title="Riders with less than or equal to target % in boundary">&le; Less Than</button>
+                    <button type="button" id="btnToggleMore" class="biker-seg-pill" title="Riders with more than or equal to target % in boundary">&ge; More Than</button>
                   </div>
-                  <div class="biker-pct-wrap">
-                    <input type="number" id="bikerExportPct" class="biker-pct-input" min="0" max="100" step="1" value="20">
-                    <span class="biker-pct-badge">%</span>
+                  <div class="biker-pct-input-wrap">
+                    <input type="number" id="bikerExportPct" class="biker-modern-pct-input" min="0" max="100" step="1" value="20">
+                    <span class="biker-pct-symbol">%</span>
                   </div>
                 </div>
               </div>
 
               <!-- Dual Action Buttons: Preview Table and Export CSV -->
               <div class="biker-actions-container">
-                <button type="button" id="btnOpenBikerModal" class="btn-biker-preview" title="View live summary stats and biker preview table">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                  Preview Bikers
+                <button type="button" id="btnOpenBikerModal" class="btn-biker-preview-modern" title="View live summary stats and biker preview table">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <span>Preview Bikers</span>
                 </button>
-                <button type="button" id="btnExportBikersCsv" class="btn-biker-export" title="Export matching bikers to CSV">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  Export CSV
+                <button type="button" id="btnExportBikersCsv" class="btn-biker-export-modern" title="Export matching bikers to CSV">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Export CSV</span>
                 </button>
               </div>
               <div id="bikerExportFeedback" class="biker-feedback-msg" style="display:none"></div>
@@ -1019,17 +1028,21 @@
               <button type="button" class="biker-preset-chip" data-biker-preset="7" title="Last 7 days">Last 7 Days</button>
             </div>
           </div>
-          <div class="biker-date-pair-wrap">
-            <div class="biker-date-box">
-              <span class="biker-date-sublabel">From</span>
-              <input type="date" id="bikerModalStartDate" class="biker-modal-date-input">
+          <!-- Interactive Calendar Trigger Card in Modal -->
+          <button type="button" id="btnBikerModalCalTrigger" class="biker-cal-trigger-card" style="width:100%" title="Click to open visual calendar date range picker">
+            <div class="biker-cal-trigger-left">
+              <span class="biker-cal-trigger-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              </span>
+              <div class="biker-cal-trigger-info">
+                <span class="biker-cal-trigger-dates" id="bikerModalPeriodText">Oct 22 &ndash; Nov 05, 2026</span>
+                <span class="biker-cal-trigger-sub" id="bikerModalPeriodSub">15 days selected &bull; Click to open visual calendar</span>
+              </div>
             </div>
-            <span class="biker-date-arrow">&rarr;</span>
-            <div class="biker-date-box">
-              <span class="biker-date-sublabel">To</span>
-              <input type="date" id="bikerModalEndDate" class="biker-modal-date-input">
-            </div>
-          </div>
+            <span class="biker-cal-trigger-arrow">&#9662;</span>
+          </button>
+          <input type="hidden" id="bikerModalStartDate">
+          <input type="hidden" id="bikerModalEndDate">
         </div>
       </div>
 
@@ -1208,6 +1221,65 @@
     <polyline points="22 4 12 14.01 9 11.01"></polyline>
   </svg>
   <span id="kmlToastMessage">KML boundaries file downloaded successfully</span>
+</div>
+
+<!-- Biker Boundary Analysis Styled Visual Calendar Popover -->
+<div id="bikerCalendarPopover" class="biker-calendar-popover">
+  <div class="biker-cal-popover-header">
+    <div style="display:flex;align-items:center;gap:7px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      <span style="font-weight:700;font-size:12.5px;color:#0f172a">Biker Date Range Picker</span>
+    </div>
+    <button type="button" id="btnCloseBikerCalendar" class="btn-popover-close" style="color:#64748b;font-size:18px">&times;</button>
+  </div>
+
+  <div class="biker-cal-popover-body">
+    <!-- Quick Presets -->
+    <div class="biker-cal-presets-strip">
+      <button type="button" class="biker-cal-preset-pill active" data-bcal-preset="active">Active Map Range</button>
+      <button type="button" class="biker-cal-preset-pill" data-bcal-preset="yesterday">Yesterday</button>
+      <button type="button" class="biker-cal-preset-pill" data-bcal-preset="3">Last 3 Days</button>
+      <button type="button" class="biker-cal-preset-pill" data-bcal-preset="7">Last 7 Days</button>
+      <button type="button" class="biker-cal-preset-pill" data-bcal-preset="14">Last 14 Days</button>
+    </div>
+
+    <!-- Month Navigation -->
+    <div class="biker-cal-nav-bar">
+      <button type="button" id="bikerCalPrevMonth" class="biker-cal-nav-btn" title="Previous Month">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div id="bikerCalMonthTitle" class="biker-cal-month-title">October 2026</div>
+      <button type="button" id="bikerCalNextMonth" class="biker-cal-nav-btn" title="Next Month">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    </div>
+
+    <!-- Weekdays Header -->
+    <div class="biker-cal-weekdays">
+      <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+    </div>
+
+    <!-- Interactive Day Grid Container -->
+    <div id="bikerCalDaysGrid" class="biker-cal-days-grid">
+      <!-- Populated via JavaScript -->
+    </div>
+
+    <!-- Hint text -->
+    <div id="bikerCalSelectionHint" class="biker-cal-hint-text">
+      Click start date, then click end date
+    </div>
+  </div>
+
+  <div class="biker-cal-popover-footer">
+    <div class="biker-cal-footer-preview">
+      <span id="bikerCalRangePreviewText" class="biker-cal-chip">2026-10-22 &rarr; 2026-11-05</span>
+      <span id="bikerCalRangeDaysText" class="biker-cal-days-badge">15 days</span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button type="button" id="btnCancelBikerCalendar" class="btn-action" style="padding:4px 10px;font-size:11px">Cancel</button>
+      <button type="button" id="btnApplyBikerCalendar" class="btn-primary" style="padding:4px 14px;font-size:11.5px;font-weight:700">Apply Period</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
