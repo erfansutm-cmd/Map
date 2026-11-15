@@ -464,6 +464,10 @@ function setupEventListeners() {
   // Citywide Report Modal
   document.getElementById('btnOpenCityModal').addEventListener('click', openCityModal);
   document.getElementById('kpiCardCityOverview').addEventListener('click', openCityModal);
+  const kpiCardFare = document.getElementById('kpiCardFare');
+  if (kpiCardFare) {
+    kpiCardFare.addEventListener('click', openCityModal);
+  }
   document.getElementById('btnCloseCityModal').addEventListener('click', closeCityModal);
   document.getElementById('btnModalCloseDone').addEventListener('click', closeCityModal);
 
@@ -1775,6 +1779,18 @@ function updateKpis(kpis, city, dataSource) {
   document.getElementById('kpiMeanDuration').textContent = `${kpis.overall_mean_duration.toFixed(1)} min`;
   document.getElementById('kpiP90Duration').textContent = `P90: ${kpis.p90_duration || 0} min`;
   document.getElementById('kpiP50Duration').textContent = `Med: ${kpis.p50_duration || 0} min`;
+
+  // Citywide Fare & Incentive metrics
+  const meanFareEl = document.getElementById('kpiMeanFare');
+  if (meanFareEl) {
+    const rawFare = kpis.avg_biker_fare !== undefined ? kpis.avg_biker_fare : 0;
+    meanFareEl.textContent = formatFareFull(rawFare);
+  }
+  const meanIncEl = document.getElementById('kpiMeanIncentive');
+  if (meanIncEl) {
+    const rawInc = kpis.avg_incentive !== undefined ? kpis.avg_incentive : 0;
+    meanIncEl.textContent = `+${formatFareFull(rawInc)} inc`;
+  }
 }
 
 // Render Interactive Day Selector Strip with 1-float precision HA30 for each date
@@ -1793,13 +1809,17 @@ function renderDaysSelector(dailyStats, allDates, selectedDates) {
     const isSelected = selectedSet.has(d.date);
     const breachColor = d.pct > 35 ? '#ef4444' : d.pct > 20 ? '#f59e0b' : '#10b981';
     const haPrecise = `${d.pct.toFixed(1)}%`;
+    const farePart = d.avg_fare ? `<span class="day-pill-sep">&bull;</span><span style="color:#2563eb;font-weight:600">${formatFare(d.avg_fare)}</span>` : '';
+    const incPart = (d.avg_incentive && d.avg_incentive > 0) ? `<span style="color:#059669;font-size:9.5px;font-weight:600;margin-left:2px">+${formatFare(d.avg_incentive)}</span>` : '';
     return `
-      <div class="day-pill ${isSelected ? 'active' : ''}" data-date="${d.date}" title="${d.label}: ${d.orders} orders, HA${state.threshold}: ${haPrecise}, ${d.mean.toFixed(1)} min avg">
+      <div class="day-pill ${isSelected ? 'active' : ''}" data-date="${d.date}" title="${d.label}: ${d.orders} orders, HA${state.threshold}: ${haPrecise}, Mean Fare: ${formatFareFull(d.avg_fare)} Toman, Incentive: +${formatFareFull(d.avg_incentive)} Toman">
         <div class="day-pill-date">${d.label}</div>
         <div class="day-pill-meta">
           <span class="day-pill-ha" style="color:${breachColor}">HA${state.threshold}: <b>${haPrecise}</b></span>
           <span class="day-pill-sep">&bull;</span>
           <span>${d.orders.toLocaleString()} ord</span>
+          ${farePart}
+          ${incPart}
         </div>
       </div>
     `;
@@ -2877,6 +2897,17 @@ function openCityModal() {
     modalAvgVendors.textContent = (!isNaN(numVal) && numVal > 0) ? `${numVal.toFixed(1)} vendors` : '-';
   }
 
+  const modalAvgFare = document.getElementById('modalCityAvgFare');
+  if (modalAvgFare) {
+    const rawFare = kpis.avg_biker_fare !== undefined ? kpis.avg_biker_fare : 0;
+    modalAvgFare.textContent = `${formatFareFull(rawFare)} Toman`;
+  }
+  const modalAvgInc = document.getElementById('modalCityAvgIncentive');
+  if (modalAvgInc) {
+    const rawInc = kpis.avg_incentive !== undefined ? kpis.avg_incentive : 0;
+    modalAvgInc.textContent = `+${formatFareFull(rawInc)} Toman`;
+  }
+
   // Daily Table
   const tbody = document.getElementById('modalDailyTableBody');
   if (state.dailyStats && state.dailyStats.length > 0) {
@@ -2887,6 +2918,8 @@ function openCityModal() {
       const rawAvg = d.avg_vendors_per_biker !== undefined ? d.avg_vendors_per_biker : null;
       const numAvg = Number(rawAvg);
       const avgStr = (!isNaN(numAvg) && numAvg > 0) ? numAvg.toFixed(1) : '-';
+      const fareStr = d.avg_fare ? `${formatFareFull(d.avg_fare)}` : '-';
+      const incStr = d.avg_incentive ? `+${formatFareFull(d.avg_incentive)}` : '-';
       return `
         <tr style="${rowStyle};border-bottom:1px solid #f1f5f9">
           <td style="padding:5px 8px;font-weight:600">${d.label} ${isSelected ? '' : '<span style="font-size:9px;color:#94a3b8">(excluded)</span>'}</td>
@@ -2895,11 +2928,13 @@ function openCityModal() {
           <td style="padding:5px 8px;font-weight:700;color:${color}">${d.pct.toFixed(1)}%</td>
           <td style="padding:5px 8px">${d.mean.toFixed(1)} min</td>
           <td style="padding:5px 8px;font-weight:600;color:#2563eb">${avgStr}</td>
+          <td style="padding:5px 8px;font-weight:600;color:#0f172a">${fareStr}</td>
+          <td style="padding:5px 8px;font-weight:600;color:#059669">${incStr}</td>
         </tr>
       `;
     }).join('');
   } else {
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:8px;text-align:center;color:#94a3b8">No daily records available</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:8px;text-align:center;color:#94a3b8">No daily records available</td></tr>';
   }
 
   document.getElementById('citywideModal').classList.add('open');

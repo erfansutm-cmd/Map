@@ -100,6 +100,33 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
         pct = round(ha30_count / with_val * 100, 1) if with_val > 0 else 0.0
         mean = round(float(v.mean()), 1) if with_val > 0 else 0.0
         avg_vendors = compute_biker_active_vendors_avg(g)
+
+        # Mean final biker fare
+        fare_col = "final_biker_fare" if "final_biker_fare" in g.columns else None
+        if fare_col is None:
+            for c in ["biker_fare", "fare"]:
+                if c in g.columns:
+                    fare_col = c
+                    break
+        if fare_col:
+            fares_num = pd.to_numeric(g[fare_col], errors="coerce").dropna()
+            avg_fare = round(float(fares_num.mean()), 0) if len(fares_num) else 0.0
+        else:
+            avg_fare = 0.0
+
+        # Mean incentive
+        inc_col = "incentive" if "incentive" in g.columns else None
+        if inc_col is None:
+            for c in ["biker_incentive", "incentives", "bonus"]:
+                if c in g.columns:
+                    inc_col = c
+                    break
+        if inc_col:
+            inc_num = pd.to_numeric(g[inc_col], errors="coerce").dropna()
+            avg_inc = round(float(inc_num.mean()), 0) if len(inc_num) else 0.0
+        else:
+            avg_inc = 0.0
+
         agg_dict[d_key] = {
             "orders": total,
             "ha30_count": ha30_count,
@@ -107,6 +134,8 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             "pct": pct,
             "mean": mean,
             "avg_vendors_per_biker": avg_vendors,
+            "avg_fare": avg_fare,
+            "avg_incentive": avg_inc,
         }
 
     for d_str in all_dates:
@@ -125,6 +154,8 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             "pct": 0.0,
             "mean": 0.0,
             "avg_vendors_per_biker": 0.0,
+            "avg_fare": 0.0,
+            "avg_incentive": 0.0,
         })
         daily_stats.append({
             "date": d_str,
@@ -135,6 +166,8 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             "pct": info["pct"],
             "mean": info["mean"],
             "avg_vendors_per_biker": info.get("avg_vendors_per_biker", 0.0),
+            "avg_fare": info.get("avg_fare", 0.0),
+            "avg_incentive": info.get("avg_incentive", 0.0),
         })
 
     return daily_stats

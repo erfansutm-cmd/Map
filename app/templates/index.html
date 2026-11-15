@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.5.1">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.5.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -298,6 +298,15 @@
           </div>
           <div id="kpiMeanDuration" class="kpi-val">0.0 min</div>
           <div class="kpi-sub"><span id="kpiP90Duration">P90: 0 min</span> &bull; <span id="kpiP50Duration">Med: 0 min</span></div>
+        </div>
+
+        <div class="kpi-card" id="kpiCardFare" style="cursor:pointer" title="Click to view citywide fare &amp; SLA report">
+          <div class="kpi-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line></svg>
+            Mean Biker Fare
+          </div>
+          <div id="kpiMeanFare" class="kpi-val" style="color:#2563eb">0</div>
+          <div class="kpi-sub"><span id="kpiMeanIncentive" style="color:#059669;font-weight:700">+0 inc</span> &bull; <span>avg / order</span></div>
         </div>
       </div>
 
@@ -833,6 +842,14 @@
         <div class="stat-box-label">Avg Active Vendors / Biker (Period)</div>
         <div id="modalCityAvgVendorsPerBiker" class="stat-box-val" style="color:#2563eb">-</div>
       </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Mean Final Biker Fare</div>
+        <div id="modalCityAvgFare" class="stat-box-val" style="color:#2563eb">0 Toman</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Mean Incentive / Order</div>
+        <div id="modalCityAvgIncentive" class="stat-box-val" style="color:#059669">+0 Toman</div>
+      </div>
     </div>
 
     <div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:4px">Accept Duration Distribution</div>
@@ -864,8 +881,10 @@
             <th style="padding:6px 8px">Orders</th>
             <th style="padding:6px 8px">HA30 Orders (&ge;30 min)</th>
             <th style="padding:6px 8px">HA30%</th>
-            <th style="padding:6px 8px">Mean</th>
-            <th style="padding:6px 8px">Avg Active Vendors / Biker</th>
+            <th style="padding:6px 8px">Mean SLA</th>
+            <th style="padding:6px 8px">Vendors/Biker</th>
+            <th style="padding:6px 8px">Mean Fare</th>
+            <th style="padding:6px 8px">Mean Incentive</th>
           </tr>
         </thead>
         <tbody id="modalDailyTableBody"></tbody>
@@ -939,6 +958,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.5.1"></script>
+<script src="/static/js/app.js?v=2.5.2"></script>
 </body>
 </html>

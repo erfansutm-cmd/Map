@@ -543,6 +543,7 @@ def analyze_city_orders(
             "min_orders": min_orders,
             "avg_vendors_per_biker": avg_vendors_per_biker,
             "avg_biker_fare": avg_city_fare,
+            "avg_fare": avg_city_fare,
             "avg_incentive": avg_city_inc,
         },
         "center": [round(center_lat, 5), round(center_lng, 5)],

@@ -211,6 +211,9 @@ class TestEngine(unittest.TestCase):
         for d in daily_stats:
             self.assertIn("avg_vendors_per_biker", d)
             self.assertGreater(d["avg_vendors_per_biker"], 0)
+            self.assertIn("avg_fare", d)
+            self.assertGreater(d["avg_fare"], 0)
+            self.assertIn("avg_incentive", d)
 
     def test_fare_and_incentive_aggregation(self):
         from app.engine import prepare_base, rollup
