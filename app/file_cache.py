@@ -50,9 +50,9 @@ def load_df_from_file(namespace: str, key_tuple: Tuple) -> Optional[pd.DataFrame
         filepath = os.path.join(CACHE_DIR, filename)
         if os.path.exists(filepath):
             df = pd.read_pickle(filepath)
-            # Invalidate and remove any legacy cache file lacking vendor_id or biker_id
+            # Invalidate and remove any legacy cache file lacking vendor_id, biker_id, or created_at
             if namespace in ("clickhouse", "fallback") and df is not None and len(df) > 0:
-                if "vendor_id" not in df.columns or "biker_id" not in df.columns:
+                if "vendor_id" not in df.columns or "biker_id" not in df.columns or "created_at" not in df.columns:
                     try:
                         os.remove(filepath)
                     except Exception:

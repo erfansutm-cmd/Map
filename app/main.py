@@ -71,12 +71,12 @@ def generate_fallback_orders(
     else:
         for d in all_dates:
             key = (city_key, d)
-            if key in FALLBACK_DAY_CACHE and ("vendor_id" not in FALLBACK_DAY_CACHE[key].columns or "biker_id" not in FALLBACK_DAY_CACHE[key].columns):
+            if key in FALLBACK_DAY_CACHE and ("vendor_id" not in FALLBACK_DAY_CACHE[key].columns or "biker_id" not in FALLBACK_DAY_CACHE[key].columns or "created_at" not in FALLBACK_DAY_CACHE[key].columns):
                 FALLBACK_DAY_CACHE.pop(key, None)
             if key not in FALLBACK_DAY_CACHE:
                 cached_file_df = load_df_from_file("fallback", key)
                 if cached_file_df is not None:
-                    if "vendor_id" in cached_file_df.columns and "biker_id" in cached_file_df.columns:
+                    if "vendor_id" in cached_file_df.columns and "biker_id" in cached_file_df.columns and "created_at" in cached_file_df.columns:
                         FALLBACK_DAY_CACHE[key] = cached_file_df
                     else:
                         try:
@@ -116,6 +116,12 @@ def generate_fallback_orders(
             num_vendors = int(rng.integers(14, 26))
             vendor_ids = [5000 + int(rng.integers(0, num_vendors)) for _ in range(n)]
 
+            minute_offsets = rng.integers(8 * 60, 23 * 60, size=n)
+            created_ats = [
+                pd.to_datetime(d_str) + pd.Timedelta(minutes=int(m))
+                for m in minute_offsets
+            ]
+
             day_df = pd.DataFrame({
                 "order_id": [f"ORD-{city[:3].upper()}-{d_str.replace('-', '')}-{i}" for i in range(n)],
                 "vendor_id": vendor_ids,
@@ -125,7 +131,8 @@ def generate_fallback_orders(
                 "destination_latitude": np.round(d_lats, 6),
                 "destination_longitude": np.round(d_lngs, 6),
                 "create_to_accept_contractual": durations,
-                "created_date": d_str
+                "created_date": d_str,
+                "created_at": [ts.strftime("%Y-%m-%d %H:%M:%S") for ts in created_ats]
             })
             FALLBACK_DAY_CACHE[(city_key, d_str)] = day_df
             save_df_to_file("fallback", (city_key, d_str), day_df)
@@ -135,7 +142,7 @@ def generate_fallback_orders(
     full_df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(columns=[
         "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
         "destination_latitude", "destination_longitude",
-        "create_to_accept_contractual", "created_date"
+        "create_to_accept_contractual", "created_date", "created_at"
     ])
 
     cached_count = len(all_dates) - len(missing_dates)

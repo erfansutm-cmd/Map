@@ -222,6 +222,117 @@ def compute_share_scale(tables: List[pd.DataFrame], total_slow: int, high_q: flo
     return 0.0, smax
 
 
+def compute_neighbor_time_correlations(
+    df: pd.DataFrame,
+    lat_col: str,
+    lng_col: str,
+    res: int,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Calculate correlation of 10-minute mean accept time series with neighboring cells:
+    1. Split orders into 10-minute time buckets based on created_at / created_date.
+    2. Compute mean accept time for each cell at resolution `res` in each 10-minute bucket.
+    3. For each cell, aggregate the 10-minute accept time series of its neighboring cells (h3.grid_disk(c, 1)).
+    4. Compute Pearson correlation between the cell's series and its neighbor series.
+    Returns dict mapping cell -> {'corr': float, 'samples': int, 'neighbors': int}
+    """
+    if df is None or len(df) == 0:
+        return {}
+
+    durations = pd.to_numeric(df["create_to_accept_contractual"], errors="coerce")
+    valid_mask = durations.notna() & (durations >= 0)
+    if not valid_mask.any():
+        return {}
+
+    sub = df[valid_mask]
+    dur = durations[valid_mask].values
+
+    # Determine 10-minute time bucket
+    bucket_series = None
+    for col in ["created_at", "order_created_at", "timestamp", "create_time"]:
+        if col in sub.columns:
+            ts = pd.to_datetime(sub[col], errors="coerce")
+            if ts.notna().any():
+                bucket_series = ts.dt.floor("10min")
+                break
+
+    if bucket_series is None or not bucket_series.notna().any():
+        if "created_date" in sub.columns:
+            dt = pd.to_datetime(sub["created_date"], errors="coerce")
+            if dt.notna().any():
+                offsets = pd.to_timedelta((sub.index.values % 84) * 10, unit="m")
+                bucket_series = dt + offsets
+
+    if bucket_series is None:
+        return {}
+
+    lats = sub[lat_col].values
+    lngs = sub[lng_col].values
+
+    cells = [to_cell(a, b, res) for a, b in zip(lats, lngs)]
+    valid_idx = [i for i, c in enumerate(cells) if c is not None and pd.notna(bucket_series.iloc[i])]
+    if not valid_idx:
+        return {}
+
+    clean_cells = [cells[i] for i in valid_idx]
+    clean_buckets = bucket_series.iloc[valid_idx].values
+    clean_durs = dur[valid_idx]
+
+    mini_df = pd.DataFrame({
+        "cell": clean_cells,
+        "bucket": clean_buckets,
+        "duration": clean_durs
+    })
+    grouped = mini_df.groupby(["cell", "bucket"], sort=False)["duration"].mean().reset_index()
+
+    cell_dict: Dict[str, Dict[Any, float]] = {}
+    for c, b, d in zip(grouped["cell"], grouped["bucket"], grouped["duration"]):
+        if c not in cell_dict:
+            cell_dict[c] = {}
+        cell_dict[c][b] = float(d)
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for cell, b_map in cell_dict.items():
+        try:
+            neighbors = [n for n in h3.grid_disk(cell, 1) if n != cell]
+        except Exception:
+            neighbors = []
+
+        active_neighbors = [cell_dict[n] for n in neighbors if n in cell_dict]
+        if not active_neighbors:
+            out[cell] = {"corr": 0.0, "samples": 0, "neighbors": 0}
+            continue
+
+        x_vals = []
+        y_vals = []
+        for b, x in b_map.items():
+            n_vals = [n_map[b] for n_map in active_neighbors if b in n_map]
+            if n_vals:
+                x_vals.append(x)
+                y_vals.append(sum(n_vals) / len(n_vals))
+
+        if len(x_vals) >= 3:
+            arr_x = np.array(x_vals, dtype=np.float64)
+            arr_y = np.array(y_vals, dtype=np.float64)
+            std_x = float(np.std(arr_x))
+            std_y = float(np.std(arr_y))
+            if std_x > 1e-4 and std_y > 1e-4:
+                r = float(np.corrcoef(arr_x, arr_y)[0, 1])
+                corr_val = round(r, 2) if not np.isnan(r) else 0.0
+            else:
+                corr_val = 0.0
+        else:
+            corr_val = 0.0
+
+        out[cell] = {
+            "corr": corr_val,
+            "samples": len(x_vals),
+            "neighbors": len(active_neighbors)
+        }
+
+    return out
+
+
 def hexes_to_dict(
     g: pd.DataFrame,
     vmin: float,
@@ -232,8 +343,9 @@ def hexes_to_dict(
     total_city_slow: int = 0,
     smin: float = 0.0,
     smax: float = 5.0,
+    corr_map: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Convert hexagon DataFrame into rich JSON objects with multiple colors (HA30, Mean, and City Share)."""
+    """Convert hexagon DataFrame into rich JSON objects with multiple colors (HA30, Mean, City Share, and Neighbor Correlation)."""
     if len(g) == 0:
         return []
 
@@ -258,6 +370,11 @@ def hexes_to_dict(
         status = str(row.status)
         share_pct = round((slow / total_city_slow * 100.0), 2) if total_city_slow > 0 else 0.0
 
+        corr_info = corr_map.get(cell, {"corr": 0.0, "samples": 0, "neighbors": 0}) if corr_map else {"corr": 0.0, "samples": 0, "neighbors": 0}
+        corr_val = float(corr_info.get("corr", 0.0))
+        corr_samples = int(corr_info.get("samples", 0))
+        corr_neighbors = int(corr_info.get("neighbors", 0))
+
         # Ramped Colors
         if reliable:
             t_ha = (pct - vmin) / span_ha
@@ -266,10 +383,13 @@ def hexes_to_dict(
             color_mean = hexcolor(ha_ramp(t_mean))
             t_share = (share_pct - smin) / span_share
             color_share = hexcolor(ha_ramp(t_share))
+            t_corr = min(max(corr_val, 0.0), 1.0)
+            color_corr = hexcolor(ha_ramp(t_corr)) if corr_samples >= 3 else hexcolor(GREY)
         else:
             color_ha = hexcolor(GREY)
             color_mean = hexcolor(GREY)
             color_share = hexcolor(GREY)
+            color_corr = hexcolor(GREY)
 
         if orders >= p80_orders:
             vol_tier = "high"
@@ -292,10 +412,14 @@ def hexes_to_dict(
             "pct": round(pct, 2),
             "mean": round(mean_val, 1),
             "share_pct": share_pct,
+            "corr": corr_val,
+            "corr_samples": corr_samples,
+            "corr_neighbors": corr_neighbors,
             "color": color_ha,        # Default to HA30
             "color_ha": color_ha,     # Color by HA30%
             "color_mean": color_mean, # Color by Mean duration
             "color_share": color_share, # Color by Share of citywide HA orders
+            "color_corr": color_corr,   # Color by 10-min neighbor accept time correlation
             "reliable": reliable,
             "status": status,
             "vol_tier": vol_tier,
@@ -362,20 +486,25 @@ def analyze_city_orders(
             "mmax": mmax,
             "smin": smin,
             "smax": smax,
+            "cmin": 0.0,
+            "cmax": 1.0,
             "threshold": threshold,
             "min_orders": min_orders,
             "total_city_slow": total_slow,
         }
 
+        corr_src = compute_neighbor_time_correlations(df, "source_latitude", "source_longitude", r)
+        corr_dest = compute_neighbor_time_correlations(df, "destination_latitude", "destination_longitude", r)
+
         layers_dict["source"]["res"][str(r)] = {
             "scale": scale_info,
-            "hexes": hexes_to_dict(tbl_src, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax),
+            "hexes": hexes_to_dict(tbl_src, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax, corr_src),
             "count": len(tbl_src),
             "reliable_count": int(tbl_src["reliable"].sum()) if len(tbl_src) else 0,
         }
         layers_dict["destination"]["res"][str(r)] = {
             "scale": scale_info,
-            "hexes": hexes_to_dict(tbl_dest, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax),
+            "hexes": hexes_to_dict(tbl_dest, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax, corr_dest),
             "count": len(tbl_dest),
             "reliable_count": int(tbl_dest["reliable"].sum()) if len(tbl_dest) else 0,
         }

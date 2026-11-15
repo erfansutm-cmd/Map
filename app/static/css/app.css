@@ -1136,10 +1136,10 @@ body.map-only-mode .btn-exit-map-only {
 
 .color-metric-toggle {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
-  padding: 2.5px;
+  padding: 2px;
   border-radius: var(--radius-sm);
   margin-bottom: 8px;
   gap: 2px;
@@ -1149,8 +1149,8 @@ body.map-only-mode .btn-exit-map-only {
 
 .color-metric-btn {
   min-width: 0;
-  padding: 5px 3px;
-  font-size: 10.5px;
+  padding: 5px 2px;
+  font-size: 10px;
   font-weight: 600;
   border: none;
   background: transparent;

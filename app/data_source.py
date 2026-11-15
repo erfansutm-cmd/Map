@@ -228,7 +228,8 @@ SELECT
     destination_latitude,
     destination_longitude,
     create_to_accept_contractual,
-    created_date
+    created_date,
+    created_at
 FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
@@ -258,7 +259,8 @@ SELECT
     destination_latitude,
     destination_longitude,
     create_to_accept_contractual,
-    created_date
+    created_date,
+    created_at
 FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
@@ -291,7 +293,7 @@ LIMIT 1 BY order_id
                 empty_df = pd.DataFrame(columns=[
                     "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
                     "destination_latitude", "destination_longitude",
-                    "create_to_accept_contractual", "created_date"
+                    "create_to_accept_contractual", "created_date", "created_at"
                 ])
                 DAY_CACHE[(clean_city, status, customer_id, d)] = empty_df
                 save_df_to_file("clickhouse", (clean_city, status, customer_id, d), empty_df)
@@ -319,7 +321,7 @@ LIMIT 1 BY order_id
         target_full_df = pd.DataFrame(columns=[
             "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
             "destination_latitude", "destination_longitude",
-            "create_to_accept_contractual", "created_date"
+            "create_to_accept_contractual", "created_date", "created_at"
         ])
 
     # Compute daily breakdown across all target dates
@@ -380,5 +382,11 @@ def parse_csv_orders(csv_bytes: bytes) -> pd.DataFrame:
 
     if "created_date" not in df.columns:
         df["created_date"] = "2026-10-22"
+
+    if "created_at" not in df.columns:
+        for alias in ["timestamp", "datetime", "order_created_at", "create_time"]:
+            if alias in df.columns:
+                df["created_at"] = df[alias]
+                break
 
     return df

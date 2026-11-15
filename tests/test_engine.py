@@ -207,6 +207,71 @@ class TestEngine(unittest.TestCase):
             self.assertIn("avg_vendors_per_biker", d)
             self.assertGreater(d["avg_vendors_per_biker"], 0)
 
+    def test_neighbor_time_correlation(self):
+        from app.engine import compute_neighbor_time_correlations
+        import h3
+
+        # Center cell and an adjacent neighbor cell at res 8
+        center_cell = h3.latlng_to_cell(32.65, 51.66, 8)
+        neighbors = [n for n in h3.grid_disk(center_cell, 1) if n != center_cell]
+        neighbor_cell = neighbors[0]
+
+        center_lat, center_lng = h3.cell_to_latlng(center_cell)
+        neighbor_lat, neighbor_lng = h3.cell_to_latlng(neighbor_cell)
+
+        # 4 distinct 10-minute buckets with strongly correlated values
+        times = [
+            "2026-11-08 10:02:00",
+            "2026-11-08 10:14:00",
+            "2026-11-08 10:27:00",
+            "2026-11-08 10:35:00",
+        ]
+        center_durs = [10.0, 20.0, 30.0, 40.0]
+        neighbor_durs = [12.0, 22.0, 31.0, 42.0]
+
+        rows = []
+        for t, d1 in zip(times, center_durs):
+            rows.append({
+                "source_latitude": center_lat,
+                "source_longitude": center_lng,
+                "create_to_accept_contractual": d1,
+                "created_at": t,
+                "order_id": f"c_{t}",
+            })
+        for t, d2 in zip(times, neighbor_durs):
+            rows.append({
+                "source_latitude": neighbor_lat,
+                "source_longitude": neighbor_lng,
+                "create_to_accept_contractual": d2,
+                "created_at": t,
+                "order_id": f"n_{t}",
+            })
+
+        df = pd.DataFrame(rows)
+        corr_dict = compute_neighbor_time_correlations(df, "source_latitude", "source_longitude", 8)
+
+        self.assertIn(center_cell, corr_dict)
+        self.assertIn(neighbor_cell, corr_dict)
+        self.assertGreaterEqual(corr_dict[center_cell]["corr"], 0.95)
+        self.assertEqual(corr_dict[center_cell]["samples"], 4)
+        self.assertEqual(corr_dict[center_cell]["neighbors"], 1)
+
+    def test_analyze_city_orders_includes_correlation(self):
+        sample_df = make_sample_orders_df("isfahan", n_orders=200)
+        # Add created_at timestamps
+        sample_df["created_at"] = [
+            f"2026-10-22 {10 + (i % 8):02d}:{(i % 60):02d}:00"
+            for i in range(len(sample_df))
+        ]
+        result = analyze_city_orders(sample_df, threshold=30, res_min=8, res_max=8)
+        hexes = result["layers"]["source"]["res"]["8"]["hexes"]
+        self.assertGreater(len(hexes), 0)
+        first_hex = hexes[0]
+        self.assertIn("corr", first_hex)
+        self.assertIn("corr_samples", first_hex)
+        self.assertIn("corr_neighbors", first_hex)
+        self.assertIn("color_corr", first_hex)
+
 
 if __name__ == "__main__":
     unittest.main()
