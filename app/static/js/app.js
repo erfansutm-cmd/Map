@@ -37,6 +37,7 @@ const state = {
   singleSelectedHex: null,    // Single selected cell
   outerBoundaryOnly: true,    // Render outer perimeter in black, hide internal dividing grid lines
   outerBoundaryGeo: null,     // Dissolved outer boundary GeoJSON
+  bikerExportToggle: 'less',  // 'less' or 'more' (default on less)
 };
 
 // Helpers for Currency & Fare Formatting
@@ -473,6 +474,46 @@ function setupEventListeners() {
   const btnKmlCtrl = document.getElementById('btnExportKmlFromControls');
   if (btnKmlCtrl) {
     btnKmlCtrl.addEventListener('click', () => exportSelectedCellsKml());
+  }
+
+  // Biker Boundary Ride Filter & CSV Export Panel
+  const btnToggleBikerExport = document.getElementById('btnToggleBikerExport');
+  const bikerExportBody = document.getElementById('bikerExportBody');
+  const iconBikerArrow = document.getElementById('iconBikerExportArrow');
+  if (btnToggleBikerExport && bikerExportBody) {
+    btnToggleBikerExport.addEventListener('click', () => {
+      const isHidden = bikerExportBody.style.display === 'none' || !bikerExportBody.style.display;
+      bikerExportBody.style.display = isHidden ? 'block' : 'none';
+      if (iconBikerArrow) iconBikerArrow.innerHTML = isHidden ? '&#9650;' : '&#9660;';
+    });
+  }
+
+  const btnToggleLess = document.getElementById('btnToggleLess');
+  const btnToggleMore = document.getElementById('btnToggleMore');
+  if (btnToggleLess && btnToggleMore) {
+    btnToggleLess.addEventListener('click', () => {
+      state.bikerExportToggle = 'less';
+      btnToggleLess.classList.add('active');
+      btnToggleMore.classList.remove('active');
+      btnToggleLess.style.background = '#2563eb';
+      btnToggleLess.style.color = '#ffffff';
+      btnToggleMore.style.background = '#f1f5f9';
+      btnToggleMore.style.color = '#475569';
+    });
+    btnToggleMore.addEventListener('click', () => {
+      state.bikerExportToggle = 'more';
+      btnToggleMore.classList.add('active');
+      btnToggleLess.classList.remove('active');
+      btnToggleMore.style.background = '#2563eb';
+      btnToggleMore.style.color = '#ffffff';
+      btnToggleLess.style.background = '#f1f5f9';
+      btnToggleLess.style.color = '#475569';
+    });
+  }
+
+  const btnExportBikersCsv = document.getElementById('btnExportBikersCsv');
+  if (btnExportBikersCsv) {
+    btnExportBikersCsv.addEventListener('click', () => exportBikersBoundaryCsv());
   }
 
   // Citywide Report Modal
@@ -2279,6 +2320,15 @@ function renderMergedSelection() {
   const mergedIncEl = document.getElementById('mergedIncentiveVal');
   if (mergedIncEl) mergedIncEl.textContent = `+${formatFareFull(weightedInc)} inc`;
 
+  const inputStartDate = document.getElementById('bikerExportStartDate');
+  const inputEndDate = document.getElementById('bikerExportEndDate');
+  if (inputStartDate && !inputStartDate.value) {
+    inputStartDate.value = state.startDate;
+  }
+  if (inputEndDate && !inputEndDate.value) {
+    inputEndDate.value = state.endDate;
+  }
+
   updateMergedOuterBoundaryLayer();
   panel.classList.add('active');
 }
@@ -2530,6 +2580,94 @@ function downloadKmlBlob(blob, filename) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Export Filtered Bikers in Boundary to CSV
+async function exportBikersBoundaryCsv() {
+  const cellIds = Array.from(state.selectedHexes.keys());
+  if (cellIds.length === 0) {
+    alert('Please select one or more cells on the map to define the boundary.');
+    return;
+  }
+
+  const startDateInput = document.getElementById('bikerExportStartDate');
+  const endDateInput = document.getElementById('bikerExportEndDate');
+  const minRidesInput = document.getElementById('bikerExportMinRides');
+  const pctInput = document.getElementById('bikerExportPct');
+  const btnExport = document.getElementById('btnExportBikersCsv');
+  const feedbackEl = document.getElementById('bikerExportFeedback');
+
+  const startDate = startDateInput ? startDateInput.value || state.startDate : state.startDate;
+  const endDate = endDateInput ? endDateInput.value || state.endDate : state.endDate;
+  const minRides = minRidesInput ? Math.max(0, parseInt(minRidesInput.value, 10) || 0) : 0;
+  const percentage = pctInput ? Math.max(0, Math.min(100, parseFloat(pctInput.value) || 0)) : 20;
+  const toggle = state.bikerExportToggle || 'less';
+
+  const origBtnHtml = btnExport ? btnExport.innerHTML : 'Export as CSV';
+  if (btnExport) {
+    btnExport.disabled = true;
+    btnExport.innerHTML = `
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+      Exporting CSV...
+    `;
+  }
+  if (feedbackEl) {
+    feedbackEl.style.display = 'block';
+    feedbackEl.textContent = 'Querying rides and filtering bikers...';
+  }
+
+  try {
+    const res = await fetch('/api/export-biker-rides-csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        city: state.city,
+        start_date: startDate,
+        end_date: endDate,
+        cells: cellIds,
+        min_rides: minRides,
+        toggle: toggle,
+        percentage: percentage,
+        layer: state.currentLayer,
+        status: state.status,
+        customer_id: state.customerId,
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Export request failed' }));
+      throw new Error(err.detail || 'Failed to export CSV');
+    }
+
+    const matchedCount = res.headers.get('x-matched-bikers-count') || '0';
+    const blob = await res.blob();
+    const filename = `${state.city}_bikers_boundary_${toggle}_${percentage}pct_${startDate}_to_${endDate}.csv`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    showKmlToast(`Exported ${matchedCount} bikers to CSV (${filename})`);
+    if (feedbackEl) {
+      feedbackEl.textContent = `Done! ${matchedCount} bikers matched and exported.`;
+      setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+    }
+  } catch (err) {
+    alert(`CSV Export Error: ${err.message}`);
+    if (feedbackEl) {
+      feedbackEl.textContent = `Error: ${err.message}`;
+    }
+  } finally {
+    if (btnExport) {
+      btnExport.disabled = false;
+      btnExport.innerHTML = origBtnHtml;
+    }
+  }
 }
 
 function generateKmlForHexes(hexItems, docTitle) {

@@ -18,6 +18,7 @@ from app.config import settings
 from app.cities import get_popular_cities, get_city_info
 from app.data_source import fetch_orders, parse_csv_orders, get_dates_between, compute_daily_breakdown
 from app.engine import analyze_city_orders
+from app.export_biker_csv import generate_biker_rides_csv, compute_biker_boundary_rides
 from app.export_html import build_standalone_html
 from app.export_kml import build_kml_boundaries, build_kml_outer_boundary
 from app.file_cache import save_df_to_file, load_df_from_file, clear_file_cache
@@ -439,6 +440,124 @@ def get_cells_outer_boundary(payload: Dict[str, Any]):
         return geo
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/export-biker-rides-csv")
+def export_biker_rides_csv_endpoint(payload: Dict[str, Any]):
+    """Filter bikers by ride count and boundary percentage (more or less) and export as CSV."""
+    city = str(payload.get("city") or "isfahan").strip().lower()
+    start_date = str(payload.get("start_date") or settings.DEFAULT_START_DATE).strip()
+    end_date = str(payload.get("end_date") or settings.DEFAULT_END_DATE).strip()
+    status = str(payload.get("status") or "DELIVERED").strip()
+    customer_id = int(payload.get("customer_id") or settings.DEFAULT_CUSTOMER_ID)
+    min_rides = max(0, int(payload.get("min_rides") or 0))
+    toggle = str(payload.get("toggle") or "less").strip().lower()
+    percentage = float(payload.get("percentage") if payload.get("percentage") is not None else 20.0)
+    layer = str(payload.get("layer") or "source").strip().lower()
+    raw_cells = payload.get("cells", [])
+
+    if isinstance(raw_cells, str):
+        cell_list = [c.strip() for c in raw_cells.split(",") if c.strip()]
+    elif isinstance(raw_cells, list):
+        cell_list = [str(c.get("hex") if isinstance(c, dict) else c).strip() for c in raw_cells if str(c).strip()]
+    else:
+        cell_list = []
+
+    if not cell_list:
+        raise HTTPException(status_code=400, detail="No boundary cell IDs provided")
+
+    try:
+        df, _, _, _ = fetch_orders(
+            city=city,
+            status=status,
+            customer_id=customer_id,
+            start_date=start_date,
+            end_date=end_date,
+            threshold=settings.DEFAULT_THRESHOLD,
+        )
+    except RuntimeError:
+        df, _, _, _ = generate_fallback_orders(
+            city=city,
+            start_date=start_date,
+            end_date=end_date,
+            threshold=settings.DEFAULT_THRESHOLD,
+        )
+
+    csv_content, count = generate_biker_rides_csv(
+        df=df,
+        cells=cell_list,
+        min_rides=min_rides,
+        toggle=toggle,
+        percentage=percentage,
+        layer=layer,
+    )
+
+    out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_{start_date}_to_{end_date}.csv"
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{out_filename}"',
+            "X-Matched-Bikers-Count": str(count),
+        },
+    )
+
+
+@app.get("/api/export-biker-rides-csv")
+def export_biker_rides_csv_get(
+    city: str = Query(default="isfahan"),
+    start_date: str = Query(default=settings.DEFAULT_START_DATE),
+    end_date: str = Query(default=settings.DEFAULT_END_DATE),
+    cells: str = Query(default=""),
+    min_rides: int = Query(default=0),
+    toggle: str = Query(default="less"),
+    percentage: float = Query(default=20.0),
+    layer: str = Query(default="source"),
+    status: str = Query(default="DELIVERED"),
+    customer_id: int = Query(default=settings.DEFAULT_CUSTOMER_ID),
+):
+    """Filter bikers by ride count and boundary percentage (more or less) and export as CSV (GET)."""
+    cell_list = [c.strip() for c in cells.split(",") if c.strip()]
+    if not cell_list:
+        raise HTTPException(status_code=400, detail="No boundary cell IDs provided")
+
+    try:
+        df, _, _, _ = fetch_orders(
+            city=city,
+            status=status,
+            customer_id=customer_id,
+            start_date=start_date,
+            end_date=end_date,
+            threshold=settings.DEFAULT_THRESHOLD,
+        )
+    except RuntimeError:
+        df, _, _, _ = generate_fallback_orders(
+            city=city,
+            start_date=start_date,
+            end_date=end_date,
+            threshold=settings.DEFAULT_THRESHOLD,
+        )
+
+    csv_content, count = generate_biker_rides_csv(
+        df=df,
+        cells=cell_list,
+        min_rides=max(0, int(min_rides)),
+        toggle=toggle,
+        percentage=percentage,
+        layer=layer,
+    )
+
+    out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_{start_date}_to_{end_date}.csv"
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{out_filename}"',
+            "X-Matched-Bikers-Count": str(count),
+        },
+    )
 
 
 @app.post("/api/upload-csv")

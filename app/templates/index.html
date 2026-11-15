@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.5.3">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.5.4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -685,6 +685,71 @@
             </svg>
             Output Outer Boundary KML
           </button>
+
+          <!-- Collapsible Biker Boundary Analysis & CSV Export Panel -->
+          <div class="biker-boundary-card" style="margin-top:4px;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;background:#f8fafc">
+            <button type="button" id="btnToggleBikerExport" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#f1f5f9;border:none;font-size:11.5px;font-weight:700;color:#0f172a;cursor:pointer">
+              <span style="display:inline-flex;align-items:center;gap:6px">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>
+                Biker Boundary Ride Filter
+              </span>
+              <span id="iconBikerExportArrow" style="font-size:10px;color:#64748b;transition:transform 0.2s">&#9660;</span>
+            </button>
+
+            <div id="bikerExportBody" style="display:none;padding:9px;border-top:1px solid #e2e8f0;background:#ffffff">
+              <!-- Period Selection with calendar view -->
+              <div style="margin-bottom:8px">
+                <div style="font-size:10.5px;font-weight:700;color:#334155;margin-bottom:3px">Analysis Period:</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  <div>
+                    <label for="bikerExportStartDate" style="font-size:9.5px;font-weight:600;color:#64748b;display:block;margin-bottom:2px">Start Date</label>
+                    <input type="date" id="bikerExportStartDate" class="form-input" style="padding:4px 6px;font-size:11px;width:100%">
+                  </div>
+                  <div>
+                    <label for="bikerExportEndDate" style="font-size:9.5px;font-weight:600;color:#64748b;display:block;margin-bottom:2px">End Date</label>
+                    <input type="date" id="bikerExportEndDate" class="form-input" style="padding:4px 6px;font-size:11px;width:100%">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Min rides per biker (>= 0) -->
+              <div style="margin-bottom:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                  <label for="bikerExportMinRides" style="font-size:10.5px;font-weight:700;color:#334155">Min Total Rides / Biker:</label>
+                  <span style="font-size:9.5px;color:#64748b;font-weight:600">&ge; 0</span>
+                </div>
+                <input type="number" id="bikerExportMinRides" class="form-input" min="0" step="1" value="5" style="padding:4px 6px;font-size:11px;width:100%" title="Minimum total rides by biker in period (>= 0)">
+              </div>
+
+              <!-- Boundary Ride Percentage Filter: Toggle (more or less) + Percentage input -->
+              <div style="margin-bottom:10px">
+                <div style="font-size:10.5px;font-weight:700;color:#334155;margin-bottom:4px">Rides in Boundary %:</div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <!-- Toggle: More or Less (default on less) -->
+                  <div class="toggle-segmented" style="display:inline-flex;border:1px solid #cbd5e1;border-radius:4px;overflow:hidden;background:#fff">
+                    <button type="button" id="btnToggleLess" class="btn-segmented active" style="padding:4px 8px;font-size:10.5px;font-weight:700;border:none;background:#2563eb;color:#fff;cursor:pointer" title="Bikers with less than or equal to this % of rides in boundary">Less (&le;)</button>
+                    <button type="button" id="btnToggleMore" class="btn-segmented" style="padding:4px 8px;font-size:10.5px;font-weight:700;border:none;background:#f1f5f9;color:#475569;cursor:pointer" title="Bikers with more than or equal to this % of rides in boundary">More (&ge;)</button>
+                  </div>
+                  <!-- Percentage input (0 to 100) -->
+                  <div style="display:flex;align-items:center;flex:1;position:relative">
+                    <input type="number" id="bikerExportPct" class="form-input" min="0" max="100" step="1" value="20" style="padding:4px 22px 4px 6px;font-size:11px;width:100%" title="Target boundary ride share percentage (0 to 100%)">
+                    <span style="position:absolute;right:6px;font-size:11px;font-weight:700;color:#64748b;pointer-events:none">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Export as CSV button -->
+              <button type="button" id="btnExportBikersCsv" class="btn-action" style="width:100%;background:#059669;color:#fff;border-color:#047857;font-weight:700;justify-content:center;padding:7px 10px;font-size:11.5px" title="Export matching bikers and rides to CSV">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export as CSV
+              </button>
+              <div id="bikerExportFeedback" style="font-size:10px;color:#64748b;text-align:center;margin-top:4px;display:none"></div>
+            </div>
+          </div>
           <div style="display:flex;gap:6px">
             <button id="btnClearSelection" class="btn-action" style="flex:1;background:#f1f5f9;color:#334155;border-color:#cbd5e1;justify-content:center">Clear Selection</button>
             <button id="btnZoomToSelection" class="btn-action" style="flex:1;background:#06b6d4;color:#fff;border-color:#0891b2;font-weight:700;justify-content:center">Zoom Selection</button>
@@ -965,6 +1030,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.5.3"></script>
+<script src="/static/js/app.js?v=2.5.4"></script>
 </body>
 </html>
