@@ -1636,7 +1636,7 @@ function updateFilterLabels() {
   if (titleEl) {
     if (isHa) titleEl.textContent = 'Min SLA Breach Filter';
     else if (isMean) titleEl.textContent = 'Min Mean Duration Filter';
-    else if (isFare) titleEl.textContent = 'Min Biker Fare Filter';
+    else if (isFare) titleEl.textContent = 'Min Mean Fare Filter';
     else titleEl.textContent = 'Min HA Share Filter';
   }
   if (unitEl) {
@@ -1986,20 +1986,12 @@ function createTooltipContent(h) {
   if (isFare) {
     topMetricHtml = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
-        <span style="font-size:13.5px;color:#0f172a"><b>Avg Fare: ${formatFareFull(h.avg_fare)} Toman</b></span>
+        <span style="font-size:13.5px;color:#0f172a"><b>Mean Fare: ${formatFareFull(h.avg_fare)} Toman</b></span>
         <span style="font-size:12px;font-weight:600;color:#2563eb">${h.orders.toLocaleString()} orders</span>
       </div>
       <div style="display:flex;justify-content:space-between;margin:2px 0">
-        <span style="color:#64748b">Avg Incentive:</span>
+        <span style="color:#64748b">Mean Incentive:</span>
         <span style="color:#059669;font-weight:700">+${formatFareFull(h.avg_incentive || 0)} Toman</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin:2px 0">
-        <span style="color:#64748b">Total Biker Fare:</span>
-        <span style="color:#0f172a;font-weight:600">${formatFareFull(h.total_fare || 0)} Toman</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin:2px 0">
-        <span style="color:#64748b">Total Incentive:</span>
-        <span style="color:#059669;font-weight:600">${formatFareFull(h.total_incentive || 0)} Toman</span>
       </div>
       <div style="display:flex;justify-content:space-between;margin:2px 0">
         <span style="color:#64748b">Mean Duration:</span>
@@ -2704,8 +2696,8 @@ function updateLegend() {
     minEl.textContent = `${s.mmin.toFixed(0)} min (Fastest)`;
     maxEl.textContent = `${s.mmax.toFixed(0)} min (Slowest)`;
   } else if (state.colorMetric === 'fare') {
-    titleEl.textContent = `Average Final Biker Fare`;
-    subEl.textContent = `Average final biker compensation & incentive per order`;
+    titleEl.textContent = `Mean Biker Fare & Incentive`;
+    subEl.textContent = `Mean final biker fare and incentive per order in cell`;
     minEl.textContent = `${formatFare(s.fmin || 0)} (Lowest)`;
     maxEl.textContent = `${formatFare(s.fmax || 60000)} (Highest)`;
   } else {

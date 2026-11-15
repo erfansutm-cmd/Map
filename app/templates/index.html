@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.5.0">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.5.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -576,12 +576,12 @@
         </div>
 
         <div class="stat-box" id="boxInspFare" style="margin-bottom:8px">
-          <div class="stat-box-label">Biker Fare &amp; Incentive</div>
+          <div class="stat-box-label">Mean Fare &amp; Incentive</div>
           <div style="display:flex;align-items:baseline;justify-content:space-between">
             <span id="inspFareVal" class="stat-box-val" style="color:#2563eb">0</span>
             <span id="inspIncentiveVal" style="font-size:11px;font-weight:700;color:#059669">+0 inc</span>
           </div>
-          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">avg final biker fare per order</div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">mean final biker fare &amp; incentive per order</div>
         </div>
 
         <div style="font-size:9.5px;color:#94a3b8;word-break:break-all">
@@ -649,12 +649,12 @@
         </div>
 
         <div class="stat-box" id="boxMergedFare" style="margin-bottom:8px">
-          <div class="stat-box-label">Combined Avg Biker Fare</div>
+          <div class="stat-box-label">Mean Fare &amp; Incentive</div>
           <div style="display:flex;align-items:baseline;justify-content:space-between">
             <span id="mergedFareVal" class="stat-box-val" style="color:#2563eb">0</span>
             <span id="mergedIncentiveVal" style="font-size:11px;font-weight:700;color:#059669">+0 inc</span>
           </div>
-          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">weighted avg per order</div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">weighted mean per order</div>
         </div>
 
         <div style="font-size:10px;font-weight:600;color:#64748b;margin-bottom:2px">Selected Cells:</div>
@@ -939,6 +939,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.5.0"></script>
+<script src="/static/js/app.js?v=2.5.1"></script>
 </body>
 </html>
