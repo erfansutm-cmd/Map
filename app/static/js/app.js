@@ -37,6 +37,8 @@ const state = {
   singleSelectedHex: null,    // Single selected cell
   bikerExportToggle: 'less',  // 'less' or 'more' (default on less)
   bikerPreviewRecords: [],    // Live cached records for biker preview table
+  bikerSortCol: 'percentage_of_rides_in_boundary',
+  bikerSortDir: 'desc',
 };
 
 // Helpers for Currency & Fare Formatting
@@ -476,7 +478,7 @@ function setupEventListeners() {
     });
   }
 
-  function setBikerToggle(mode) {
+    function setBikerToggle(mode) {
     state.bikerExportToggle = mode;
     const btnLess = document.getElementById('btnToggleLess');
     const btnMore = document.getElementById('btnToggleMore');
@@ -485,28 +487,16 @@ function setupEventListeners() {
 
     [btnLess, modalLess].forEach(btn => {
       if (!btn) return;
-      if (mode === 'less') {
-        btn.classList.add('active');
-        btn.style.background = '#2563eb';
-        btn.style.color = '#ffffff';
-      } else {
-        btn.classList.remove('active');
-        btn.style.background = '#f8fafc';
-        btn.style.color = '#475569';
-      }
+      btn.classList.toggle('active', mode === 'less');
+      btn.style.background = '';
+      btn.style.color = '';
     });
 
     [btnMore, modalMore].forEach(btn => {
       if (!btn) return;
-      if (mode === 'more') {
-        btn.classList.add('active');
-        btn.style.background = '#2563eb';
-        btn.style.color = '#ffffff';
-      } else {
-        btn.classList.remove('active');
-        btn.style.background = '#f8fafc';
-        btn.style.color = '#475569';
-      }
+      btn.classList.toggle('active', mode === 'more');
+      btn.style.background = '';
+      btn.style.color = '';
     });
   }
 
@@ -556,6 +546,49 @@ function setupEventListeners() {
       renderBikerModalTable(filtered);
     });
   }
+
+  // Column header sorting
+  document.querySelectorAll('.sortable-th').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (col) sortBikerTableBy(col);
+    });
+  });
+
+  // Preset chips click listeners
+  document.querySelectorAll('[data-biker-preset]').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const preset = chip.dataset.bikerPreset;
+      const isInsideModal = !!chip.closest('#bikerModal');
+      handleBikerPresetClick(preset, isInsideModal ? 'modal' : 'card');
+    });
+  });
+
+  // Date inputs change listeners for two-way sync
+  ['bikerExportStartDate', 'bikerExportEndDate', 'bikerModalStartDate', 'bikerModalEndDate'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) {
+      input.addEventListener('change', () => {
+        const isModal = id.startsWith('bikerModal');
+        const s = isModal ? document.getElementById('bikerModalStartDate').value : document.getElementById('bikerExportStartDate').value;
+        const e = isModal ? document.getElementById('bikerModalEndDate').value : document.getElementById('bikerExportEndDate').value;
+        if (isModal) {
+          const cardStart = document.getElementById('bikerExportStartDate');
+          const cardEnd = document.getElementById('bikerExportEndDate');
+          if (cardStart) cardStart.value = s;
+          if (cardEnd) cardEnd.value = e;
+        } else {
+          const modalStart = document.getElementById('bikerModalStartDate');
+          const modalEnd = document.getElementById('bikerModalEndDate');
+          if (modalStart) modalStart.value = s;
+          if (modalEnd) modalEnd.value = e;
+        }
+        updateBikerPeriodDisplay(s, e);
+        document.querySelectorAll('[data-biker-preset]').forEach(c => c.classList.remove('active'));
+      });
+    }
+  });
 
   // Citywide Report Modal
   document.getElementById('btnOpenCityModal').addEventListener('click', openCityModal);
@@ -1565,6 +1598,11 @@ function applyNewDatePeriod(startDate, endDate) {
   state.endDate = endDate;
   state.selectedDates = null; // Reset to select all dates in new period
   updateCalendarTriggerLabel();
+  const cardStart = document.getElementById('bikerExportStartDate');
+  const cardEnd = document.getElementById('bikerExportEndDate');
+  if (cardStart) cardStart.value = startDate;
+  if (cardEnd) cardEnd.value = endDate;
+  updateBikerPeriodDisplay(startDate, endDate);
   loadCityData(state.city, false);
 }
 
@@ -2365,6 +2403,7 @@ function renderMergedSelection() {
   if (inputEndDate && !inputEndDate.value) {
     inputEndDate.value = state.endDate;
   }
+  updateBikerPeriodDisplay(inputStartDate ? inputStartDate.value : null, inputEndDate ? inputEndDate.value : null);
 
   panel.classList.add('active');
 }
@@ -2442,6 +2481,101 @@ async function exportSelectedCellsKml() {
   showKmlToast(`Exported 2-layer KML for ${count} cell${count > 1 ? 's' : ''}`);
 }
 
+function formatBikerDate(ymd) {
+  if (!ymd) return '';
+  const parts = ymd.split('-');
+  if (parts.length !== 3) return ymd;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  return `${monthNames[m] || parts[1]} ${d}, ${parts[0]}`;
+}
+
+function updateBikerPeriodDisplay(startDate, endDate) {
+  const s = startDate || state.startDate;
+  const e = endDate || state.endDate;
+  const el = document.getElementById('bikerCardPeriodText');
+  if (el && s && e) {
+    el.textContent = `${formatBikerDate(s)} – ${formatBikerDate(e)}`;
+  }
+}
+
+function handleBikerPresetClick(preset, source) {
+  let sDate = state.startDate;
+  let eDate = state.endDate;
+
+  if (preset === 'active') {
+    sDate = state.startDate;
+    eDate = state.endDate;
+  } else if (preset === '3') {
+    const rng = getRelativeDateRange(3);
+    sDate = rng.start;
+    eDate = rng.end;
+  } else if (preset === '7') {
+    const rng = getRelativeDateRange(7);
+    sDate = rng.start;
+    eDate = rng.end;
+  }
+
+  // Update card inputs
+  const cardStart = document.getElementById('bikerExportStartDate');
+  const cardEnd = document.getElementById('bikerExportEndDate');
+  if (cardStart) cardStart.value = sDate;
+  if (cardEnd) cardEnd.value = eDate;
+
+  // Update modal inputs
+  const modalStart = document.getElementById('bikerModalStartDate');
+  const modalEnd = document.getElementById('bikerModalEndDate');
+  if (modalStart) modalStart.value = sDate;
+  if (modalEnd) modalEnd.value = eDate;
+
+  updateBikerPeriodDisplay(sDate, eDate);
+
+  // Sync active states on chips across card and modal
+  document.querySelectorAll('[data-biker-preset]').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.bikerPreset === preset);
+  });
+
+  if (source === 'modal') {
+    loadBikerModalPreview();
+  }
+}
+
+function sortBikerTableBy(col) {
+  if (state.bikerSortCol === col) {
+    state.bikerSortDir = state.bikerSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.bikerSortCol = col;
+    state.bikerSortDir = (col === 'biker_id') ? 'asc' : 'desc';
+  }
+
+  // Update header sort indicators
+  ['biker_id', 'total_rides_in_period', 'total_rides_in_boundary', 'percentage_of_rides_in_boundary'].forEach(c => {
+    const th = document.querySelector(`.sortable-th[data-col="${c}"]`);
+    const icon = document.getElementById(`sortIcon_${c}`);
+    if (th && icon) {
+      if (c === state.bikerSortCol) {
+        th.classList.add('active-sort');
+        icon.innerHTML = state.bikerSortDir === 'asc' ? '&#9650;' : '&#9660;';
+        icon.style.color = '#2563eb';
+      } else {
+        th.classList.remove('active-sort');
+        icon.innerHTML = '&#8645;';
+        icon.style.color = '#94a3b8';
+      }
+    }
+  });
+
+  // Re-render table with current search query preserved
+  const searchInput = document.getElementById('bikerModalSearch');
+  const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const list = (q && state.bikerPreviewRecords)
+    ? state.bikerPreviewRecords.filter(r => String(r.biker_id).toLowerCase().includes(q))
+    : (state.bikerPreviewRecords || []);
+
+  renderBikerModalTable(list);
+}
+
 function openBikerModal() {
   if (state.selectedHexes.size === 0) {
     alert('Please select one or more boundary cells first.');
@@ -2458,15 +2592,41 @@ function openBikerModal() {
   const modalMinRides = document.getElementById('bikerModalMinRides');
   const modalPct = document.getElementById('bikerModalPct');
 
-  if (modalStartDate) modalStartDate.value = (inputStartDate && inputStartDate.value) || state.startDate;
-  if (modalEndDate) modalEndDate.value = (inputEndDate && inputEndDate.value) || state.endDate;
+  const sVal = (inputStartDate && inputStartDate.value) || state.startDate;
+  const eVal = (inputEndDate && inputEndDate.value) || state.endDate;
+
+  if (modalStartDate) modalStartDate.value = sVal;
+  if (modalEndDate) modalEndDate.value = eVal;
   if (modalMinRides) modalMinRides.value = (inputMinRides && inputMinRides.value) || '5';
   if (modalPct) modalPct.value = (inputPct && inputPct.value) || '20';
+
+  updateBikerPeriodDisplay(sVal, eVal);
 
   const subEl = document.getElementById('bikerModalSubtitle');
   if (subEl) {
     subEl.textContent = `Analyzing ${state.city.toUpperCase()} • ${state.selectedHexes.size} boundary cells selected (customer_id = 2)`;
   }
+
+  // Clear search field on open
+  const searchInput = document.getElementById('bikerModalSearch');
+  if (searchInput) searchInput.value = '';
+
+  // Ensure sort indicators are in sync
+  ['biker_id', 'total_rides_in_period', 'total_rides_in_boundary', 'percentage_of_rides_in_boundary'].forEach(c => {
+    const th = document.querySelector(`.sortable-th[data-col="${c}"]`);
+    const icon = document.getElementById(`sortIcon_${c}`);
+    if (th && icon) {
+      if (c === state.bikerSortCol) {
+        th.classList.add('active-sort');
+        icon.innerHTML = state.bikerSortDir === 'asc' ? '&#9650;' : '&#9660;';
+        icon.style.color = '#2563eb';
+      } else {
+        th.classList.remove('active-sort');
+        icon.innerHTML = '&#8645;';
+        icon.style.color = '#94a3b8';
+      }
+    }
+  });
 
   document.getElementById('bikerModal').classList.add('open');
   loadBikerModalPreview();
@@ -2559,12 +2719,30 @@ function renderBikerModalTable(bikers) {
   const tbody = document.getElementById('bikerModalTableBody');
   if (!tbody) return;
 
-  if (!bikers || bikers.length === 0) {
+  const records = bikers !== undefined ? bikers : (state.bikerPreviewRecords || []);
+
+  if (!records || records.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#94a3b8">No bikers match the selected criteria</td></tr>';
     return;
   }
 
-  tbody.innerHTML = bikers.map(b => {
+  // Sort according to active column & direction
+  const col = state.bikerSortCol || 'percentage_of_rides_in_boundary';
+  const dir = state.bikerSortDir === 'asc' ? 1 : -1;
+
+  const sorted = [...records].sort((a, b) => {
+    if (col === 'biker_id') {
+      return dir * String(a.biker_id).localeCompare(String(b.biker_id), undefined, { numeric: true });
+    }
+    const valA = Number(a[col]) || 0;
+    const valB = Number(b[col]) || 0;
+    if (valA !== valB) {
+      return dir * (valA - valB);
+    }
+    return (Number(b.total_rides_in_period) || 0) - (Number(a.total_rides_in_period) || 0);
+  });
+
+  tbody.innerHTML = sorted.map(b => {
     const pct = typeof b.percentage_of_rides_in_boundary === 'number'
       ? b.percentage_of_rides_in_boundary
       : parseFloat(b.percentage_of_rides_in_boundary) || 0;

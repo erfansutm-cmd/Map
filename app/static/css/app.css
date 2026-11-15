@@ -2386,10 +2386,55 @@ body.map-only-mode .btn-exit-map-only {
   margin-top: 5px;
 }
 
+/* Biker Preset Chips & Date Display */
+.biker-preset-strip {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.biker-preset-chip {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.biker-preset-chip:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.biker-preset-chip.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+.biker-date-display-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
 /* Modal Styling for Biker Boundary Analysis */
 .biker-modal-dialog {
-  max-width: 720px;
-  width: 92%;
+  max-width: 820px;
+  width: 94%;
 }
 
 .biker-modal-header {
@@ -2411,29 +2456,193 @@ body.map-only-mode .btn-exit-map-only {
   flex-shrink: 0;
 }
 
-.biker-modal-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px;
+/* Beautiful Structured Filter Control Card */
+.biker-modal-filter-card {
   background: #f8fafc;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
   border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
   margin-bottom: 12px;
 }
 
-.biker-modal-filter-field {
-  flex: 1;
-  min-width: 100px;
+.biker-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.biker-mini-label {
-  display: block;
-  font-size: 10px;
+.biker-filter-row-bottom {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.biker-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.biker-field-label {
+  font-size: 11px;
   font-weight: 700;
+  color: #334155;
+  display: block;
+}
+
+.biker-date-pair-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.biker-date-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.biker-date-sublabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  margin-right: 6px;
+}
+
+.biker-date-arrow {
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.biker-modal-date-input {
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  font-size: 11.5px;
+  font-family: inherit;
+  color: #0f172a;
+  outline: none;
+  width: 100%;
+}
+
+.biker-filter-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.biker-input-with-addon {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 8px;
+  height: 34px;
+  margin-top: 3px;
+}
+
+.biker-modal-input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+  font-family: inherit;
+}
+
+.biker-input-addon {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.biker-rule-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  margin-top: 3px;
+}
+
+.biker-segmented-btn-group {
+  display: inline-flex;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+  height: 34px;
+}
+
+.biker-seg-choice {
+  padding: 0 11px;
+  font-size: 11px;
+  font-weight: 700;
+  border: none;
+  background: #ffffff;
   color: #475569;
-  margin-bottom: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.biker-seg-choice.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.biker-pct-box {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 8px;
+  height: 34px;
+  width: 80px;
+}
+
+.biker-pct-suffix {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  margin-left: 4px;
+}
+
+.btn-biker-modal-apply {
+  min-width: 140px;
+  height: 34px;
+  padding: 0 16px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(37,99,235,0.25);
+  transition: all 0.15s ease;
+}
+.btn-biker-modal-apply:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
 }
 
 .biker-modal-kpi-grid {
@@ -2445,7 +2654,7 @@ body.map-only-mode .btn-exit-map-only {
 .biker-modal-table-wrap {
   border: 1px solid #e2e8f0;
   border-radius: var(--radius-sm);
-  max-height: 240px;
+  max-height: 250px;
   overflow-y: auto;
   background: #fff;
 }
@@ -2458,15 +2667,45 @@ body.map-only-mode .btn-exit-map-only {
 
 .biker-table th {
   background: #f8fafc;
-  padding: 7px 10px;
+  padding: 8px 10px;
   text-align: left;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   color: #475569;
   border-bottom: 1px solid #e2e8f0;
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+/* Sortable Table Headers */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sortable-th:hover {
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+.sortable-th.active-sort {
+  color: #2563eb !important;
+}
+
+.th-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sort-icon {
+  font-size: 11px;
+  margin-left: 3px;
+  color: #94a3b8;
+}
+.sortable-th.active-sort .sort-icon {
+  color: #2563eb;
+  font-weight: 800;
 }
 
 .biker-table td {

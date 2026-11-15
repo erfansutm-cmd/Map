@@ -684,7 +684,7 @@
             <button type="button" id="btnToggleBikerExport" class="biker-card-header">
               <div class="biker-card-title-group">
                 <span class="biker-card-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                     <circle cx="18.5" cy="17.5" r="3.5"></circle>
                     <circle cx="5.5" cy="17.5" r="3.5"></circle>
                     <circle cx="15" cy="5" r="1"></circle>
@@ -692,21 +692,31 @@
                   </svg>
                 </span>
                 <div style="text-align:left">
-                  <div class="biker-card-title">Biker Boundary Filter</div>
-                  <div class="biker-card-subtitle">Filter riders by boundary ride share</div>
+                  <div class="biker-card-title">Biker Boundary Rides</div>
+                  <div class="biker-card-subtitle">Filter riders inside/outside selection</div>
                 </div>
               </div>
               <span id="iconBikerExportArrow" class="biker-card-chevron">&#9660;</span>
             </button>
 
             <div id="bikerExportBody" class="biker-card-body" style="display:none">
-              <!-- Period with dates -->
+              <!-- Period with Quick Presets and Dates -->
               <div class="biker-form-group">
                 <div class="biker-form-label-row">
-                  <span class="biker-form-label">Analysis Period</span>
-                  <span class="biker-label-hint">active range</span>
+                  <span class="biker-form-label">Analysis Period:</span>
                 </div>
-                <div class="biker-date-grid">
+                <!-- Quick presets pills -->
+                <div class="biker-preset-strip" style="margin-bottom:6px">
+                  <button type="button" class="biker-preset-chip active" data-biker-preset="active" title="Sync with current map date range">Active Range</button>
+                  <button type="button" class="biker-preset-chip" data-biker-preset="3" title="Last 3 days">Last 3d</button>
+                  <button type="button" class="biker-preset-chip" data-biker-preset="7" title="Last 7 days">Last 7d</button>
+                </div>
+                <!-- Formatted Date Range Display -->
+                <div class="biker-date-display-badge" id="bikerCardPeriodDisplay">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>
+                  <span id="bikerCardPeriodText">Oct 22 &ndash; Nov 05, 2026</span>
+                </div>
+                <div class="biker-date-grid" style="margin-top:6px">
                   <div class="biker-date-item">
                     <span class="biker-date-prefix">From</span>
                     <input type="date" id="bikerExportStartDate" class="biker-date-input">
@@ -721,7 +731,7 @@
               <!-- Min Rides Input -->
               <div class="biker-form-group">
                 <div class="biker-form-label-row">
-                  <label for="bikerExportMinRides" class="biker-form-label">Min Rides in Period</label>
+                  <label for="bikerExportMinRides" class="biker-form-label">Min Total Rides / Biker</label>
                   <span class="biker-pill-tag">&ge; 0</span>
                 </div>
                 <input type="number" id="bikerExportMinRides" class="biker-number-input" min="0" step="1" value="5" placeholder="5">
@@ -996,38 +1006,66 @@
       <button type="button" id="btnCloseBikerModal" class="btn-close-inspector">&times;</button>
     </div>
 
-    <!-- Quick Filter Control Bar inside modal -->
-    <div class="biker-modal-filter-bar">
-      <div class="biker-modal-filter-field">
-        <label for="bikerModalStartDate" class="biker-mini-label">Start Date</label>
-        <input type="date" id="bikerModalStartDate" class="form-input" style="padding:4px 6px;font-size:11.5px">
-      </div>
-      <div class="biker-modal-filter-field">
-        <label for="bikerModalEndDate" class="biker-mini-label">End Date</label>
-        <input type="date" id="bikerModalEndDate" class="form-input" style="padding:4px 6px;font-size:11.5px">
-      </div>
-      <div class="biker-modal-filter-field" style="max-width:90px">
-        <label for="bikerModalMinRides" class="biker-mini-label">Min Rides</label>
-        <input type="number" id="bikerModalMinRides" class="form-input" min="0" step="1" value="5" style="padding:4px 6px;font-size:11.5px">
-      </div>
-      <div class="biker-modal-filter-field">
-        <label class="biker-mini-label">Target % Share</label>
-        <div style="display:flex;gap:4px;align-items:center">
-          <div class="biker-segmented">
-            <button type="button" id="bikerModalToggleLess" class="biker-seg-btn active" style="font-size:10px;padding:4px 7px">&le; Less</button>
-            <button type="button" id="bikerModalToggleMore" class="biker-seg-btn" style="font-size:10px;padding:4px 7px">&ge; More</button>
+    <!-- Beautiful Structured Filter Control Panel (Fits cleanly without cramping) -->
+    <div class="biker-modal-filter-card">
+      <!-- Top Row: Date Range & Quick Presets -->
+      <div class="biker-filter-row">
+        <div style="flex:1">
+          <div class="biker-field-header">
+            <span class="biker-field-label">Analysis Period:</span>
+            <div class="biker-preset-strip" id="bikerModalPresetStrip">
+              <button type="button" class="biker-preset-chip active" data-biker-preset="active" title="Sync with active map date range">Active Map Range</button>
+              <button type="button" class="biker-preset-chip" data-biker-preset="3" title="Last 3 days">Last 3 Days</button>
+              <button type="button" class="biker-preset-chip" data-biker-preset="7" title="Last 7 days">Last 7 Days</button>
+            </div>
           </div>
-          <div style="position:relative;width:65px">
-            <input type="number" id="bikerModalPct" class="form-input" min="0" max="100" step="1" value="20" style="padding:4px 18px 4px 6px;font-size:11.5px">
-            <span style="position:absolute;right:5px;top:4px;font-size:10px;color:#64748b;font-weight:700">%</span>
+          <div class="biker-date-pair-wrap">
+            <div class="biker-date-box">
+              <span class="biker-date-sublabel">From</span>
+              <input type="date" id="bikerModalStartDate" class="biker-modal-date-input">
+            </div>
+            <span class="biker-date-arrow">&rarr;</span>
+            <div class="biker-date-box">
+              <span class="biker-date-sublabel">To</span>
+              <input type="date" id="bikerModalEndDate" class="biker-modal-date-input">
+            </div>
           </div>
         </div>
       </div>
-      <div style="display:flex;align-items:flex-end">
-        <button type="button" id="btnBikerModalApply" class="btn-primary" style="padding:5px 12px;font-size:11.5px;height:29px;display:flex;align-items:center;gap:4px">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-          Update
-        </button>
+
+      <!-- Bottom Row: Min Rides, Boundary Rule & Large Update Button -->
+      <div class="biker-filter-row biker-filter-row-bottom">
+        <!-- Min Rides -->
+        <div class="biker-filter-group" style="width:130px">
+          <label for="bikerModalMinRides" class="biker-field-label">Min Total Rides (&ge;0):</label>
+          <div class="biker-input-with-addon">
+            <input type="number" id="bikerModalMinRides" class="biker-modal-input" min="0" step="1" value="5">
+            <span class="biker-input-addon">rides</span>
+          </div>
+        </div>
+
+        <!-- Boundary % Rule -->
+        <div class="biker-filter-group" style="flex:1">
+          <label class="biker-field-label">Boundary Ride Share Target:</label>
+          <div class="biker-rule-controls">
+            <div class="biker-segmented-btn-group">
+              <button type="button" id="bikerModalToggleLess" class="biker-seg-choice active" title="Bikers with less than or equal to this % of rides in boundary">&le; Less Than</button>
+              <button type="button" id="bikerModalToggleMore" class="biker-seg-choice" title="Bikers with more than or equal to this % of rides in boundary">&ge; More Than</button>
+            </div>
+            <div class="biker-pct-box">
+              <input type="number" id="bikerModalPct" class="biker-modal-input" min="0" max="100" step="1" value="20">
+              <span class="biker-pct-suffix">%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Update / Apply Button (Prominent & never truncated!) -->
+        <div class="biker-filter-group biker-action-group">
+          <button type="button" id="btnBikerModalApply" class="btn-biker-modal-apply" title="Apply filters and reload table preview">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            <span>Update Preview</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1067,10 +1105,30 @@
         <table class="biker-table">
           <thead>
             <tr>
-              <th style="width:25%">Biker ID</th>
-              <th style="width:25%;text-align:right">Total Period Rides</th>
-              <th style="width:25%;text-align:right">Boundary Rides</th>
-              <th style="width:25%;text-align:right">Boundary Share %</th>
+              <th class="sortable-th" data-col="biker_id" style="width:25%" title="Click to sort by Biker ID">
+                <span class="th-content">
+                  <span>Biker ID</span>
+                  <span class="sort-icon" id="sortIcon_biker_id">&#8645;</span>
+                </span>
+              </th>
+              <th class="sortable-th" data-col="total_rides_in_period" style="width:25%;text-align:right" title="Click to sort by Total Period Rides">
+                <span class="th-content" style="justify-content:flex-end">
+                  <span>Total Period Rides</span>
+                  <span class="sort-icon" id="sortIcon_total_rides_in_period">&#8645;</span>
+                </span>
+              </th>
+              <th class="sortable-th" data-col="total_rides_in_boundary" style="width:25%;text-align:right" title="Click to sort by Boundary Rides">
+                <span class="th-content" style="justify-content:flex-end">
+                  <span>Boundary Rides</span>
+                  <span class="sort-icon" id="sortIcon_total_rides_in_boundary">&#8645;</span>
+                </span>
+              </th>
+              <th class="sortable-th active-sort" data-col="percentage_of_rides_in_boundary" style="width:25%;text-align:right" title="Click to sort by Boundary Share %">
+                <span class="th-content" style="justify-content:flex-end">
+                  <span>Boundary Share %</span>
+                  <span class="sort-icon" id="sortIcon_percentage_of_rides_in_boundary">&#9660;</span>
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody id="bikerModalTableBody">
