@@ -1651,6 +1651,10 @@ body.map-only-mode .btn-exit-map-only {
   box-shadow: var(--shadow-lg);
 }
 
+#citywideModal .modal-dialog {
+  max-width: 640px;
+}
+
 .modal-title {
   font-size: 16px;
   font-weight: 800;

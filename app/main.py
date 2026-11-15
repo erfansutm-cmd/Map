@@ -27,6 +27,16 @@ app = FastAPI(
     version="2.2.0",
 )
 
+
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -61,10 +71,22 @@ def generate_fallback_orders(
     else:
         for d in all_dates:
             key = (city_key, d)
+            if key in FALLBACK_DAY_CACHE and ("vendor_id" not in FALLBACK_DAY_CACHE[key].columns or "biker_id" not in FALLBACK_DAY_CACHE[key].columns):
+                FALLBACK_DAY_CACHE.pop(key, None)
             if key not in FALLBACK_DAY_CACHE:
                 cached_file_df = load_df_from_file("fallback", key)
                 if cached_file_df is not None:
-                    FALLBACK_DAY_CACHE[key] = cached_file_df
+                    if "vendor_id" in cached_file_df.columns and "biker_id" in cached_file_df.columns:
+                        FALLBACK_DAY_CACHE[key] = cached_file_df
+                    else:
+                        try:
+                            from app.file_cache import _cache_filename, CACHE_DIR
+                            fn = _cache_filename("fallback", key)
+                            fp = os.path.join(CACHE_DIR, fn)
+                            if os.path.exists(fp):
+                                os.remove(fp)
+                        except Exception:
+                            pass
 
     missing_dates = [d for d in all_dates if (city_key, d) not in FALLBACK_DAY_CACHE]
 
@@ -89,8 +111,15 @@ def generate_fallback_orders(
             durations = rng.lognormal(mean=np.log(14.0 + slowdown), sigma=0.52, size=n)
             durations = np.clip(durations, 2.0, 180.0)
 
+            num_bikers = int(rng.integers(22, 38))
+            biker_ids = [1000 + int(rng.integers(0, num_bikers)) for _ in range(n)]
+            num_vendors = int(rng.integers(14, 26))
+            vendor_ids = [5000 + int(rng.integers(0, num_vendors)) for _ in range(n)]
+
             day_df = pd.DataFrame({
                 "order_id": [f"ORD-{city[:3].upper()}-{d_str.replace('-', '')}-{i}" for i in range(n)],
+                "vendor_id": vendor_ids,
+                "biker_id": biker_ids,
                 "source_latitude": np.round(s_lats, 6),
                 "source_longitude": np.round(s_lngs, 6),
                 "destination_latitude": np.round(d_lats, 6),
@@ -104,7 +133,7 @@ def generate_fallback_orders(
     # Assemble all requested dates from cache
     dfs = [FALLBACK_DAY_CACHE[(city_key, d)] for d in all_dates if (city_key, d) in FALLBACK_DAY_CACHE]
     full_df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(columns=[
-        "order_id", "source_latitude", "source_longitude",
+        "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
         "destination_latitude", "destination_longitude",
         "create_to_accept_contractual", "created_date"
     ])
@@ -238,7 +267,7 @@ def get_city_data(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/cache/clear")
+@app.api_route("/api/cache/clear", methods=["GET", "POST"])
 def clear_all_caches():
     """Clear both ClickHouse query cache, fallback cache, and disk file cache."""
     from app.data_source import clear_day_cache

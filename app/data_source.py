@@ -14,6 +14,7 @@ import pandas as pd
 
 from app.config import settings
 from app.cities import normalize_city_name
+from app.engine import compute_biker_active_vendors_avg
 from app.file_cache import save_df_to_file, load_df_from_file, clear_file_cache
 
 # Daily in-memory partition cache: (clean_city, status, customer_id, date_str) -> pd.DataFrame
@@ -78,7 +79,7 @@ def get_dates_between(start_date: str, end_date: str) -> List[str]:
 
 
 def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: int) -> List[Dict[str, Any]]:
-    """Compute daily HA30, orders, and duration statistics for each date in the period."""
+    """Compute daily HA30, orders, duration statistics, and avg active vendors per biker for each date."""
     if len(df) == 0:
         return []
 
@@ -98,12 +99,14 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
         ha30_count = int((v >= threshold).sum())
         pct = round(ha30_count / with_val * 100, 1) if with_val > 0 else 0.0
         mean = round(float(v.mean()), 1) if with_val > 0 else 0.0
+        avg_vendors = compute_biker_active_vendors_avg(g)
         agg_dict[d_key] = {
             "orders": total,
             "ha30_count": ha30_count,
             "with_value": with_val,
             "pct": pct,
             "mean": mean,
+            "avg_vendors_per_biker": avg_vendors,
         }
 
     for d_str in all_dates:
@@ -115,7 +118,14 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             day_name = ""
             short_label = d_str
 
-        info = agg_dict.get(d_str, {"orders": 0, "ha30_count": 0, "with_value": 0, "pct": 0.0, "mean": 0.0})
+        info = agg_dict.get(d_str, {
+            "orders": 0,
+            "ha30_count": 0,
+            "with_value": 0,
+            "pct": 0.0,
+            "mean": 0.0,
+            "avg_vendors_per_biker": 0.0,
+        })
         daily_stats.append({
             "date": d_str,
             "day_name": day_name,
@@ -124,6 +134,7 @@ def compute_daily_breakdown(df: pd.DataFrame, all_dates: List[str], threshold: i
             "ha30_count": info["ha30_count"],
             "pct": info["pct"],
             "mean": info["mean"],
+            "avg_vendors_per_biker": info.get("avg_vendors_per_biker", 0.0),
         })
 
     return daily_stats
@@ -160,14 +171,20 @@ def fetch_orders(
             DAY_CACHE.pop((clean_city, status, customer_id, d), None)
             QUERIED_DATES.discard((clean_city, status, customer_id, d))
     else:
-        # Check disk cache for any dates not in memory
+        # Check disk cache for any dates not in memory (must contain vendor_id and biker_id)
         for d in all_target_dates:
             key = (clean_city, status, customer_id, d)
-            if key not in DAY_CACHE:
+            if key in DAY_CACHE:
+                if len(DAY_CACHE[key]) > 0 and ("biker_id" not in DAY_CACHE[key].columns or "vendor_id" not in DAY_CACHE[key].columns):
+                    DAY_CACHE.pop(key, None)
+                    QUERIED_DATES.discard(key)
+            else:
                 cached_file_df = load_df_from_file("clickhouse", key)
                 if cached_file_df is not None:
                     DAY_CACHE[key] = cached_file_df
                     QUERIED_DATES.add(key)
+                else:
+                    QUERIED_DATES.discard(key)
 
     # Identify which of the requested dates do not have data in cache
     missing_dates = [
@@ -204,6 +221,8 @@ def fetch_orders(
         sql = f"""
 SELECT
     order_id,
+    vendor_id,
+    biker_id,
     source_latitude,
     source_longitude,
     destination_latitude,
@@ -232,11 +251,14 @@ LIMIT 1 BY order_id
             sql_fallback = f"""
 SELECT
     order_id,
+    vendor_id,
+    biker_id,
     source_latitude,
     source_longitude,
     destination_latitude,
     destination_longitude,
-    create_to_accept_contractual
+    create_to_accept_contractual,
+    created_date
 FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
@@ -267,7 +289,7 @@ LIMIT 1 BY order_id
         for d in missing_dates:
             if (clean_city, status, customer_id, d) not in DAY_CACHE:
                 empty_df = pd.DataFrame(columns=[
-                    "order_id", "source_latitude", "source_longitude",
+                    "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
                     "destination_latitude", "destination_longitude",
                     "create_to_accept_contractual", "created_date"
                 ])
@@ -295,7 +317,7 @@ LIMIT 1 BY order_id
         target_full_df = pd.concat(day_frames, ignore_index=True)
     else:
         target_full_df = pd.DataFrame(columns=[
-            "order_id", "source_latitude", "source_longitude",
+            "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
             "destination_latitude", "destination_longitude",
             "create_to_accept_contractual", "created_date"
         ])
@@ -322,6 +344,18 @@ def parse_csv_orders(csv_bytes: bytes) -> pd.DataFrame:
 
     if "order_id" not in df.columns:
         df["order_id"] = [f"CSV-{i}" for i in range(len(df))]
+
+    if "vendor_id" not in df.columns:
+        for alias in ["vendor", "store_id", "shop_id", "merchant_id"]:
+            if alias in df.columns:
+                df["vendor_id"] = df[alias]
+                break
+
+    if "biker_id" not in df.columns:
+        for alias in ["courier_id", "driver_id", "rider_id", "biker", "courier"]:
+            if alias in df.columns:
+                df["biker_id"] = df[alias]
+                break
 
     if "destination_latitude" not in df.columns:
         df["destination_latitude"] = df["source_latitude"]

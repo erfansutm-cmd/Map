@@ -44,6 +44,59 @@ def to_cell(lat: Any, lng: Any, res: int) -> Optional[str]:
     return h3.latlng_to_cell(lat, lng, res)
 
 
+def compute_biker_active_vendors_avg(df: pd.DataFrame) -> float:
+    """
+    Calculate average active vendors per biker:
+    1. Filter orders where biker_id and vendor_id are present and valid (not null, not 0, not empty).
+    2. For each biker, count the number of unique vendors they fulfilled orders for.
+    3. Compute and return the average across all active bikers, rounded to 1 decimal place.
+    """
+    if df is None or len(df) == 0:
+        return 0.0
+
+    biker_col = None
+    for c in df.columns:
+        if c.lower() in ("biker_id", "courier_id", "driver_id", "rider_id", "biker", "courier"):
+            biker_col = c
+            break
+
+    vendor_col = None
+    for c in df.columns:
+        if c.lower() in ("vendor_id", "vendor", "store_id", "shop_id", "merchant_id"):
+            vendor_col = c
+            break
+
+    if biker_col is None or vendor_col is None:
+        return 0.0
+
+    bikers = df[biker_col]
+    vendors = df[vendor_col]
+
+    b_series = pd.Series(bikers.values, index=df.index)
+    v_series = pd.Series(vendors.values, index=df.index)
+
+    b_str = b_series.astype(str).str.strip()
+    v_str = v_series.astype(str).str.strip()
+
+    invalid_biker = b_series.isna() | (b_str == "") | (b_str == "0") | (b_str == "0.0") | b_str.str.lower().isin(["nan", "none", "null"])
+    invalid_vendor = v_series.isna() | (v_str == "") | (v_str == "0") | (v_str == "0.0") | v_str.str.lower().isin(["nan", "none", "null"])
+
+    valid_mask = (~invalid_biker) & (~invalid_vendor)
+    if not valid_mask.any():
+        return 0.0
+
+    clean_df = pd.DataFrame({
+        "biker_id": b_str[valid_mask],
+        "vendor_id": v_str[valid_mask]
+    })
+
+    vendors_per_biker = clean_df.groupby("biker_id")["vendor_id"].nunique()
+    if len(vendors_per_biker) == 0:
+        return 0.0
+
+    return round(float(vendors_per_biker.mean()), 1)
+
+
 def prepare_base(df: pd.DataFrame, lat_col: str, lng_col: str, threshold: int, res_max: int = 10) -> pd.DataFrame:
     """Aggregate orders per finest-level hexagon (RES_MAX)."""
     d = df.copy()
@@ -368,6 +421,7 @@ def analyze_city_orders(
 
     center_lat = float(df["source_latitude"].mean()) if len(df) else 32.6546
     center_lng = float(df["source_longitude"].mean()) if len(df) else 51.6680
+    avg_vendors_per_biker = compute_biker_active_vendors_avg(df)
 
     return {
         "kpis": {
@@ -382,6 +436,7 @@ def analyze_city_orders(
             "sla_health": sla_health,
             "threshold": threshold,
             "min_orders": min_orders,
+            "avg_vendors_per_biker": avg_vendors_per_biker,
         },
         "center": [round(center_lat, 5), round(center_lng, 5)],
         "res_min": res_min,

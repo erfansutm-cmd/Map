@@ -35,8 +35,13 @@ def make_sample_orders_df(city: str = "isfahan", n_orders: int = 200) -> pd.Data
     dates = ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"]
     created_dates = np.random.choice(dates, size=n_orders)
 
+    vendor_ids = [5000 + (i % 8) for i in range(n_orders)]
+    biker_ids = [1000 + (i % 12) for i in range(n_orders)]
+
     return pd.DataFrame({
         "order_id": [f"ord_{i}" for i in range(n_orders)],
+        "vendor_id": vendor_ids,
+        "biker_id": biker_ids,
         "source_latitude": lats,
         "source_longitude": lngs,
         "destination_latitude": dest_lats,
@@ -105,6 +110,8 @@ class TestEngine(unittest.TestCase):
         self.assertIn("sla_health", kpis)
         self.assertIn("p50_duration", kpis)
         self.assertIn("p90_duration", kpis)
+        self.assertIn("avg_vendors_per_biker", kpis)
+        self.assertGreater(kpis["avg_vendors_per_biker"], 0)
 
         # Dual colors, City HA share, and HA30 fields on hexagons
         hexes = analysis["layers"]["source"]["res"]["7"]["hexes"]
@@ -176,6 +183,29 @@ class TestEngine(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             fetch_orders("isfahan", start_date="2026-09-15", end_date="2026-09-15")
         self.assertIn("ClickHouse", str(ctx.exception))
+
+    def test_biker_active_vendors_calculation(self):
+        from app.engine import compute_biker_active_vendors_avg
+        # 3 bikers, each visiting specific vendors:
+        # Biker 101 visits vendor 501, 502 (2 vendors)
+        # Biker 102 visits vendor 501 (1 vendor)
+        # Biker 103 visits vendor 503 (1 vendor)
+        # Biker 0 is filtered out
+        # Avg = (2 + 1 + 1) / 3 = 1.333... -> 1.3
+        df = pd.DataFrame({
+            "biker_id": [101, 101, 102, 102, 103, 0, None],
+            "vendor_id": [501, 502, 501, 501, 503, 501, 502]
+        })
+        res = compute_biker_active_vendors_avg(df)
+        self.assertEqual(res, 1.3)
+
+        # Check daily breakdown incorporates avg_vendors_per_biker
+        sample_df = make_sample_orders_df("isfahan", n_orders=100)
+        daily_stats = compute_daily_breakdown(sample_df, ["2026-10-22", "2026-10-23"], threshold=30)
+        self.assertEqual(len(daily_stats), 2)
+        for d in daily_stats:
+            self.assertIn("avg_vendors_per_biker", d)
+            self.assertGreater(d["avg_vendors_per_biker"], 0)
 
 
 if __name__ == "__main__":
