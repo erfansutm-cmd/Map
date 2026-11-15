@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.4.0">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.4.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -369,10 +369,10 @@
                 <span class="ctrl-card-title">Color Metric / Layer View</span>
               </div>
               <div class="color-metric-toggle">
-                <button id="btnMetricHa" class="color-metric-btn active" type="button" title="Cell local SLA breach percentage">HA30% Breach</button>
-                <button id="btnMetricMean" class="color-metric-btn" type="button" title="Mean accept duration in minutes">Mean (min)</button>
-                <button id="btnMetricShare" class="color-metric-btn" type="button" title="Percentage share of whole city's hyper act orders">HA Share</button>
-                <button id="btnMetricCorr" class="color-metric-btn" type="button" title="Correlation of 10-minute mean accept time series with neighboring cells">Neighbor Corr</button>
+                <button id="btnMetricHa" class="color-metric-btn active" type="button" title="Cell local SLA breach percentage (HA%)">HA%</button>
+                <button id="btnMetricMean" class="color-metric-btn" type="button" title="Mean accept duration in minutes">Mean</button>
+                <button id="btnMetricShare" class="color-metric-btn" type="button" title="Percentage share of whole city's hyper act orders">Share</button>
+                <button id="btnMetricCorr" class="color-metric-btn" type="button" title="Correlation of 10-minute mean accept time series with neighboring cells">Corr</button>
               </div>
 
               <div class="ctrl-card-header" style="margin-top:8px">
@@ -936,6 +936,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.4.0"></script>
+<script src="/static/js/app.js?v=2.4.1"></script>
 </body>
 </html>
