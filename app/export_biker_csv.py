@@ -75,6 +75,17 @@ def compute_biker_boundary_rides(
     if len(valid) == 0:
         return empty_df
 
+    # Strictly filter customer_id = 2 if customer_id column exists
+    cust_col = None
+    for c in df.columns:
+        if c.lower() in ("customer_id", "customer"):
+            cust_col = c
+            break
+    if cust_col is not None:
+        valid = valid[valid[cust_col].astype(str).str.strip() == "2"]
+    if len(valid) == 0:
+        return empty_df
+
     # Ensure biker_id is clean string or integer
     valid["biker_clean"] = valid[biker_col].astype(str).str.strip()
     valid = valid[valid["biker_clean"] != ""]

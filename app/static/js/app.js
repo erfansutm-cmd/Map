@@ -35,7 +35,7 @@ const state = {
   polygons: [],
   selectedHexes: new Map(),   // Multi-selected cells: hexId -> { h, polygon }
   singleSelectedHex: null,    // Single selected cell
-  outerBoundaryOnly: true,    // Render outer perimeter in black, hide internal dividing grid lines
+  showOuterBoundaryLayer: true, // Show dissolved black outer boundary layer
   outerBoundaryGeo: null,     // Dissolved outer boundary GeoJSON
   bikerExportToggle: 'less',  // 'less' or 'more' (default on less)
 };
@@ -336,13 +336,20 @@ function setupEventListeners() {
     });
   }
 
-  // Outer boundary only toggle
-  const checkOuter = document.getElementById('checkOuterBoundaryOnly');
+  // Outer boundary layer toggle (both merged panel & display tab)
+  const checkOuter = document.getElementById('checkOuterBoundaryLayer');
+  const checkOuterCtrl = document.getElementById('checkOuterBoundaryLayerCtrl');
+  function toggleOuterBoundary(show) {
+    state.showOuterBoundaryLayer = show;
+    if (checkOuter) checkOuter.checked = show;
+    if (checkOuterCtrl) checkOuterCtrl.checked = show;
+    updateMergedOuterBoundaryLayer();
+  }
   if (checkOuter) {
-    checkOuter.addEventListener('change', (e) => {
-      state.outerBoundaryOnly = e.target.checked;
-      updateMergedOuterBoundaryLayer();
-    });
+    checkOuter.addEventListener('change', (e) => toggleOuterBoundary(e.target.checked));
+  }
+  if (checkOuterCtrl) {
+    checkOuterCtrl.addEventListener('change', (e) => toggleOuterBoundary(e.target.checked));
   }
 
   // Calendar / Period Trigger & Popover
@@ -1990,14 +1997,13 @@ function renderMapHexagons() {
     const isVisible = passesMetric && (h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(h.hex);
     const fillColor = getHexFillColor(h);
-    const hidePerCell = isSelected && state.outerBoundaryOnly;
 
     const polygon = L.polygon(h.ring, {
-      color: isSelected ? (hidePerCell ? 'transparent' : '#06b6d4') : '#ffffff',
-      weight: isVisible ? (isSelected ? (hidePerCell ? 0 : 3.5) : 1.2) : 0,
+      color: isSelected ? '#06b6d4' : '#ffffff',
+      weight: isVisible ? (isSelected ? 2.5 : 1.2) : 0,
       fillColor: fillColor,
       fillOpacity: isVisible ? state.opacity : 0,
-      opacity: isVisible ? (hidePerCell ? 0 : 1) : 0,
+      opacity: isVisible ? 1 : 0,
       className: `h3-hex ${h.status}`,
       interactive: isVisible
     });
@@ -2017,11 +2023,10 @@ function renderMapHexagons() {
     polygon.on('mouseout', () => {
       const selected = state.selectedHexes.has(h.hex);
       const singleSel = state.singleSelectedHex && state.singleSelectedHex.hex === h.hex;
-      const hidePerCell = selected && state.outerBoundaryOnly;
       polygon.setStyle({
-        weight: selected ? (hidePerCell ? 0 : 3.5) : (singleSel ? 3.0 : 1.2),
-        color: selected ? (hidePerCell ? 'transparent' : '#06b6d4') : (singleSel ? '#2563eb' : '#ffffff'),
-        opacity: hidePerCell ? 0 : 1,
+        weight: selected ? 2.5 : (singleSel ? 3.0 : 1.2),
+        color: selected ? '#06b6d4' : (singleSel ? '#2563eb' : '#ffffff'),
+        opacity: 1,
       });
     });
 
@@ -2218,10 +2223,8 @@ function toggleMultiSelectHex(h, polygon) {
     polygon.setStyle({ weight: 1.2, color: '#ffffff', opacity: 1, fillOpacity: state.opacity });
   } else {
     state.selectedHexes.set(h.hex, { h, polygon });
-    if (!state.outerBoundaryOnly) {
-      polygon.setStyle({ weight: 3.5, color: '#06b6d4', opacity: 1 });
-      polygon.bringToFront();
-    }
+    polygon.setStyle({ weight: 2.5, color: '#06b6d4', opacity: 1, fillOpacity: state.opacity });
+    polygon.bringToFront();
   }
 
   renderMergedSelection();
@@ -2342,25 +2345,21 @@ function updateMergedOuterBoundaryLayer() {
     return;
   }
 
-  // Update styles of selected polygons: if outerBoundaryOnly is active, hide internal per-cell dividing borders
+  // Ensure all selected polygons in hexLayerGroup retain their per-cell selection borders
   state.selectedHexes.forEach(item => {
     if (item.polygon) {
-      if (state.outerBoundaryOnly) {
-        item.polygon.setStyle({
-          weight: 0,
-          opacity: 0,
-          fillOpacity: state.opacity,
-        });
-      } else {
-        item.polygon.setStyle({
-          weight: 3.5,
-          color: '#06b6d4',
-          opacity: 1,
-          fillOpacity: state.opacity,
-        });
-      }
+      item.polygon.setStyle({
+        weight: 2.5,
+        color: '#06b6d4',
+        opacity: 1,
+        fillOpacity: state.opacity,
+      });
     }
   });
+
+  if (!state.showOuterBoundaryLayer) {
+    return;
+  }
 
   const cellIds = Array.from(state.selectedHexes.keys());
 
@@ -2375,7 +2374,9 @@ function updateMergedOuterBoundaryLayer() {
   })
   .then(geo => {
     state.outerBoundaryGeo = geo;
-    renderOuterBoundaryGeo(geo);
+    if (state.showOuterBoundaryLayer) {
+      renderOuterBoundaryGeo(geo);
+    }
   })
   .catch(err => {
     console.warn('Outer boundary calculation error:', err);
@@ -2392,8 +2393,7 @@ function renderOuterBoundaryGeo(geo) {
       color: '#000000',
       weight: 3.5,
       opacity: 1,
-      fillColor: '#000000',
-      fillOpacity: 0.05,
+      fill: false,
       lineCap: 'round',
       lineJoin: 'round',
       interactive: false,
@@ -3029,7 +3029,7 @@ function filterHexagons() {
       item.polygon.setStyle({
         fillOpacity: state.opacity,
         opacity: 1,
-        weight: isSelected ? 3.5 : 1.2,
+        weight: isSelected ? 2.5 : 1.2,
         color: isSelected ? '#06b6d4' : '#ffffff'
       });
       const el = item.polygon.getElement();

@@ -204,6 +204,15 @@ class TestEngine(unittest.TestCase):
         res = compute_biker_active_vendors_avg(df)
         self.assertEqual(res, 1.3)
 
+        # Test customer_id filtering:
+        df_with_cust = pd.DataFrame({
+            "biker_id": [101, 101, 102],
+            "vendor_id": [501, 502, 501],
+            "customer_id": [2, 2, 1]  # Biker 102 has customer_id 1, must be excluded
+        })
+        res_cust = compute_biker_active_vendors_avg(df_with_cust)
+        self.assertEqual(res_cust, 2.0)
+
         # Check daily breakdown incorporates avg_vendors_per_biker
         sample_df = make_sample_orders_df("isfahan", n_orders=100)
         daily_stats = compute_daily_breakdown(sample_df, ["2026-10-22", "2026-10-23"], threshold=30)

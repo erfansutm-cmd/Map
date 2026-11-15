@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.5.4">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.5.5">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -483,6 +483,10 @@
                   <button id="btnLabelHaOnly" class="pill-item" type="button" title="Show only metric in cell views">HA% Only</button>
                   <button id="btnLabelOrdersOnly" class="pill-item" type="button" title="Show only orders count in cell views">Orders Only</button>
                 </div>
+                <label class="checkbox-label" style="margin-top:8px;margin-bottom:0" title="Render black outer boundary of selected cells as an independent layer">
+                  <input type="checkbox" id="checkOuterBoundaryLayerCtrl" checked style="accent-color:#000">
+                  <span style="font-weight:600">Outer Boundary Layer (Black)</span>
+                </label>
               </div>
 
               <!-- Basemap Style -->
@@ -624,11 +628,11 @@
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <span id="mergedDeltaBadge" style="font-size:11px;font-weight:700;color:#0e7490">+0.0% vs City</span>
-          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#0f172a;cursor:pointer" title="Only show outer black boundary, hide internal per-cell grid lines">
-            <input type="checkbox" id="checkOuterBoundaryOnly" checked style="accent-color:#000;cursor:pointer">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#0f172a;cursor:pointer" title="Toggle Black Outer Boundary overlay layer">
+            <input type="checkbox" id="checkOuterBoundaryLayer" checked style="accent-color:#000;cursor:pointer">
             <span style="display:inline-flex;align-items:center;gap:3px">
               <span style="display:inline-block;width:7px;height:7px;border-radius:1px;background:#000"></span>
-              Black Outer Boundary
+              Outer Boundary Layer
             </span>
           </label>
         </div>
@@ -1030,6 +1034,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.5.4"></script>
+<script src="/static/js/app.js?v=2.5.5"></script>
 </body>
 </html>

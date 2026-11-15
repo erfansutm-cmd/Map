@@ -101,6 +101,27 @@ class TestBikerCsvExport(unittest.TestCase):
         })
         self.assertEqual(res.status_code, 400)
 
+    def test_customer_id_filtering_in_boundary_rides(self):
+        # Create df where B101 has orders under customer_id 2 and customer_id 1
+        mixed_df = pd.DataFrame({
+            "order_id": ["o1", "o2", "o3", "o4"],
+            "biker_id": ["B201", "B201", "B201", "B201"],
+            "customer_id": [2, 2, 1, 1],
+            "source_latitude": [32.65, 32.65, 32.65, 32.65],
+            "source_longitude": [51.66, 51.66, 51.66, 51.66],
+        })
+        res = compute_biker_boundary_rides(
+            mixed_df,
+            cells=[self.cell_a],
+            min_rides=1,
+            toggle="more",
+            percentage=0.0
+        )
+        self.assertEqual(len(res), 1)
+        # B201 should only have 2 rides counted (the ones with customer_id=2)
+        self.assertEqual(res.iloc[0]["total_rides_in_period"], 2)
+        self.assertEqual(res.iloc[0]["total_rides_in_boundary"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

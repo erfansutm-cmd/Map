@@ -58,6 +58,10 @@ def load_df_from_file(namespace: str, key_tuple: Tuple) -> Optional[pd.DataFrame
                     except Exception:
                         pass
                     return None
+                if "customer_id" not in df.columns:
+                    df["customer_id"] = 2
+                else:
+                    df = df[df["customer_id"].astype(str).str.strip() == "2"].copy()
             return df
     except Exception:
         pass

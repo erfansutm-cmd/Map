@@ -82,6 +82,17 @@ def compute_biker_active_vendors_avg(df: pd.DataFrame) -> float:
     invalid_vendor = v_series.isna() | (v_str == "") | (v_str == "0") | (v_str == "0.0") | v_str.str.lower().isin(["nan", "none", "null"])
 
     valid_mask = (~invalid_biker) & (~invalid_vendor)
+
+    # Strictly filter customer_id = 2 if customer_id column is present
+    cust_col = None
+    for c in df.columns:
+        if c.lower() in ("customer_id", "customer"):
+            cust_col = c
+            break
+    if cust_col is not None:
+        c_str = df[cust_col].astype(str).str.strip()
+        valid_mask = valid_mask & (c_str == "2")
+
     if not valid_mask.any():
         return 0.0
 

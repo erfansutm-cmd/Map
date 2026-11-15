@@ -256,6 +256,7 @@ SELECT
     order_id,
     vendor_id,
     biker_id,
+    customer_id,
     source_latitude,
     source_longitude,
     destination_latitude,
@@ -289,6 +290,7 @@ SELECT
     order_id,
     vendor_id,
     biker_id,
+    customer_id,
     source_latitude,
     source_longitude,
     destination_latitude,
@@ -315,6 +317,13 @@ LIMIT 1 BY order_id
             if len(raw_df) > 0 and "created_date" not in raw_df.columns:
                 raw_df["created_date"] = max_d
 
+        # Ensure customer_id column exists and is strictly filtered
+        if len(raw_df) > 0:
+            if "customer_id" in raw_df.columns:
+                raw_df = raw_df[raw_df["customer_id"].astype(str).str.strip() == str(customer_id)].copy()
+            else:
+                raw_df["customer_id"] = customer_id
+
         # Ensure final_biker_fare and incentive columns exist in raw_df
         if len(raw_df) > 0:
             if "final_biker_fare" not in raw_df.columns:
@@ -335,7 +344,7 @@ LIMIT 1 BY order_id
         for d in missing_dates:
             if (clean_city, status, customer_id, d) not in DAY_CACHE:
                 empty_df = pd.DataFrame(columns=[
-                    "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
+                    "order_id", "vendor_id", "biker_id", "customer_id", "source_latitude", "source_longitude",
                     "destination_latitude", "destination_longitude",
                     "create_to_accept_contractual", "created_date", "created_at",
                     "final_biker_fare", "incentive"
@@ -364,7 +373,7 @@ LIMIT 1 BY order_id
         target_full_df = pd.concat(day_frames, ignore_index=True)
     else:
         target_full_df = pd.DataFrame(columns=[
-            "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
+            "order_id", "vendor_id", "biker_id", "customer_id", "source_latitude", "source_longitude",
             "destination_latitude", "destination_longitude",
             "create_to_accept_contractual", "created_date", "created_at",
             "final_biker_fare", "incentive"
@@ -450,6 +459,11 @@ def parse_csv_orders(csv_bytes: bytes) -> pd.DataFrame:
                 break
         if "incentive" not in df.columns:
             df["incentive"] = 0.0
+
+    if "customer_id" in df.columns:
+        df = df[df["customer_id"].astype(str).str.strip() == "2"].copy()
+    else:
+        df["customer_id"] = 2
 
     df["final_biker_fare"] = pd.to_numeric(df["final_biker_fare"], errors="coerce").fillna(0.0)
     df["incentive"] = pd.to_numeric(df["incentive"], errors="coerce").fillna(0.0)

@@ -133,6 +133,7 @@ def generate_fallback_orders(
                 "order_id": [f"ORD-{city[:3].upper()}-{d_str.replace('-', '')}-{i}" for i in range(n)],
                 "vendor_id": vendor_ids,
                 "biker_id": biker_ids,
+                "customer_id": [2] * n,
                 "source_latitude": np.round(s_lats, 6),
                 "source_longitude": np.round(s_lngs, 6),
                 "destination_latitude": np.round(d_lats, 6),
@@ -149,7 +150,7 @@ def generate_fallback_orders(
     # Assemble all requested dates from cache
     dfs = [FALLBACK_DAY_CACHE[(city_key, d)] for d in all_dates if (city_key, d) in FALLBACK_DAY_CACHE]
     full_df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(columns=[
-        "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
+        "order_id", "vendor_id", "biker_id", "customer_id", "source_latitude", "source_longitude",
         "destination_latitude", "destination_longitude",
         "create_to_accept_contractual", "created_date", "created_at",
         "final_biker_fare", "incentive"
