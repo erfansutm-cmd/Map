@@ -35,6 +35,8 @@ const state = {
   polygons: [],
   selectedHexes: new Map(),   // Multi-selected cells: hexId -> { h, polygon }
   singleSelectedHex: null,    // Single selected cell
+  outerBoundaryOnly: true,    // Render outer perimeter in black, hide internal dividing grid lines
+  outerBoundaryGeo: null,     // Dissolved outer boundary GeoJSON
 };
 
 // Helpers for Currency & Fare Formatting
@@ -81,6 +83,7 @@ const BASEMAP_PROVIDERS = {
 let map;
 let tileLayer;
 let hexLayerGroup;
+let outerBoundaryLayerGroup;
 let labelLayerGroup;
 
 function createTileLayer(type) {
@@ -139,6 +142,7 @@ function initMap() {
   tileLayer = createTileLayer(state.activeBasemap).addTo(map);
 
   hexLayerGroup = L.layerGroup().addTo(map);
+  outerBoundaryLayerGroup = L.layerGroup().addTo(map);
   labelLayerGroup = L.layerGroup().addTo(map);
 
   map.on('zoomend', () => {
@@ -249,7 +253,8 @@ function setupEventListeners() {
     ['input', 'change'].forEach(evt => {
       numBreach.addEventListener(evt, (e) => {
         let val = parseFloat(e.target.value) || 0;
-        const maxVal = parseFloat(sliderBreach?.dataset.dataMax || sliderBreach?.max) || 100;
+        const isHa = state.colorMetric === 'ha';
+        const maxVal = isHa ? 5 : (parseFloat(sliderBreach?.dataset.dataMax || sliderBreach?.max) || 100);
         val = Math.max(0, Math.min(val, maxVal));
         if (state.colorMetric === 'ha') {
           state.minBreachFilter = val;
@@ -327,6 +332,15 @@ function setupEventListeners() {
   if (checkMulti) {
     checkMulti.addEventListener('change', (e) => {
       state.multiSelectMode = e.target.checked;
+    });
+  }
+
+  // Outer boundary only toggle
+  const checkOuter = document.getElementById('checkOuterBoundaryOnly');
+  if (checkOuter) {
+    checkOuter.addEventListener('change', (e) => {
+      state.outerBoundaryOnly = e.target.checked;
+      updateMergedOuterBoundaryLayer();
     });
   }
 
@@ -1563,16 +1577,14 @@ function resizeFilterSliders() {
   const breachSlider = document.getElementById('sliderBreachFilter');
   if (breachSlider) {
     if (isHa) {
-      const ceilSla = Math.ceil(maxSla);
-      const sliderMax = Math.max(ceilSla, 10);
       breachSlider.min = 0;
-      breachSlider.max = sliderMax;
-      breachSlider.step = sliderMax > 25 ? 1 : 0.5;
-      if (state.minBreachFilter > sliderMax) {
+      breachSlider.max = 5;
+      breachSlider.step = 0.1;
+      if (state.minBreachFilter > 5) {
         state.minBreachFilter = 0;
       }
       breachSlider.value = state.minBreachFilter;
-      breachSlider.dataset.dataMax = ceilSla;
+      breachSlider.dataset.dataMax = '5';
     } else if (isMean) {
       const ceilMean = Math.ceil(maxMean);
       const sliderMax = Math.max(ceilMean, 10);
@@ -1667,9 +1679,9 @@ function updateFilterLabels() {
 
       breachNum.value = curVal;
       breachNum.max = maxVal;
-      breachNum.step = isFare ? '1000' : (isShare ? '0.1' : (isMean ? '0.5' : '1'));
+      breachNum.step = isFare ? '1000' : (isShare ? '0.1' : (isMean ? '0.5' : (isHa ? '0.1' : '1')));
       breachNum.title = isHa
-        ? 'Type minimum SLA breach percentage'
+        ? 'Type minimum SLA breach percentage (0 to 5%)'
         : (isMean ? 'Type minimum mean accept duration in minutes' : (isFare ? 'Type minimum average biker fare in Toman' : 'Type minimum citywide HA share percentage'));
     }
   }
@@ -1937,13 +1949,14 @@ function renderMapHexagons() {
     const isVisible = passesMetric && (h.orders >= state.minOrdersFilter);
     const isSelected = state.selectedHexes.has(h.hex);
     const fillColor = getHexFillColor(h);
+    const hidePerCell = isSelected && state.outerBoundaryOnly;
 
     const polygon = L.polygon(h.ring, {
-      color: isSelected ? '#06b6d4' : '#ffffff',
-      weight: isVisible ? (isSelected ? 3.5 : 1.2) : 0,
+      color: isSelected ? (hidePerCell ? 'transparent' : '#06b6d4') : '#ffffff',
+      weight: isVisible ? (isSelected ? (hidePerCell ? 0 : 3.5) : 1.2) : 0,
       fillColor: fillColor,
       fillOpacity: isVisible ? state.opacity : 0,
-      opacity: isVisible ? 1 : 0,
+      opacity: isVisible ? (hidePerCell ? 0 : 1) : 0,
       className: `h3-hex ${h.status}`,
       interactive: isVisible
     });
@@ -1963,9 +1976,11 @@ function renderMapHexagons() {
     polygon.on('mouseout', () => {
       const selected = state.selectedHexes.has(h.hex);
       const singleSel = state.singleSelectedHex && state.singleSelectedHex.hex === h.hex;
+      const hidePerCell = selected && state.outerBoundaryOnly;
       polygon.setStyle({
-        weight: selected ? 3.5 : (singleSel ? 3.0 : 1.2),
-        color: selected ? '#06b6d4' : (singleSel ? '#2563eb' : '#ffffff')
+        weight: selected ? (hidePerCell ? 0 : 3.5) : (singleSel ? 3.0 : 1.2),
+        color: selected ? (hidePerCell ? 'transparent' : '#06b6d4') : (singleSel ? '#2563eb' : '#ffffff'),
+        opacity: hidePerCell ? 0 : 1,
       });
     });
 
@@ -2159,11 +2174,13 @@ function toggleMultiSelectHex(h, polygon) {
 
   if (state.selectedHexes.has(h.hex)) {
     state.selectedHexes.delete(h.hex);
-    polygon.setStyle({ weight: 1.2, color: '#ffffff' });
+    polygon.setStyle({ weight: 1.2, color: '#ffffff', opacity: 1, fillOpacity: state.opacity });
   } else {
     state.selectedHexes.set(h.hex, { h, polygon });
-    polygon.setStyle({ weight: 3.5, color: '#06b6d4' });
-    polygon.bringToFront();
+    if (!state.outerBoundaryOnly) {
+      polygon.setStyle({ weight: 3.5, color: '#06b6d4', opacity: 1 });
+      polygon.bringToFront();
+    }
   }
 
   renderMergedSelection();
@@ -2177,6 +2194,8 @@ function renderMergedSelection() {
   if (state.selectedHexes.size === 0) {
     panel.classList.remove('active');
     if (ctrlKml) ctrlKml.style.display = 'none';
+    if (outerBoundaryLayerGroup) outerBoundaryLayerGroup.clearLayers();
+    state.outerBoundaryGeo = null;
     return;
   }
 
@@ -2260,13 +2279,83 @@ function renderMergedSelection() {
   const mergedIncEl = document.getElementById('mergedIncentiveVal');
   if (mergedIncEl) mergedIncEl.textContent = `+${formatFareFull(weightedInc)} inc`;
 
+  updateMergedOuterBoundaryLayer();
   panel.classList.add('active');
+}
+
+function updateMergedOuterBoundaryLayer() {
+  if (!outerBoundaryLayerGroup) return;
+  outerBoundaryLayerGroup.clearLayers();
+
+  if (state.selectedHexes.size === 0) {
+    state.outerBoundaryGeo = null;
+    return;
+  }
+
+  // Update styles of selected polygons: if outerBoundaryOnly is active, hide internal per-cell dividing borders
+  state.selectedHexes.forEach(item => {
+    if (item.polygon) {
+      if (state.outerBoundaryOnly) {
+        item.polygon.setStyle({
+          weight: 0,
+          opacity: 0,
+          fillOpacity: state.opacity,
+        });
+      } else {
+        item.polygon.setStyle({
+          weight: 3.5,
+          color: '#06b6d4',
+          opacity: 1,
+          fillOpacity: state.opacity,
+        });
+      }
+    }
+  });
+
+  const cellIds = Array.from(state.selectedHexes.keys());
+
+  fetch('/api/cells/outer-boundary', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cells: cellIds })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Failed to compute outer boundary');
+    return res.json();
+  })
+  .then(geo => {
+    state.outerBoundaryGeo = geo;
+    renderOuterBoundaryGeo(geo);
+  })
+  .catch(err => {
+    console.warn('Outer boundary calculation error:', err);
+  });
+}
+
+function renderOuterBoundaryGeo(geo) {
+  if (!outerBoundaryLayerGroup) return;
+  outerBoundaryLayerGroup.clearLayers();
+  if (!geo || !geo.coordinates || geo.coordinates.length === 0) return;
+
+  const boundaryLayer = L.geoJSON(geo, {
+    style: {
+      color: '#000000',
+      weight: 3.5,
+      opacity: 1,
+      fillColor: '#000000',
+      fillOpacity: 0.05,
+      lineCap: 'round',
+      lineJoin: 'round',
+      interactive: false,
+    }
+  });
+  outerBoundaryLayerGroup.addLayer(boundaryLayer);
 }
 
 window.removeSingleSelectedHex = function(hexId) {
   const item = state.selectedHexes.get(hexId);
   if (item && item.polygon) {
-    item.polygon.setStyle({ weight: 1.2, color: '#ffffff' });
+    item.polygon.setStyle({ weight: 1.2, color: '#ffffff', opacity: 1, fillOpacity: state.opacity });
   }
   state.selectedHexes.delete(hexId);
   renderMergedSelection();
@@ -2275,10 +2364,12 @@ window.removeSingleSelectedHex = function(hexId) {
 function clearHexSelection() {
   state.selectedHexes.forEach(item => {
     if (item.polygon) {
-      item.polygon.setStyle({ weight: 1.2, color: '#ffffff' });
+      item.polygon.setStyle({ weight: 1.2, color: '#ffffff', opacity: 1, fillOpacity: state.opacity });
     }
   });
   state.selectedHexes.clear();
+  if (outerBoundaryLayerGroup) outerBoundaryLayerGroup.clearLayers();
+  state.outerBoundaryGeo = null;
   document.getElementById('mergedSelectionPanel').classList.remove('active');
 
   const ctrlKml = document.getElementById('multiSelectControlsKml');
@@ -2291,8 +2382,8 @@ function zoomToSelection() {
   map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
 }
 
-// Export Selected Cell Boundaries as KML
-function exportSelectedCellsKml() {
+// Export Selected Cell Boundaries as KML (Outer boundaries in solid black)
+async function exportSelectedCellsKml() {
   let hexItems = [];
   if (state.selectedHexes && state.selectedHexes.size > 0) {
     hexItems = Array.from(state.selectedHexes.values());
@@ -2307,12 +2398,138 @@ function exportSelectedCellsKml() {
 
   const cityName = state.city ? state.city.toLowerCase() : 'fleet';
   const count = hexItems.length;
-  const filename = `${cityName}_${count}_cells_boundaries.kml`;
-  const docTitle = `${state.city || 'Fleet'} Selected Cell Boundaries (${count} cell${count > 1 ? 's' : ''})`;
+  const filename = `${cityName}_${count}_cells_outer_boundary.kml`;
+  const docTitle = `${state.city ? state.city.toUpperCase() : 'Fleet'} Merged Region Outer Boundary (${count} cell${count > 1 ? 's' : ''})`;
 
-  const kmlContent = generateKmlForHexes(hexItems, docTitle);
-  downloadKmlFile(kmlContent, filename);
-  showKmlToast(`Exported ${count} cell boundar${count > 1 ? 'ies' : 'y'} as KML (${filename})`);
+  try {
+    const res = await fetch('/api/export-kml', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cells: hexItems.map(item => item.h),
+        filename: filename,
+        mode: 'outer'
+      })
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      downloadKmlBlob(blob, filename);
+      showKmlToast(`Exported outer boundary of ${count} cell${count > 1 ? 's' : ''} as KML (${filename})`);
+      return;
+    }
+  } catch (err) {
+    console.warn('API KML export failed, using client fallback:', err);
+  }
+
+  // Client-side fallback if network error
+  if (state.outerBoundaryGeo) {
+    const kmlContent = generateKmlForOuterGeo(state.outerBoundaryGeo, docTitle, hexItems);
+    downloadKmlFile(kmlContent, filename);
+    showKmlToast(`Exported outer boundary of ${count} cell${count > 1 ? 's' : ''} as KML (${filename})`);
+  } else {
+    const kmlContent = generateKmlForHexes(hexItems, docTitle);
+    downloadKmlFile(kmlContent, filename);
+    showKmlToast(`Exported ${count} cell boundary as KML (${filename})`);
+  }
+}
+
+function generateKmlForOuterGeo(geo, docTitle, hexItems) {
+  const geomType = geo.type;
+  const coords = geo.coordinates || [];
+  const polyList = geomType === 'Polygon' ? [coords] : (geomType === 'MultiPolygon' ? coords : []);
+
+  let totalOrders = 0;
+  let totalSlow = 0;
+  let vsum = 0;
+  hexItems.forEach(item => {
+    const h = item.h || item;
+    totalOrders += h.orders || 0;
+    totalSlow += (h.ha30_count != null ? h.ha30_count : h.slow) || 0;
+    vsum += (h.mean || 0) * (h.orders || 0);
+  });
+  const haPct = totalOrders > 0 ? (totalSlow / totalOrders * 100) : 0;
+  const meanDur = totalOrders > 0 ? (vsum / totalOrders) : 0;
+
+  const polygonsXml = polyList.map(poly => {
+    if (!poly || poly.length === 0) return '';
+    const outer = poly[0];
+    const coordPairs = outer.map(pt => `${Number(pt[0]).toFixed(6)},${Number(pt[1]).toFixed(6)},0`);
+    if (coordPairs.length > 0 && coordPairs[0] !== coordPairs[coordPairs.length - 1]) {
+      coordPairs.push(coordPairs[0]);
+    }
+    const outerStr = coordPairs.join(' ');
+
+    const holesXml = poly.slice(1).map(inner => {
+      const innerPairs = inner.map(pt => `${Number(pt[0]).toFixed(6)},${Number(pt[1]).toFixed(6)},0`);
+      if (innerPairs.length > 0 && innerPairs[0] !== innerPairs[innerPairs.length - 1]) {
+        innerPairs.push(innerPairs[0]);
+      }
+      return `        <innerBoundaryIs>
+          <LinearRing>
+            <coordinates>${innerPairs.join(' ')}</coordinates>
+          </LinearRing>
+        </innerBoundaryIs>`;
+    }).join('\n');
+
+    return `      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>${outerStr}</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+${holesXml}
+      </Polygon>`;
+  }).filter(Boolean).join('\n');
+
+  const geomXml = polyList.length === 1 ? polygonsXml : `      <MultiGeometry>\n${polygonsXml}\n      </MultiGeometry>`;
+
+  const descHtml = `<![CDATA[
+<div style="font-family:sans-serif;font-size:12px;line-height:1.5;">
+  <h4 style="margin:0 0 6px 0;color:#000000;">Merged Region Outer Boundary (${hexItems.length} Cells)</h4>
+  <table style="border-collapse:collapse;width:100%;font-size:12px;">
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Combined HA30% Breach:</b></td><td style="padding:2px 0;font-weight:700;color:${haPct > 25 ? '#dc2626' : '#16a34a'};">${haPct.toFixed(1)}%</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Total Orders:</b></td><td style="padding:2px 0;font-weight:700;">${totalOrders.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>HA30 Orders Count:</b></td><td style="padding:2px 0;">${totalSlow.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Weighted Mean Duration:</b></td><td style="padding:2px 0;">${meanDur.toFixed(1)} min</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Cell Count:</b></td><td style="padding:2px 0;">${hexItems.length}</td></tr>
+  </table>
+</div>
+]]>`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(docTitle || 'Selected Region Outer Boundary')}</name>
+    <description>Black outer boundaries of selected H3 cells exported from Fleet HexMap</description>
+    <Style id="blackOuterBoundary">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>3.0</width>
+      </LineStyle>
+      <PolyStyle>
+        <fill>0</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>${escapeXml(docTitle || 'Selected Region Outer Boundary')}</name>
+      <description>${descHtml}</description>
+      <styleUrl>#blackOuterBoundary</styleUrl>
+${geomXml}
+    </Placemark>
+  </Document>
+</kml>`;
+}
+
+function downloadKmlBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'selected_cells_outer_boundary.kml';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function generateKmlForHexes(hexItems, docTitle) {

@@ -6,6 +6,7 @@ Supports single-execution query caching, day-level filtering, and API key tile c
 import math
 import os
 from typing import Optional, List, Dict, Any, Tuple
+import h3
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, Request, Query, UploadFile, File, HTTPException
@@ -18,7 +19,7 @@ from app.cities import get_popular_cities, get_city_info
 from app.data_source import fetch_orders, parse_csv_orders, get_dates_between, compute_daily_breakdown
 from app.engine import analyze_city_orders
 from app.export_html import build_standalone_html
-from app.export_kml import build_kml_boundaries
+from app.export_kml import build_kml_boundaries, build_kml_outer_boundary
 from app.file_cache import save_df_to_file, load_df_from_file, clear_file_cache
 
 app = FastAPI(
@@ -353,13 +354,18 @@ def export_html(
 def export_kml_get(
     cells: str = Query(default="", description="Comma-separated list of H3 cell IDs"),
     filename: Optional[str] = Query(default=None, description="Custom filename for KML export"),
+    mode: str = Query(default="individual", description="Export mode: 'outer' for dissolved black outer boundary, 'individual' for per-cell"),
 ):
     """Export boundaries of selected H3 cells as an OGC KML 2.2 file."""
     cell_list = [c.strip() for c in cells.split(",") if c.strip()]
     if not cell_list:
         raise HTTPException(status_code=400, detail="No cell IDs provided")
 
-    kml_content = build_kml_boundaries(cell_list)
+    if mode == "outer":
+        kml_content = build_kml_outer_boundary(cell_list)
+    else:
+        kml_content = build_kml_boundaries(cell_list)
+
     out_filename = filename or f"selected_{len(cell_list)}_cells_boundaries.kml"
     if not out_filename.endswith(".kml"):
         out_filename += ".kml"
@@ -375,6 +381,7 @@ def export_kml_get(
 def export_kml_post(payload: Dict[str, Any]):
     """Export boundaries of selected H3 cells as an OGC KML 2.2 file (POST with JSON)."""
     raw_cells = payload.get("cells", [])
+    mode = str(payload.get("mode") or "").strip().lower()
     if isinstance(raw_cells, str):
         cell_list = [c.strip() for c in raw_cells.split(",") if c.strip()]
     elif isinstance(raw_cells, list):
@@ -390,7 +397,11 @@ def export_kml_post(payload: Dict[str, Any]):
     if not cell_list:
         raise HTTPException(status_code=400, detail="No cell IDs provided")
 
-    kml_content = build_kml_boundaries(cell_list)
+    if mode == "outer":
+        kml_content = build_kml_outer_boundary(cell_list)
+    else:
+        kml_content = build_kml_boundaries(cell_list)
+
     out_filename = payload.get("filename") or f"selected_{len(cell_list)}_cells_boundaries.kml"
     if not out_filename.endswith(".kml"):
         out_filename += ".kml"
@@ -400,6 +411,34 @@ def export_kml_post(payload: Dict[str, Any]):
         media_type="application/vnd.google-earth.kml+xml; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{out_filename}"'},
     )
+
+
+@app.post("/api/cells/outer-boundary")
+def get_cells_outer_boundary(payload: Dict[str, Any]):
+    """Compute dissolved outer boundary GeoJSON Polygon/MultiPolygon for given H3 cell IDs."""
+    raw_cells = payload.get("cells", [])
+    if isinstance(raw_cells, str):
+        cell_ids = [c.strip().lower() for c in raw_cells.split(",") if c.strip()]
+    elif isinstance(raw_cells, list):
+        cell_ids = []
+        for c in raw_cells:
+            if isinstance(c, dict):
+                h = str(c.get("hex") or "").strip().lower()
+                if h:
+                    cell_ids.append(h)
+            elif str(c).strip():
+                cell_ids.append(str(c).strip().lower())
+    else:
+        cell_ids = []
+
+    if not cell_ids:
+        return {"type": "Polygon", "coordinates": []}
+
+    try:
+        geo = h3.cells_to_geo(cell_ids)
+        return geo
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/upload-csv")

@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.5.2">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.5.3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -419,16 +419,16 @@
                 <div class="filter-card-header">
                   <span class="filter-title" id="titleMetricFilter">Min SLA Breach Filter</span>
                   <div class="filter-val-badge">
-                    <input type="number" id="numBreachFilter" class="filter-num-input" min="0" max="100" step="1" value="0" title="Type minimum value">
+                    <input type="number" id="numBreachFilter" class="filter-num-input" min="0" max="5" step="0.1" value="0" title="Type minimum value (0 to 5%)">
                     <span id="unitBreachFilter" class="filter-unit-tag">%</span>
                   </div>
                 </div>
                 <div class="filter-slider-container">
-                  <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="100" step="1" value="0">
+                  <input type="range" id="sliderBreachFilter" class="range-slider" min="0" max="5" step="0.1" value="0">
                 </div>
                 <div class="filter-scale-footer">
                   <span id="minScaleMetricFilter">0%</span>
-                  <span id="valBreachFilter">max: 100%</span>
+                  <span id="valBreachFilter">max: 5%</span>
                 </div>
               </div>
 
@@ -502,13 +502,13 @@
                   <span>Multi-Select Cells (or hold <kbd style="background:#e2e8f0;padding:1px 4px;border-radius:3px">Shift</kbd>)</span>
                 </label>
                 <div id="multiSelectControlsKml" style="display:none;margin-top:6px">
-                  <button id="btnExportKmlFromControls" class="btn-action btn-kml-export" style="width:100%;background:#059669;color:#fff;border-color:#047857;font-weight:600;justify-content:center;padding:5px 8px;font-size:11px" title="Output selected cells boundaries as KML file" type="button">
+                  <button id="btnExportKmlFromControls" class="btn-action btn-kml-export" style="width:100%;background:#000000;color:#fff;border-color:#000000;font-weight:600;justify-content:center;padding:5px 8px;font-size:11px" title="Output selected cells outer boundary as KML file" type="button">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:4px">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                       <polyline points="7 10 12 15 17 10"></polyline>
                       <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
-                    Output KML (<span id="multiKmlCountText">0</span> Selected)
+                    Output Outer Boundary KML (<span id="multiKmlCountText">0</span> Selected)
                   </button>
                 </div>
               </div>
@@ -624,6 +624,13 @@
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <span id="mergedDeltaBadge" style="font-size:11px;font-weight:700;color:#0e7490">+0.0% vs City</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#0f172a;cursor:pointer" title="Only show outer black boundary, hide internal per-cell grid lines">
+            <input type="checkbox" id="checkOuterBoundaryOnly" checked style="accent-color:#000;cursor:pointer">
+            <span style="display:inline-flex;align-items:center;gap:3px">
+              <span style="display:inline-block;width:7px;height:7px;border-radius:1px;background:#000"></span>
+              Black Outer Boundary
+            </span>
+          </label>
         </div>
 
         <div class="stat-grid">
@@ -670,13 +677,13 @@
         <div id="mergedCellsList" class="merged-cells-chips"></div>
 
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
-          <button id="btnExportKmlSelection" class="btn-action btn-kml-export" style="width:100%;background:#059669;color:#fff;border-color:#047857;font-weight:700;justify-content:center;padding:7px 10px;font-size:12px" title="Output selected cells boundaries as KML file">
+          <button id="btnExportKmlSelection" class="btn-action btn-kml-export" style="width:100%;background:#000000;color:#fff;border-color:#000000;font-weight:700;justify-content:center;padding:7px 10px;font-size:12px" title="Output selected cells outer boundary as KML file">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Output as KML (Boundaries)
+            Output Outer Boundary KML
           </button>
           <div style="display:flex;gap:6px">
             <button id="btnClearSelection" class="btn-action" style="flex:1;background:#f1f5f9;color:#334155;border-color:#cbd5e1;justify-content:center">Clear Selection</button>
@@ -958,6 +965,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.5.2"></script>
+<script src="/static/js/app.js?v=2.5.3"></script>
 </body>
 </html>

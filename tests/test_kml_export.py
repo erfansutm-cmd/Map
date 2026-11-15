@@ -95,6 +95,42 @@ class TestKmlExport(unittest.TestCase):
         res = self.client.get("/api/export-kml?cells=")
         self.assertEqual(res.status_code, 400)
 
+    def test_build_kml_outer_boundary_black_style(self):
+        from app.export_kml import build_kml_outer_boundary
+        cells_with_stats = [
+            {"hex": "881f18b321fffff", "pct": 28.5, "orders": 1000, "slow": 285, "mean": 21.4},
+            {"hex": "881f18b323fffff", "pct": 14.2, "orders": 500, "slow": 71, "mean": 17.8},
+        ]
+        kml = build_kml_outer_boundary(cells_with_stats, "Merged Zone")
+        root = ET.fromstring(kml)
+        ns = {"kml": "http://www.opengis.net/kml/2.2"}
+
+        # Verify single merged placemark (no per-cell view)
+        placemarks = root.findall(".//kml:Placemark", ns)
+        self.assertEqual(len(placemarks), 1)
+
+        # Verify black color styling
+        style = root.find(".//kml:Style[@id='blackOuterBoundary']", ns)
+        self.assertIsNotNone(style)
+        line_color = style.find(".//kml:LineStyle/kml:color", ns)
+        self.assertEqual(line_color.text, "ff000000")
+
+    def test_api_cells_outer_boundary_endpoint(self):
+        res = self.client.post("/api/cells/outer-boundary", json={"cells": self.sample_cells})
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn(data["type"], ["Polygon", "MultiPolygon"])
+        self.assertTrue(len(data["coordinates"]) > 0)
+
+    def test_api_export_kml_outer_mode(self):
+        res = self.client.post(
+            "/api/export-kml",
+            json={"cells": self.sample_cells, "filename": "merged_zone.kml", "mode": "outer"}
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("ff000000", res.text)
+        self.assertIn("Merged Region Outer Boundary", res.text)
+
 
 if __name__ == "__main__":
     unittest.main()
