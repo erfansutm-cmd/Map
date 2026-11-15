@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.2.1">
+  <link rel="stylesheet" href="/static/css/app.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -806,13 +806,9 @@
         <div class="stat-box-label">Total Delivered Orders</div>
         <div id="modalCityTotalOrders" class="stat-box-val" style="font-size:20px">0</div>
       </div>
-      <div class="stat-box">
-        <div class="stat-box-label">HA30 Orders Count (&ge; 30 min)</div>
+      <div class="stat-box" style="grid-column: span 2">
+        <div class="stat-box-label">HA30 Orders Count (create to accept time &ge; 30 min)</div>
         <div id="modalCitySlowOrders" class="stat-box-val" style="color:#dc2626">0</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-box-label">Avg Active Cells / Biker (Period)</div>
-        <div id="modalCityAvgCellsPerBiker" class="stat-box-val" style="color:#2563eb">-</div>
       </div>
     </div>
 
@@ -846,7 +842,6 @@
             <th style="padding:6px 8px">HA30 Orders (&ge;30 min)</th>
             <th style="padding:6px 8px">HA30%</th>
             <th style="padding:6px 8px">Mean</th>
-            <th style="padding:6px 8px">Avg Active Cells / Biker</th>
           </tr>
         </thead>
         <tbody id="modalDailyTableBody"></tbody>
@@ -920,6 +915,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.2.1"></script>
+<script src="/static/js/app.js"></script>
 </body>
 </html>

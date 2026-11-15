@@ -2755,13 +2755,6 @@ function openCityModal() {
   document.getElementById('modalCityP90').textContent = `${kpis.p90_duration || 0} min`;
   document.getElementById('modalCityP95').textContent = `${kpis.p95_duration || 0} min`;
 
-  const modalAvgCells = document.getElementById('modalCityAvgCellsPerBiker');
-  if (modalAvgCells) {
-    const rawVal = kpis.avg_cells_per_biker !== undefined ? kpis.avg_cells_per_biker : (kpis.avg_active_cells_per_biker !== undefined ? kpis.avg_active_cells_per_biker : null);
-    const numVal = Number(rawVal);
-    modalAvgCells.textContent = (!isNaN(numVal) && numVal > 0) ? `${numVal.toFixed(1)} cells` : '-';
-  }
-
   // Daily Table
   const tbody = document.getElementById('modalDailyTableBody');
   if (state.dailyStats && state.dailyStats.length > 0) {
@@ -2769,9 +2762,6 @@ function openCityModal() {
       const isSelected = state.selectedDates.includes(d.date);
       const rowStyle = isSelected ? '' : 'opacity:0.4;background:#f8fafc';
       const color = d.pct > 35 ? '#dc2626' : d.pct > 20 ? '#d97706' : '#16a34a';
-      const rawAvg = d.avg_cells_per_biker !== undefined ? d.avg_cells_per_biker : (d.avg_active_cells_per_biker !== undefined ? d.avg_active_cells_per_biker : null);
-      const numAvg = Number(rawAvg);
-      const avgStr = (!isNaN(numAvg) && numAvg > 0) ? numAvg.toFixed(1) : '-';
       return `
         <tr style="${rowStyle};border-bottom:1px solid #f1f5f9">
           <td style="padding:5px 8px;font-weight:600">${d.label} ${isSelected ? '' : '<span style="font-size:9px;color:#94a3b8">(excluded)</span>'}</td>
@@ -2779,12 +2769,11 @@ function openCityModal() {
           <td style="padding:5px 8px;color:#dc2626">${(d.ha30_count !== undefined ? d.ha30_count : (d.slow || 0)).toLocaleString()}</td>
           <td style="padding:5px 8px;font-weight:700;color:${color}">${d.pct.toFixed(1)}%</td>
           <td style="padding:5px 8px">${d.mean.toFixed(1)} min</td>
-          <td style="padding:5px 8px;font-weight:600;color:#2563eb">${avgStr}</td>
         </tr>
       `;
     }).join('');
   } else {
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:8px;text-align:center;color:#94a3b8">No daily records available</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:8px;text-align:center;color:#94a3b8">No daily records available</td></tr>';
   }
 
   document.getElementById('citywideModal').classList.add('open');

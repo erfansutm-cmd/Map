@@ -34,11 +34,9 @@ def make_sample_orders_df(city: str = "isfahan", n_orders: int = 200) -> pd.Data
 
     dates = ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"]
     created_dates = np.random.choice(dates, size=n_orders)
-    biker_ids = [100 + (i % 12) for i in range(n_orders)]
 
     return pd.DataFrame({
         "order_id": [f"ord_{i}" for i in range(n_orders)],
-        "biker_id": biker_ids,
         "source_latitude": lats,
         "source_longitude": lngs,
         "destination_latitude": dest_lats,
@@ -83,8 +81,6 @@ class TestEngine(unittest.TestCase):
             self.assertIn("orders", stat)
             self.assertIn("ha30_count", stat)
             self.assertIn("pct", stat)
-            self.assertIn("avg_cells_per_biker", stat)
-            self.assertTrue(stat["avg_cells_per_biker"] > 0)
 
     def test_parse_csv_orders(self):
         csv_data = b"""order_id,source_latitude,source_longitude,destination_latitude,destination_longitude,create_to_accept_contractual,created_date
@@ -109,8 +105,6 @@ class TestEngine(unittest.TestCase):
         self.assertIn("sla_health", kpis)
         self.assertIn("p50_duration", kpis)
         self.assertIn("p90_duration", kpis)
-        self.assertIn("avg_cells_per_biker", kpis)
-        self.assertTrue(kpis["avg_cells_per_biker"] > 0)
 
         # Dual colors, City HA share, and HA30 fields on hexagons
         hexes = analysis["layers"]["source"]["res"]["7"]["hexes"]
@@ -124,18 +118,6 @@ class TestEngine(unittest.TestCase):
         self.assertIn("mean", first_hex)
         self.assertIn("slow", first_hex)
         self.assertIn("ha30_count", first_hex)
-
-    def test_biker_active_cells_calculation(self):
-        from app.engine import compute_biker_active_cells_avg
-        test_df = pd.DataFrame({
-            "order_id": [1, 2, 3, 4, 5, 6],
-            "biker_id": [1, 1, 1, 2, 2, 3],
-            "source_hexagon": ["cell_a", "cell_b", "cell_c", "cell_b", "cell_c", "cell_a"],
-            "create_to_accept_contractual": [10.0, 15.0, 20.0, 25.0, 30.0, 35.0],
-            "created_date": ["2026-10-22"] * 6
-        })
-        avg_cells = compute_biker_active_cells_avg(test_df)
-        self.assertEqual(avg_cells, 2.0)
 
     def test_bottlenecks_ranking_by_city_hyper_share(self):
         df = make_sample_orders_df("isfahan", n_orders=300)
@@ -194,24 +176,6 @@ class TestEngine(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             fetch_orders("isfahan", start_date="2026-09-15", end_date="2026-09-15")
         self.assertIn("ClickHouse", str(ctx.exception))
-
-    def test_cache_invalidation_when_biker_id_missing(self):
-        from app.data_source import DAY_CACHE, QUERIED_DATES, clear_day_cache
-
-        clear_day_cache()
-        sample_df = make_sample_orders_df("isfahan", n_orders=20)
-        # Drop biker_id to simulate old cache
-        old_cache_df = sample_df.drop(columns=["biker_id"])
-
-        DAY_CACHE[("isfahan", "DELIVERED", 2, "2026-10-22")] = old_cache_df
-        QUERIED_DATES.add(("isfahan", "DELIVERED", 2, "2026-10-22"))
-
-        # fetch_orders should detect that biker_id is missing, evict it, and attempt DB fetch
-        with self.assertRaises(RuntimeError) as ctx:
-            fetch_orders("isfahan", start_date="2026-10-22", end_date="2026-10-22")
-        self.assertIn("ClickHouse", str(ctx.exception))
-        # Ensure it was evicted from cache
-        self.assertNotIn(("isfahan", "DELIVERED", 2, "2026-10-22"), DAY_CACHE)
 
 
 if __name__ == "__main__":
