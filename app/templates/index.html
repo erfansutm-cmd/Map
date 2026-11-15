@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.4.1">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.5.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -372,7 +372,7 @@
                 <button id="btnMetricHa" class="color-metric-btn active" type="button" title="Cell local SLA breach percentage (HA%)">HA%</button>
                 <button id="btnMetricMean" class="color-metric-btn" type="button" title="Mean accept duration in minutes">Mean</button>
                 <button id="btnMetricShare" class="color-metric-btn" type="button" title="Percentage share of whole city's hyper act orders">Share</button>
-                <button id="btnMetricCorr" class="color-metric-btn" type="button" title="Correlation of 10-minute mean accept time series with neighboring cells">Corr</button>
+                <button id="btnMetricFare" class="color-metric-btn" type="button" title="Average final biker fare and incentive per cell">Fare</button>
               </div>
 
               <div class="ctrl-card-header" style="margin-top:8px">
@@ -575,13 +575,13 @@
           <div id="inspMeanDuration" class="stat-box-val">0.0 min</div>
         </div>
 
-        <div class="stat-box" id="boxInspCorr" style="margin-bottom:8px">
-          <div class="stat-box-label">Neighbor Correlation</div>
+        <div class="stat-box" id="boxInspFare" style="margin-bottom:8px">
+          <div class="stat-box-label">Biker Fare &amp; Incentive</div>
           <div style="display:flex;align-items:baseline;justify-content:space-between">
-            <span id="inspCorrVal" class="stat-box-val" style="color:#2563eb">0.00</span>
-            <span id="inspCorrNeighbors" style="font-size:11px;color:#64748b">0 neighbors</span>
+            <span id="inspFareVal" class="stat-box-val" style="color:#2563eb">0</span>
+            <span id="inspIncentiveVal" style="font-size:11px;font-weight:700;color:#059669">+0 inc</span>
           </div>
-          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">10-min mean accept time (<span id="inspCorrSamples">0</span> buckets)</div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">avg final biker fare per order</div>
         </div>
 
         <div style="font-size:9.5px;color:#94a3b8;word-break:break-all">
@@ -648,10 +648,13 @@
           <div id="mergedMeanDuration" class="stat-box-val">0.0 min</div>
         </div>
 
-        <div class="stat-box" id="boxMergedCorr" style="margin-bottom:8px">
-          <div class="stat-box-label">Avg Neighbor Correlation</div>
-          <div id="mergedCorrVal" class="stat-box-val" style="color:#2563eb">0.00</div>
-          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">10-min mean accept time synchrony</div>
+        <div class="stat-box" id="boxMergedFare" style="margin-bottom:8px">
+          <div class="stat-box-label">Combined Avg Biker Fare</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span id="mergedFareVal" class="stat-box-val" style="color:#2563eb">0</span>
+            <span id="mergedIncentiveVal" style="font-size:11px;font-weight:700;color:#059669">+0 inc</span>
+          </div>
+          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">weighted avg per order</div>
         </div>
 
         <div style="font-size:10px;font-weight:600;color:#64748b;margin-bottom:2px">Selected Cells:</div>
@@ -936,6 +939,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.4.1"></script>
+<script src="/static/js/app.js?v=2.5.0"></script>
 </body>
 </html>

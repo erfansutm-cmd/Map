@@ -21,12 +21,12 @@ const state = {
   showLabels: true,
   cellLabelMode: 'orders_ha', // 'orders_ha', 'ha_only', or 'orders_only'
   multiSelectMode: false,
-  colorMetric: 'ha',          // 'ha' (HA30% breach), 'mean' (Mean duration), 'share' (City HA Share %), or 'corr' (Neighbor Corr)
+  colorMetric: 'ha',          // 'ha' (HA30% breach), 'mean' (Mean duration), 'share' (City HA Share %), or 'fare' (Biker Fare)
   activeBasemap: 'voyager',
   minBreachFilter: 0,
   minMeanFilter: 0,
   minShareFilter: 0,
-  minCorrFilter: 0,
+  minFareFilter: 0,
   minOrdersFilter: 0,
   selectedDates: [],          // Active YYYY-MM-DD date strings
   allDates: [],               // Full range of dates
@@ -36,6 +36,19 @@ const state = {
   selectedHexes: new Map(),   // Multi-selected cells: hexId -> { h, polygon }
   singleSelectedHex: null,    // Single selected cell
 };
+
+// Helpers for Currency & Fare Formatting
+function formatFare(val) {
+  if (val === undefined || val === null || isNaN(val)) return '0';
+  if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+  if (val >= 1000) return Math.round(val / 1000) + 'k';
+  return Math.round(val).toString();
+}
+
+function formatFareFull(val) {
+  if (val === undefined || val === null || isNaN(val)) return '0';
+  return Number(Math.round(val)).toLocaleString();
+}
 
 // Basemap Tile Providers (Carto with API key, OpenStreetMap, Esri Satellite)
 const mapApiKey = window.MAP_API_KEY || 'cb1_5558_1_345367a66619045ea57fcdba';
@@ -171,16 +184,16 @@ function setupEventListeners() {
   document.getElementById('btnLayerSrc').addEventListener('click', () => setLayer('source'));
   document.getElementById('btnLayerDest').addEventListener('click', () => setLayer('destination'));
 
-  // Color Metric Toggle (HA30 vs Mean Duration vs City HA Share vs Neighbor Correlation)
+  // Color Metric Toggle (HA30 vs Mean Duration vs City HA Share vs Biker Fare)
   document.getElementById('btnMetricHa').addEventListener('click', () => setColorMetric('ha'));
   document.getElementById('btnMetricMean').addEventListener('click', () => setColorMetric('mean'));
   const btnMetricShare = document.getElementById('btnMetricShare');
   if (btnMetricShare) {
     btnMetricShare.addEventListener('click', () => setColorMetric('share'));
   }
-  const btnMetricCorr = document.getElementById('btnMetricCorr');
-  if (btnMetricCorr) {
-    btnMetricCorr.addEventListener('click', () => setColorMetric('corr'));
+  const btnMetricFare = document.getElementById('btnMetricFare');
+  if (btnMetricFare) {
+    btnMetricFare.addEventListener('click', () => setColorMetric('fare'));
   }
 
   // Resolution stepper
@@ -212,7 +225,7 @@ function setupEventListeners() {
   });
 
   // Dynamic SLA breach filter slider & number input
-  // Dynamic Metric (SLA breach / Mean duration / City HA share / Neighbor Corr) filter slider & number input
+  // Dynamic Metric (SLA breach / Mean duration / City HA share / Biker Fare) filter slider & number input
   const sliderBreach = document.getElementById('sliderBreachFilter');
   const numBreach = document.getElementById('numBreachFilter');
   if (sliderBreach) {
@@ -222,8 +235,8 @@ function setupEventListeners() {
         state.minBreachFilter = val;
       } else if (state.colorMetric === 'mean') {
         state.minMeanFilter = val;
-      } else if (state.colorMetric === 'corr') {
-        state.minCorrFilter = val;
+      } else if (state.colorMetric === 'fare') {
+        state.minFareFilter = val;
       } else {
         state.minShareFilter = val;
       }
@@ -242,8 +255,8 @@ function setupEventListeners() {
           state.minBreachFilter = val;
         } else if (state.colorMetric === 'mean') {
           state.minMeanFilter = val;
-        } else if (state.colorMetric === 'corr') {
-          state.minCorrFilter = val;
+        } else if (state.colorMetric === 'fare') {
+          state.minFareFilter = val;
         } else {
           state.minShareFilter = val;
         }
@@ -1517,7 +1530,7 @@ async function loadCityData(city, isNewCity = false, forceRefresh = false) {
   }
 }
 
-// Dynamically rescale Primary Metric (SLA breach / Mean duration) and Min Orders filter sliders to the max in active data
+// Dynamically rescale Primary Metric (SLA breach / Mean duration / City HA share / Biker Fare) and Min Orders filter sliders to the max in active data
 function resizeFilterSliders() {
   if (!state.data) return;
   const layerData = state.data.layers?.[state.currentLayer]?.res?.[state.currentRes];
@@ -1527,10 +1540,12 @@ function resizeFilterSliders() {
   let maxMean = 0;
   let maxOrders = 0;
   let maxShare = 0;
+  let maxFare = 0;
   hexes.forEach(h => {
     if (h.pct > maxSla) maxSla = h.pct;
     if (h.mean > maxMean) maxMean = h.mean;
     if (h.orders > maxOrders) maxOrders = h.orders;
+    if (h.avg_fare && h.avg_fare > maxFare) maxFare = h.avg_fare;
     const s = getHexSharePct(h);
     if (s > maxShare) maxShare = s;
   });
@@ -1538,9 +1553,9 @@ function resizeFilterSliders() {
   const isHa = state.colorMetric === 'ha';
   const isMean = state.colorMetric === 'mean';
   const isShare = state.colorMetric === 'share';
-  const isCorr = state.colorMetric === 'corr';
+  const isFare = state.colorMetric === 'fare';
 
-  // Scale Primary Metric Filter slider (HA%, Mean Duration, City HA Share, or Neighbor Corr)
+  // Scale Primary Metric Filter slider (HA%, Mean Duration, City HA Share, or Biker Fare)
   const breachSlider = document.getElementById('sliderBreachFilter');
   if (breachSlider) {
     if (isHa) {
@@ -1565,15 +1580,17 @@ function resizeFilterSliders() {
       }
       breachSlider.value = state.minMeanFilter || 0;
       breachSlider.dataset.dataMax = ceilMean;
-    } else if (isCorr) {
+    } else if (isFare) {
+      const ceilFare = Math.ceil(maxFare / 1000) * 1000 || 80000;
+      const sliderMax = Math.max(ceilFare, 10000);
       breachSlider.min = 0;
-      breachSlider.max = 1.0;
-      breachSlider.step = 0.05;
-      if ((state.minCorrFilter || 0) > 1.0) {
-        state.minCorrFilter = 0;
+      breachSlider.max = sliderMax;
+      breachSlider.step = 1000;
+      if ((state.minFareFilter || 0) > sliderMax) {
+        state.minFareFilter = 0;
       }
-      breachSlider.value = state.minCorrFilter || 0;
-      breachSlider.dataset.dataMax = "1.00";
+      breachSlider.value = state.minFareFilter || 0;
+      breachSlider.dataset.dataMax = Math.round(maxFare).toString();
     } else {
       const ceilShare = Math.ceil(maxShare * 1.05) || 5;
       const sliderMax = Math.max(ceilShare, 2);
@@ -1608,7 +1625,7 @@ function updateFilterLabels() {
   const isHa = state.colorMetric === 'ha';
   const isMean = state.colorMetric === 'mean';
   const isShare = state.colorMetric === 'share';
-  const isCorr = state.colorMetric === 'corr';
+  const isFare = state.colorMetric === 'fare';
   const titleEl = document.getElementById('titleMetricFilter');
   const unitEl = document.getElementById('unitBreachFilter');
   const minScaleEl = document.getElementById('minScaleMetricFilter');
@@ -1619,14 +1636,14 @@ function updateFilterLabels() {
   if (titleEl) {
     if (isHa) titleEl.textContent = 'Min SLA Breach Filter';
     else if (isMean) titleEl.textContent = 'Min Mean Duration Filter';
-    else if (isCorr) titleEl.textContent = 'Min Neighbor Correlation Filter';
+    else if (isFare) titleEl.textContent = 'Min Biker Fare Filter';
     else titleEl.textContent = 'Min HA Share Filter';
   }
   if (unitEl) {
-    unitEl.textContent = isMean ? 'min' : (isCorr ? 'r' : '%');
+    unitEl.textContent = isMean ? 'min' : (isFare ? 'Toman' : '%');
   }
   if (minScaleEl) {
-    minScaleEl.textContent = isMean ? '0 min' : (isCorr ? '0.00 r' : (isShare ? '0.0%' : '0%'));
+    minScaleEl.textContent = isMean ? '0 min' : (isFare ? '0' : (isShare ? '0.0%' : '0%'));
   }
 
   if (breachSlider) {
@@ -1634,22 +1651,22 @@ function updateFilterLabels() {
     if (breachVal) {
       if (isHa) breachVal.textContent = `max: ${maxVal}%`;
       else if (isMean) breachVal.textContent = `max: ${maxVal} min`;
-      else if (isCorr) breachVal.textContent = `max: +1.00 r`;
+      else if (isFare) breachVal.textContent = `max: ${Number(maxVal).toLocaleString()}`;
       else breachVal.textContent = `max: ${maxVal}%`;
     }
     if (breachNum) {
       let curVal = 0;
       if (isHa) curVal = state.minBreachFilter;
       else if (isMean) curVal = state.minMeanFilter || 0;
-      else if (isCorr) curVal = state.minCorrFilter || 0;
+      else if (isFare) curVal = state.minFareFilter || 0;
       else curVal = state.minShareFilter || 0;
 
       breachNum.value = curVal;
       breachNum.max = maxVal;
-      breachNum.step = isCorr ? '0.05' : (isShare ? '0.1' : (isMean ? '0.5' : '1'));
+      breachNum.step = isFare ? '1000' : (isShare ? '0.1' : (isMean ? '0.5' : '1'));
       breachNum.title = isHa
         ? 'Type minimum SLA breach percentage'
-        : (isMean ? 'Type minimum mean accept duration in minutes' : (isCorr ? 'Type minimum neighbor correlation (-1 to +1)' : 'Type minimum citywide HA share percentage'));
+        : (isMean ? 'Type minimum mean accept duration in minutes' : (isFare ? 'Type minimum average biker fare in Toman' : 'Type minimum citywide HA share percentage'));
     }
   }
 
@@ -1674,13 +1691,13 @@ function updateFilterLabels() {
   if (btnLabelOrdersHa) {
     if (isHa) btnLabelOrdersHa.textContent = 'HA% + Orders';
     else if (isMean) btnLabelOrdersHa.textContent = 'Mean + Orders';
-    else if (isCorr) btnLabelOrdersHa.textContent = 'Corr + Orders';
+    else if (isFare) btnLabelOrdersHa.textContent = 'Fare + Inc';
     else btnLabelOrdersHa.textContent = 'Share + HA';
   }
   if (btnLabelHaOnly) {
     if (isHa) btnLabelHaOnly.textContent = 'HA% Only';
     else if (isMean) btnLabelHaOnly.textContent = 'Mean Only';
-    else if (isCorr) btnLabelHaOnly.textContent = 'Corr Only';
+    else if (isFare) btnLabelHaOnly.textContent = 'Fare Only';
     else btnLabelHaOnly.textContent = 'Share Only';
   }
   if (btnLabelOrdersOnly) {
@@ -1690,7 +1707,7 @@ function updateFilterLabels() {
   if (labelCheckboxText) {
     if (isHa) labelCheckboxText.textContent = 'Cell Numbers (HA% & Orders)';
     else if (isMean) labelCheckboxText.textContent = 'Cell Numbers (Mean & Orders)';
-    else if (isCorr) labelCheckboxText.textContent = 'Cell Numbers (Neighbor Corr)';
+    else if (isFare) labelCheckboxText.textContent = 'Cell Numbers (Biker Fare)';
     else labelCheckboxText.textContent = 'Cell Numbers (HA Share)';
   }
 
@@ -1699,7 +1716,7 @@ function updateFilterLabels() {
   let activeMetricVal = 0;
   if (isHa) activeMetricVal = state.minBreachFilter;
   else if (isMean) activeMetricVal = state.minMeanFilter || 0;
-  else if (isCorr) activeMetricVal = state.minCorrFilter || 0;
+  else if (isFare) activeMetricVal = state.minFareFilter || 0;
   else activeMetricVal = state.minShareFilter || 0;
 
   const isFiltered = (activeMetricVal > 0) || (state.minOrdersFilter > 0);
@@ -1713,7 +1730,7 @@ function updateKpis(kpis, city, dataSource) {
   document.getElementById('headerCityLabel').textContent = `${city.toUpperCase()}`;
   document.getElementById('headerThresholdLabel').textContent = state.colorMetric === 'ha'
     ? `HA${kpis.threshold}%`
-    : (state.colorMetric === 'mean' ? 'MEAN DURATION' : (state.colorMetric === 'corr' ? 'NEIGHBOR CORR' : 'HA SHARE'));
+    : (state.colorMetric === 'mean' ? 'MEAN DURATION' : (state.colorMetric === 'fare' ? 'BIKER FARE' : 'HA SHARE'));
   document.getElementById('kpiThresholdVal').textContent = kpis.threshold;
 
   // Citywide HA30 Overview Card
@@ -1867,12 +1884,7 @@ function interpolateHaColor(t) {
 function getHexFillColor(h) {
   if (state.colorMetric === 'ha') return h.color_ha;
   if (state.colorMetric === 'mean') return h.color_mean;
-  if (state.colorMetric === 'corr') {
-    if (h.color_corr) return h.color_corr;
-    const corrVal = h.corr !== undefined ? h.corr : 0;
-    const t = Math.max(0, Math.min(1, corrVal));
-    return (h.reliable && (h.corr_samples || 0) >= 3) ? interpolateHaColor(t) : '#94a3b8';
-  }
+  if (state.colorMetric === 'fare') return h.color_fare || h.color_ha;
   if (h.color_share) return h.color_share;
   const layerData = state.data?.layers?.[state.currentLayer]?.res?.[state.currentRes];
   const smax = layerData?.scale?.smax || 5.0;
@@ -1897,8 +1909,8 @@ function renderMapHexagons() {
       passesMetric = h.pct >= state.minBreachFilter;
     } else if (state.colorMetric === 'mean') {
       passesMetric = h.mean >= (state.minMeanFilter || 0);
-    } else if (state.colorMetric === 'corr') {
-      passesMetric = (h.corr !== undefined ? h.corr : 0) >= (state.minCorrFilter || 0);
+    } else if (state.colorMetric === 'fare') {
+      passesMetric = (h.avg_fare || 0) >= (state.minFareFilter || 0);
     } else {
       passesMetric = getHexSharePct(h) >= (state.minShareFilter || 0);
     }
@@ -1968,18 +1980,27 @@ function renderMapHexagons() {
 function createTooltipContent(h) {
   const isMean = state.colorMetric === 'mean';
   const isShare = state.colorMetric === 'share';
-  const isCorr = state.colorMetric === 'corr';
+  const isFare = state.colorMetric === 'fare';
   let topMetricHtml;
 
-  if (isCorr) {
-    const corrVal = h.corr !== undefined ? h.corr : 0;
-    const sign = corrVal >= 0 ? '+' : '';
+  if (isFare) {
     topMetricHtml = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
-        <span style="font-size:13.5px;color:#0f172a"><b>Neighbor Corr: ${sign}${corrVal.toFixed(2)}</b></span>
+        <span style="font-size:13.5px;color:#0f172a"><b>Avg Fare: ${formatFareFull(h.avg_fare)} Toman</b></span>
         <span style="font-size:12px;font-weight:600;color:#2563eb">${h.orders.toLocaleString()} orders</span>
       </div>
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px">10-min mean accept series vs ${h.corr_neighbors || 0} neighbor cells (${h.corr_samples || 0} buckets)</div>
+      <div style="display:flex;justify-content:space-between;margin:2px 0">
+        <span style="color:#64748b">Avg Incentive:</span>
+        <span style="color:#059669;font-weight:700">+${formatFareFull(h.avg_incentive || 0)} Toman</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin:2px 0">
+        <span style="color:#64748b">Total Biker Fare:</span>
+        <span style="color:#0f172a;font-weight:600">${formatFareFull(h.total_fare || 0)} Toman</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin:2px 0">
+        <span style="color:#64748b">Total Incentive:</span>
+        <span style="color:#059669;font-weight:600">${formatFareFull(h.total_incentive || 0)} Toman</span>
+      </div>
       <div style="display:flex;justify-content:space-between;margin:2px 0">
         <span style="color:#64748b">Mean Duration:</span>
         <span style="color:#0f172a;font-weight:600">${h.mean.toFixed(1)} min</span>
@@ -1987,10 +2008,6 @@ function createTooltipContent(h) {
       <div style="display:flex;justify-content:space-between;margin:2px 0">
         <span style="color:#64748b">Cell HA${state.threshold}% Breach:</span>
         <span style="color:#0f172a;font-weight:600">${h.pct.toFixed(1)}%</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin:2px 0">
-        <span style="color:#64748b">City HA Share:</span>
-        <span style="color:#0f172a;font-weight:600">${(h.share_pct || 0).toFixed(1)}%</span>
       </div>`;
   } else if (isShare) {
     const sharePct = getHexSharePct(h);
@@ -2092,7 +2109,7 @@ function selectSingleHexagon(h, polygon) {
   const boxInspHa = document.getElementById('boxInspHa');
   const boxInspMean = document.getElementById('boxInspMean');
   const boxInspShare = document.getElementById('boxInspShare');
-  const boxInspCorr = document.getElementById('boxInspCorr');
+  const boxInspFare = document.getElementById('boxInspFare');
   if (boxInspHa && boxInspMean) {
     boxInspHa.classList.toggle('active-metric-box', state.colorMetric === 'ha');
     boxInspMean.classList.toggle('active-metric-box', state.colorMetric === 'mean');
@@ -2100,17 +2117,14 @@ function selectSingleHexagon(h, polygon) {
   if (boxInspShare) {
     boxInspShare.classList.toggle('active-metric-box', state.colorMetric === 'share');
   }
-  if (boxInspCorr) {
-    boxInspCorr.classList.toggle('active-metric-box', state.colorMetric === 'corr');
+  if (boxInspFare) {
+    boxInspFare.classList.toggle('active-metric-box', state.colorMetric === 'fare');
   }
 
-  const corrVal = h.corr !== undefined ? h.corr : 0;
-  const inspCorrEl = document.getElementById('inspCorrVal');
-  if (inspCorrEl) inspCorrEl.textContent = `${corrVal >= 0 ? '+' : ''}${corrVal.toFixed(2)}`;
-  const inspCorrNeighborsEl = document.getElementById('inspCorrNeighbors');
-  if (inspCorrNeighborsEl) inspCorrNeighborsEl.textContent = `${h.corr_neighbors || 0} neighbors`;
-  const inspCorrSamplesEl = document.getElementById('inspCorrSamples');
-  if (inspCorrSamplesEl) inspCorrSamplesEl.textContent = `${h.corr_samples || 0}`;
+  const inspFareEl = document.getElementById('inspFareVal');
+  if (inspFareEl) inspFareEl.textContent = formatFareFull(h.avg_fare);
+  const inspIncEl = document.getElementById('inspIncentiveVal');
+  if (inspIncEl) inspIncEl.textContent = `+${formatFareFull(h.avg_incentive || 0)} inc`;
 
   const sharePct = getHexSharePct(h);
   const inspShareEl = document.getElementById('inspSharePct');
@@ -2212,7 +2226,7 @@ function renderMergedSelection() {
   const boxMergedHa = document.getElementById('boxMergedHa');
   const boxMergedMean = document.getElementById('boxMergedMean');
   const boxMergedShare = document.getElementById('boxMergedShare');
-  const boxMergedCorr = document.getElementById('boxMergedCorr');
+  const boxMergedFare = document.getElementById('boxMergedFare');
   if (boxMergedHa && boxMergedMean) {
     boxMergedHa.classList.toggle('active-metric-box', state.colorMetric === 'ha');
     boxMergedMean.classList.toggle('active-metric-box', state.colorMetric === 'mean');
@@ -2220,15 +2234,19 @@ function renderMergedSelection() {
   if (boxMergedShare) {
     boxMergedShare.classList.toggle('active-metric-box', state.colorMetric === 'share');
   }
-  if (boxMergedCorr) {
-    boxMergedCorr.classList.toggle('active-metric-box', state.colorMetric === 'corr');
+  if (boxMergedFare) {
+    boxMergedFare.classList.toggle('active-metric-box', state.colorMetric === 'fare');
   }
 
-  const avgCorr = hexItems.length > 0
-    ? (hexItems.reduce((acc, item) => acc + (item.h.corr !== undefined ? item.h.corr : 0), 0) / hexItems.length)
-    : 0;
-  const mergedCorrEl = document.getElementById('mergedCorrVal');
-  if (mergedCorrEl) mergedCorrEl.textContent = `${avgCorr >= 0 ? '+' : ''}${avgCorr.toFixed(2)}`;
+  const totalFare = hexItems.reduce((acc, item) => acc + (item.h.total_fare || 0), 0);
+  const totalInc = hexItems.reduce((acc, item) => acc + (item.h.total_incentive || 0), 0);
+  const weightedFare = totalOrders > 0 ? (totalFare / totalOrders) : 0;
+  const weightedInc = totalOrders > 0 ? (totalInc / totalOrders) : 0;
+
+  const mergedFareEl = document.getElementById('mergedFareVal');
+  if (mergedFareEl) mergedFareEl.textContent = formatFareFull(weightedFare);
+  const mergedIncEl = document.getElementById('mergedIncentiveVal');
+  if (mergedIncEl) mergedIncEl.textContent = `+${formatFareFull(weightedInc)} inc`;
 
   panel.classList.add('active');
 }
@@ -2404,15 +2422,15 @@ function showKmlToast(message) {
   }, 3500);
 }
 
-// Color Metric Switcher (HA30 vs Mean Duration vs City HA Share vs Neighbor Corr)
+// Color Metric Switcher (HA30 vs Mean Duration vs City HA Share vs Biker Fare)
 function setColorMetric(metric) {
   state.colorMetric = metric;
   document.getElementById('btnMetricHa').classList.toggle('active', metric === 'ha');
   document.getElementById('btnMetricMean').classList.toggle('active', metric === 'mean');
   const btnShare = document.getElementById('btnMetricShare');
   if (btnShare) btnShare.classList.toggle('active', metric === 'share');
-  const btnCorr = document.getElementById('btnMetricCorr');
-  if (btnCorr) btnCorr.classList.toggle('active', metric === 'corr');
+  const btnFare = document.getElementById('btnMetricFare');
+  if (btnFare) btnFare.classList.toggle('active', metric === 'fare');
 
   state.polygons.forEach(item => {
     const isSelected = state.selectedHexes.has(item.h.hex);
@@ -2433,14 +2451,14 @@ function setColorMetric(metric) {
   if (headerThresh) {
     if (metric === 'ha') headerThresh.textContent = `HA${state.threshold}%`;
     else if (metric === 'mean') headerThresh.textContent = 'MEAN DURATION';
-    else if (metric === 'corr') headerThresh.textContent = 'NEIGHBOR CORR';
+    else if (metric === 'fare') headerThresh.textContent = 'BIKER FARE';
     else headerThresh.textContent = 'HA SHARE';
   }
 
   const boxInspHa = document.getElementById('boxInspHa');
   const boxInspMean = document.getElementById('boxInspMean');
   const boxInspShare = document.getElementById('boxInspShare');
-  const boxInspCorr = document.getElementById('boxInspCorr');
+  const boxInspFare = document.getElementById('boxInspFare');
   if (boxInspHa && boxInspMean) {
     boxInspHa.classList.toggle('active-metric-box', metric === 'ha');
     boxInspMean.classList.toggle('active-metric-box', metric === 'mean');
@@ -2448,14 +2466,14 @@ function setColorMetric(metric) {
   if (boxInspShare) {
     boxInspShare.classList.toggle('active-metric-box', metric === 'share');
   }
-  if (boxInspCorr) {
-    boxInspCorr.classList.toggle('active-metric-box', metric === 'corr');
+  if (boxInspFare) {
+    boxInspFare.classList.toggle('active-metric-box', metric === 'fare');
   }
 
   const boxMergedHa = document.getElementById('boxMergedHa');
   const boxMergedMean = document.getElementById('boxMergedMean');
   const boxMergedShare = document.getElementById('boxMergedShare');
-  const boxMergedCorr = document.getElementById('boxMergedCorr');
+  const boxMergedFare = document.getElementById('boxMergedFare');
   if (boxMergedHa && boxMergedMean) {
     boxMergedHa.classList.toggle('active-metric-box', metric === 'ha');
     boxMergedMean.classList.toggle('active-metric-box', metric === 'mean');
@@ -2463,8 +2481,8 @@ function setColorMetric(metric) {
   if (boxMergedShare) {
     boxMergedShare.classList.toggle('active-metric-box', metric === 'share');
   }
-  if (boxMergedCorr) {
-    boxMergedCorr.classList.toggle('active-metric-box', metric === 'corr');
+  if (boxMergedFare) {
+    boxMergedFare.classList.toggle('active-metric-box', metric === 'fare');
   }
 
   if (state.data && state.data.bottlenecks) {
@@ -2538,7 +2556,7 @@ function renderLabels() {
   const isHa = state.colorMetric === 'ha';
   const isMean = state.colorMetric === 'mean';
   const isShare = state.colorMetric === 'share';
-  const isCorr = state.colorMetric === 'corr';
+  const isFare = state.colorMetric === 'fare';
 
   state.polygons.forEach(item => {
     const h = item.h;
@@ -2548,8 +2566,8 @@ function renderLabels() {
       passesMetric = h.pct >= state.minBreachFilter;
     } else if (isMean) {
       passesMetric = h.mean >= (state.minMeanFilter || 0);
-    } else if (isCorr) {
-      passesMetric = (h.corr !== undefined ? h.corr : 0) >= (state.minCorrFilter || 0);
+    } else if (isFare) {
+      passesMetric = (h.avg_fare || 0) >= (state.minFareFilter || 0);
     } else {
       passesMetric = getHexSharePct(h) >= (state.minShareFilter || 0);
     }
@@ -2557,19 +2575,18 @@ function renderLabels() {
 
     let htmlContent;
 
-    if (isCorr) {
-      const corrVal = h.corr !== undefined ? h.corr : 0;
-      const sign = corrVal >= 0 ? '+' : '';
-      const metricText = `${sign}${corrVal.toFixed(2)}`;
+    if (isFare) {
+      const metricText = formatFare(h.avg_fare);
 
       if (state.cellLabelMode === 'orders_only') {
         htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${h.orders.toLocaleString()}</span>`;
       } else if (state.cellLabelMode === 'ha_only' || radiusPx < 11) {
         htmlContent = `<span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>`;
       } else {
+        const subText = (h.avg_incentive > 0) ? `+${formatFare(h.avg_incentive)}` : `${h.orders.toLocaleString()} ord`;
         htmlContent = `
           <span class="lbl-main-orders" style="font-size:${fontHaPx}px">${metricText}</span>
-          <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${h.orders.toLocaleString()} ord</span>
+          <span class="lbl-sub-metric" style="font-size:${fontSubPx}px">${subText}</span>
         `;
       }
     } else if (isShare) {
@@ -2621,11 +2638,11 @@ function updateLabelsVisibility() {
   }
 }
 
-// Filter hexagons by breach rate, mean duration, city HA share, or neighbor correlation and orders slider
+// Filter hexagons by breach rate, mean duration, city HA share, or biker fare and orders slider
 function filterHexagons() {
   const isHa = state.colorMetric === 'ha';
   const isMean = state.colorMetric === 'mean';
-  const isCorr = state.colorMetric === 'corr';
+  const isFare = state.colorMetric === 'fare';
 
   state.polygons.forEach(item => {
     let passesMetric = true;
@@ -2633,8 +2650,8 @@ function filterHexagons() {
       passesMetric = item.h.pct >= state.minBreachFilter;
     } else if (isMean) {
       passesMetric = item.h.mean >= (state.minMeanFilter || 0);
-    } else if (isCorr) {
-      passesMetric = (item.h.corr !== undefined ? item.h.corr : 0) >= (state.minCorrFilter || 0);
+    } else if (isFare) {
+      passesMetric = (item.h.avg_fare || 0) >= (state.minFareFilter || 0);
     } else {
       passesMetric = getHexSharePct(item.h) >= (state.minShareFilter || 0);
     }
@@ -2686,11 +2703,11 @@ function updateLegend() {
     subEl.textContent = `Average time from order creation to courier accept`;
     minEl.textContent = `${s.mmin.toFixed(0)} min (Fastest)`;
     maxEl.textContent = `${s.mmax.toFixed(0)} min (Slowest)`;
-  } else if (state.colorMetric === 'corr') {
-    titleEl.textContent = `Neighbor Correlation (10-min Accept Time)`;
-    subEl.textContent = `Correlation of 10-minute mean accept times with neighboring cells`;
-    minEl.textContent = `0.00 (Independent)`;
-    maxEl.textContent = `1.00 (Synchronized)`;
+  } else if (state.colorMetric === 'fare') {
+    titleEl.textContent = `Average Final Biker Fare`;
+    subEl.textContent = `Average final biker compensation & incentive per order`;
+    minEl.textContent = `${formatFare(s.fmin || 0)} (Lowest)`;
+    maxEl.textContent = `${formatFare(s.fmax || 60000)} (Highest)`;
   } else {
     titleEl.textContent = `Citywide HA${state.threshold}% Order Share`;
     subEl.textContent = `Percentage of whole city's hyper act orders`;

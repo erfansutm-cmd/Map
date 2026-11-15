@@ -229,7 +229,9 @@ SELECT
     destination_longitude,
     create_to_accept_contractual,
     created_date,
-    created_at
+    created_at,
+    final_biker_fare,
+    incentive
 FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
@@ -260,7 +262,9 @@ SELECT
     destination_longitude,
     create_to_accept_contractual,
     created_date,
-    created_at
+    created_at,
+    final_biker_fare,
+    incentive
 FROM dwh_box.fact_ka
 WHERE city = '{clean_city}'
   AND status = '{status}'
@@ -278,6 +282,13 @@ LIMIT 1 BY order_id
             if len(raw_df) > 0 and "created_date" not in raw_df.columns:
                 raw_df["created_date"] = max_d
 
+        # Ensure final_biker_fare and incentive columns exist in raw_df
+        if len(raw_df) > 0:
+            if "final_biker_fare" not in raw_df.columns:
+                raw_df["final_biker_fare"] = 0.0
+            if "incentive" not in raw_df.columns:
+                raw_df["incentive"] = 0.0
+
         # Partition returned rows into DAY_CACHE and file cache
         if len(raw_df) > 0 and "created_date" in raw_df.columns:
             for d_val, grp in raw_df.groupby("created_date"):
@@ -293,7 +304,8 @@ LIMIT 1 BY order_id
                 empty_df = pd.DataFrame(columns=[
                     "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
                     "destination_latitude", "destination_longitude",
-                    "create_to_accept_contractual", "created_date", "created_at"
+                    "create_to_accept_contractual", "created_date", "created_at",
+                    "final_biker_fare", "incentive"
                 ])
                 DAY_CACHE[(clean_city, status, customer_id, d)] = empty_df
                 save_df_to_file("clickhouse", (clean_city, status, customer_id, d), empty_df)
@@ -321,7 +333,8 @@ LIMIT 1 BY order_id
         target_full_df = pd.DataFrame(columns=[
             "order_id", "vendor_id", "biker_id", "source_latitude", "source_longitude",
             "destination_latitude", "destination_longitude",
-            "create_to_accept_contractual", "created_date", "created_at"
+            "create_to_accept_contractual", "created_date", "created_at",
+            "final_biker_fare", "incentive"
         ])
 
     # Compute daily breakdown across all target dates
@@ -388,5 +401,24 @@ def parse_csv_orders(csv_bytes: bytes) -> pd.DataFrame:
             if alias in df.columns:
                 df["created_at"] = df[alias]
                 break
+
+    if "final_biker_fare" not in df.columns:
+        for alias in ["biker_fare", "fare", "courier_fare", "driver_fare"]:
+            if alias in df.columns:
+                df["final_biker_fare"] = df[alias]
+                break
+        if "final_biker_fare" not in df.columns:
+            df["final_biker_fare"] = 45000.0
+
+    if "incentive" not in df.columns:
+        for alias in ["biker_incentive", "incentives", "bonus", "biker_bonus"]:
+            if alias in df.columns:
+                df["incentive"] = df[alias]
+                break
+        if "incentive" not in df.columns:
+            df["incentive"] = 0.0
+
+    df["final_biker_fare"] = pd.to_numeric(df["final_biker_fare"], errors="coerce").fillna(0.0)
+    df["incentive"] = pd.to_numeric(df["incentive"], errors="coerce").fillna(0.0)
 
     return df

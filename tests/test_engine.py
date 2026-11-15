@@ -38,6 +38,9 @@ def make_sample_orders_df(city: str = "isfahan", n_orders: int = 200) -> pd.Data
     vendor_ids = [5000 + (i % 8) for i in range(n_orders)]
     biker_ids = [1000 + (i % 12) for i in range(n_orders)]
 
+    fares = np.random.uniform(35000, 65000, size=n_orders)
+    incentives = np.random.uniform(0, 15000, size=n_orders)
+
     return pd.DataFrame({
         "order_id": [f"ord_{i}" for i in range(n_orders)],
         "vendor_id": vendor_ids,
@@ -48,6 +51,8 @@ def make_sample_orders_df(city: str = "isfahan", n_orders: int = 200) -> pd.Data
         "destination_longitude": dest_lngs,
         "create_to_accept_contractual": durations,
         "created_date": created_dates,
+        "final_biker_fare": fares,
+        "incentive": incentives,
     })
 
 
@@ -207,70 +212,51 @@ class TestEngine(unittest.TestCase):
             self.assertIn("avg_vendors_per_biker", d)
             self.assertGreater(d["avg_vendors_per_biker"], 0)
 
-    def test_neighbor_time_correlation(self):
-        from app.engine import compute_neighbor_time_correlations
-        import h3
+    def test_fare_and_incentive_aggregation(self):
+        from app.engine import prepare_base, rollup
 
-        # Center cell and an adjacent neighbor cell at res 8
-        center_cell = h3.latlng_to_cell(32.65, 51.66, 8)
-        neighbors = [n for n in h3.grid_disk(center_cell, 1) if n != center_cell]
-        neighbor_cell = neighbors[0]
+        df = pd.DataFrame({
+            "order_id": ["o1", "o2", "o3"],
+            "source_latitude": [32.65, 32.65, 32.65],
+            "source_longitude": [51.66, 51.66, 51.66],
+            "create_to_accept_contractual": [12.0, 18.0, 24.0],
+            "final_biker_fare": [40000.0, 50000.0, 60000.0],
+            "incentive": [5000.0, 0.0, 10000.0],
+        })
+        base = prepare_base(df, "source_latitude", "source_longitude", threshold=30, res_max=8)
+        self.assertEqual(len(base), 1)
+        self.assertEqual(base["fare_sum"].iloc[0], 150000.0)
+        self.assertEqual(base["inc_sum"].iloc[0], 15000.0)
 
-        center_lat, center_lng = h3.cell_to_latlng(center_cell)
-        neighbor_lat, neighbor_lng = h3.cell_to_latlng(neighbor_cell)
+        tbl = rollup(base, res=8, min_orders=1, res_max=8)
+        self.assertEqual(len(tbl), 1)
+        self.assertEqual(tbl["avg_fare"].iloc[0], 50000.0)
+        self.assertEqual(tbl["total_fare"].iloc[0], 150000.0)
+        self.assertEqual(tbl["avg_incentive"].iloc[0], 5000.0)
+        self.assertEqual(tbl["total_incentive"].iloc[0], 15000.0)
 
-        # 4 distinct 10-minute buckets with strongly correlated values
-        times = [
-            "2026-11-08 10:02:00",
-            "2026-11-08 10:14:00",
-            "2026-11-08 10:27:00",
-            "2026-11-08 10:35:00",
-        ]
-        center_durs = [10.0, 20.0, 30.0, 40.0]
-        neighbor_durs = [12.0, 22.0, 31.0, 42.0]
-
-        rows = []
-        for t, d1 in zip(times, center_durs):
-            rows.append({
-                "source_latitude": center_lat,
-                "source_longitude": center_lng,
-                "create_to_accept_contractual": d1,
-                "created_at": t,
-                "order_id": f"c_{t}",
-            })
-        for t, d2 in zip(times, neighbor_durs):
-            rows.append({
-                "source_latitude": neighbor_lat,
-                "source_longitude": neighbor_lng,
-                "create_to_accept_contractual": d2,
-                "created_at": t,
-                "order_id": f"n_{t}",
-            })
-
-        df = pd.DataFrame(rows)
-        corr_dict = compute_neighbor_time_correlations(df, "source_latitude", "source_longitude", 8)
-
-        self.assertIn(center_cell, corr_dict)
-        self.assertIn(neighbor_cell, corr_dict)
-        self.assertGreaterEqual(corr_dict[center_cell]["corr"], 0.95)
-        self.assertEqual(corr_dict[center_cell]["samples"], 4)
-        self.assertEqual(corr_dict[center_cell]["neighbors"], 1)
-
-    def test_analyze_city_orders_includes_correlation(self):
+    def test_analyze_city_orders_includes_fare(self):
         sample_df = make_sample_orders_df("isfahan", n_orders=200)
-        # Add created_at timestamps
-        sample_df["created_at"] = [
-            f"2026-10-22 {10 + (i % 8):02d}:{(i % 60):02d}:00"
-            for i in range(len(sample_df))
-        ]
         result = analyze_city_orders(sample_df, threshold=30, res_min=8, res_max=8)
         hexes = result["layers"]["source"]["res"]["8"]["hexes"]
         self.assertGreater(len(hexes), 0)
         first_hex = hexes[0]
-        self.assertIn("corr", first_hex)
-        self.assertIn("corr_samples", first_hex)
-        self.assertIn("corr_neighbors", first_hex)
-        self.assertIn("color_corr", first_hex)
+        self.assertIn("avg_fare", first_hex)
+        self.assertIn("total_fare", first_hex)
+        self.assertIn("avg_incentive", first_hex)
+        self.assertIn("total_incentive", first_hex)
+        self.assertIn("color_fare", first_hex)
+        self.assertGreater(first_hex["avg_fare"], 0)
+
+        scale = result["layers"]["source"]["res"]["8"]["scale"]
+        self.assertIn("fmin", scale)
+        self.assertIn("fmax", scale)
+        self.assertGreater(scale["fmax"], scale["fmin"])
+
+        kpis = result["kpis"]
+        self.assertIn("avg_biker_fare", kpis)
+        self.assertIn("avg_incentive", kpis)
+        self.assertGreater(kpis["avg_biker_fare"], 0)
 
 
 if __name__ == "__main__":

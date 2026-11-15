@@ -103,7 +103,7 @@ def prepare_base(df: pd.DataFrame, lat_col: str, lng_col: str, threshold: int, r
     d["hex"] = [to_cell(a, b, res_max) for a, b in zip(d[lat_col], d[lng_col])]
     d = d.dropna(subset=["hex"])
     if len(d) == 0:
-        return pd.DataFrame(columns=["orders", "with_value", "slow", "vsum"])
+        return pd.DataFrame(columns=["orders", "with_value", "slow", "vsum", "fare_sum", "inc_sum"])
 
     v = pd.Series(
         d["create_to_accept_contractual"].to_numpy(dtype="float64", na_value=float("nan")),
@@ -113,11 +113,42 @@ def prepare_base(df: pd.DataFrame, lat_col: str, lng_col: str, threshold: int, r
     d["slow"] = (v >= threshold).astype(int)
     d["value"] = v.fillna(0)
 
+    # Final biker fare extraction
+    fare_col = "final_biker_fare" if "final_biker_fare" in d.columns else None
+    if fare_col is None:
+        for c in ["biker_fare", "fare"]:
+            if c in d.columns:
+                fare_col = c
+                break
+
+    if fare_col:
+        fares = pd.to_numeric(d[fare_col], errors="coerce").fillna(0)
+    else:
+        fares = pd.Series(0.0, index=d.index)
+
+    # Incentive extraction
+    inc_col = "incentive" if "incentive" in d.columns else None
+    if inc_col is None:
+        for c in ["biker_incentive", "incentives", "bonus"]:
+            if c in d.columns:
+                inc_col = c
+                break
+
+    if inc_col:
+        inc = pd.to_numeric(d[inc_col], errors="coerce").fillna(0)
+    else:
+        inc = pd.Series(0.0, index=d.index)
+
+    d["fare_val"] = fares
+    d["inc_val"] = inc
+
     base = d.groupby("hex").agg(
         orders=("order_id", "nunique"),
         with_value=("has", "sum"),
         slow=("slow", "sum"),
         vsum=("value", "sum"),
+        fare_sum=("fare_val", "sum"),
+        inc_sum=("inc_val", "sum"),
     )
     return base
 
@@ -126,7 +157,11 @@ def rollup(base: pd.DataFrame, res: int, min_orders: int, res_max: int = 10) -> 
     """Hexagon table at resolution `res`, summed up from the finest level."""
     if len(base) == 0:
         return pd.DataFrame(
-            columns=["hex", "orders", "with_value", "slow", "fast", "mean", "pct_slow", "reliable", "status"]
+            columns=[
+                "hex", "orders", "with_value", "slow", "fast", "mean", "pct_slow",
+                "avg_fare", "total_fare", "avg_incentive", "total_incentive",
+                "reliable", "status"
+            ]
         )
 
     if res == res_max:
@@ -139,6 +174,10 @@ def rollup(base: pd.DataFrame, res: int, min_orders: int, res_max: int = 10) -> 
     g["fast"] = g["with_value"] - g["slow"]
     g["mean"] = g["vsum"] / g["with_value"]
     g["pct_slow"] = 100.0 * g["slow"] / g["with_value"]
+    g["avg_fare"] = np.where(g["orders"] > 0, g["fare_sum"] / g["orders"], 0.0)
+    g["total_fare"] = g["fare_sum"]
+    g["avg_incentive"] = np.where(g["orders"] > 0, g["inc_sum"] / g["orders"], 0.0)
+    g["total_incentive"] = g["inc_sum"]
     g["reliable"] = g["orders"] >= min_orders
     g.index.name = "hex"
 
@@ -222,115 +261,27 @@ def compute_share_scale(tables: List[pd.DataFrame], total_slow: int, high_q: flo
     return 0.0, smax
 
 
-def compute_neighbor_time_correlations(
-    df: pd.DataFrame,
-    lat_col: str,
-    lng_col: str,
-    res: int,
-) -> Dict[str, Dict[str, Any]]:
-    """
-    Calculate correlation of 10-minute mean accept time series with neighboring cells:
-    1. Split orders into 10-minute time buckets based on created_at / created_date.
-    2. Compute mean accept time for each cell at resolution `res` in each 10-minute bucket.
-    3. For each cell, aggregate the 10-minute accept time series of its neighboring cells (h3.grid_disk(c, 1)).
-    4. Compute Pearson correlation between the cell's series and its neighbor series.
-    Returns dict mapping cell -> {'corr': float, 'samples': int, 'neighbors': int}
-    """
-    if df is None or len(df) == 0:
-        return {}
+def compute_fare_scale(tables: List[pd.DataFrame], low_q: float = 0.05, high_q: float = 0.95) -> Tuple[float, float]:
+    """Compute 5th and 95th percentiles of avg_fare across reliable hexagons."""
+    valid_tables = [t for t in tables if len(t) > 0]
+    if not valid_tables:
+        return 0.0, 60000.0
 
-    durations = pd.to_numeric(df["create_to_accept_contractual"], errors="coerce")
-    valid_mask = durations.notna() & (durations >= 0)
-    if not valid_mask.any():
-        return {}
+    frames = [t[t["reliable"]]["avg_fare"] for t in valid_tables if "reliable" in t.columns and "avg_fare" in t.columns]
+    ok_fares = pd.concat(frames, ignore_index=True) if frames else pd.Series(dtype=float)
 
-    sub = df[valid_mask]
-    dur = durations[valid_mask].values
+    if len(ok_fares) < 3:
+        all_frames = [t["avg_fare"] for t in valid_tables if "avg_fare" in t.columns]
+        ok_fares = pd.concat(all_frames, ignore_index=True) if all_frames else pd.Series(dtype=float)
 
-    # Determine 10-minute time bucket
-    bucket_series = None
-    for col in ["created_at", "order_created_at", "timestamp", "create_time"]:
-        if col in sub.columns:
-            ts = pd.to_datetime(sub[col], errors="coerce")
-            if ts.notna().any():
-                bucket_series = ts.dt.floor("10min")
-                break
+    if len(ok_fares) == 0:
+        return 0.0, 60000.0
 
-    if bucket_series is None or not bucket_series.notna().any():
-        if "created_date" in sub.columns:
-            dt = pd.to_datetime(sub["created_date"], errors="coerce")
-            if dt.notna().any():
-                offsets = pd.to_timedelta((sub.index.values % 84) * 10, unit="m")
-                bucket_series = dt + offsets
-
-    if bucket_series is None:
-        return {}
-
-    lats = sub[lat_col].values
-    lngs = sub[lng_col].values
-
-    cells = [to_cell(a, b, res) for a, b in zip(lats, lngs)]
-    valid_idx = [i for i, c in enumerate(cells) if c is not None and pd.notna(bucket_series.iloc[i])]
-    if not valid_idx:
-        return {}
-
-    clean_cells = [cells[i] for i in valid_idx]
-    clean_buckets = bucket_series.iloc[valid_idx].values
-    clean_durs = dur[valid_idx]
-
-    mini_df = pd.DataFrame({
-        "cell": clean_cells,
-        "bucket": clean_buckets,
-        "duration": clean_durs
-    })
-    grouped = mini_df.groupby(["cell", "bucket"], sort=False)["duration"].mean().reset_index()
-
-    cell_dict: Dict[str, Dict[Any, float]] = {}
-    for c, b, d in zip(grouped["cell"], grouped["bucket"], grouped["duration"]):
-        if c not in cell_dict:
-            cell_dict[c] = {}
-        cell_dict[c][b] = float(d)
-
-    out: Dict[str, Dict[str, Any]] = {}
-    for cell, b_map in cell_dict.items():
-        try:
-            neighbors = [n for n in h3.grid_disk(cell, 1) if n != cell]
-        except Exception:
-            neighbors = []
-
-        active_neighbors = [cell_dict[n] for n in neighbors if n in cell_dict]
-        if not active_neighbors:
-            out[cell] = {"corr": 0.0, "samples": 0, "neighbors": 0}
-            continue
-
-        x_vals = []
-        y_vals = []
-        for b, x in b_map.items():
-            n_vals = [n_map[b] for n_map in active_neighbors if b in n_map]
-            if n_vals:
-                x_vals.append(x)
-                y_vals.append(sum(n_vals) / len(n_vals))
-
-        if len(x_vals) >= 3:
-            arr_x = np.array(x_vals, dtype=np.float64)
-            arr_y = np.array(y_vals, dtype=np.float64)
-            std_x = float(np.std(arr_x))
-            std_y = float(np.std(arr_y))
-            if std_x > 1e-4 and std_y > 1e-4:
-                r = float(np.corrcoef(arr_x, arr_y)[0, 1])
-                corr_val = round(r, 2) if not np.isnan(r) else 0.0
-            else:
-                corr_val = 0.0
-        else:
-            corr_val = 0.0
-
-        out[cell] = {
-            "corr": corr_val,
-            "samples": len(x_vals),
-            "neighbors": len(active_neighbors)
-        }
-
-    return out
+    fmin = max(0.0, float(ok_fares.quantile(low_q)))
+    fmax = float(ok_fares.quantile(high_q))
+    if fmax <= fmin:
+        fmax = fmin + 1000.0
+    return round(fmin, 0), round(fmax, 0)
 
 
 def hexes_to_dict(
@@ -343,15 +294,17 @@ def hexes_to_dict(
     total_city_slow: int = 0,
     smin: float = 0.0,
     smax: float = 5.0,
-    corr_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    fmin: float = 0.0,
+    fmax: float = 60000.0,
 ) -> List[Dict[str, Any]]:
-    """Convert hexagon DataFrame into rich JSON objects with multiple colors (HA30, Mean, City Share, and Neighbor Correlation)."""
+    """Convert hexagon DataFrame into rich JSON objects with multiple colors (HA30, Mean, City Share, and Biker Fare)."""
     if len(g) == 0:
         return []
 
     span_ha = (vmax - vmin) or 1.0
     span_mean = (mmax - mmin) or 1.0
     span_share = (smax - smin) or 1.0
+    span_fare = (fmax - fmin) or 1.0
 
     orders_arr = g["orders"].to_numpy()
     p80_orders = np.percentile(orders_arr, 80) if len(orders_arr) else 10
@@ -370,10 +323,10 @@ def hexes_to_dict(
         status = str(row.status)
         share_pct = round((slow / total_city_slow * 100.0), 2) if total_city_slow > 0 else 0.0
 
-        corr_info = corr_map.get(cell, {"corr": 0.0, "samples": 0, "neighbors": 0}) if corr_map else {"corr": 0.0, "samples": 0, "neighbors": 0}
-        corr_val = float(corr_info.get("corr", 0.0))
-        corr_samples = int(corr_info.get("samples", 0))
-        corr_neighbors = int(corr_info.get("neighbors", 0))
+        avg_fare = round(float(row.avg_fare), 0) if hasattr(row, "avg_fare") else 0.0
+        total_fare = round(float(row.total_fare), 0) if hasattr(row, "total_fare") else 0.0
+        avg_inc = round(float(row.avg_incentive), 0) if hasattr(row, "avg_incentive") else 0.0
+        total_inc = round(float(row.total_incentive), 0) if hasattr(row, "total_incentive") else 0.0
 
         # Ramped Colors
         if reliable:
@@ -383,13 +336,13 @@ def hexes_to_dict(
             color_mean = hexcolor(ha_ramp(t_mean))
             t_share = (share_pct - smin) / span_share
             color_share = hexcolor(ha_ramp(t_share))
-            t_corr = min(max(corr_val, 0.0), 1.0)
-            color_corr = hexcolor(ha_ramp(t_corr)) if corr_samples >= 3 else hexcolor(GREY)
+            t_fare = (avg_fare - fmin) / span_fare
+            color_fare = hexcolor(ha_ramp(t_fare))
         else:
             color_ha = hexcolor(GREY)
             color_mean = hexcolor(GREY)
             color_share = hexcolor(GREY)
-            color_corr = hexcolor(GREY)
+            color_fare = hexcolor(GREY)
 
         if orders >= p80_orders:
             vol_tier = "high"
@@ -412,14 +365,15 @@ def hexes_to_dict(
             "pct": round(pct, 2),
             "mean": round(mean_val, 1),
             "share_pct": share_pct,
-            "corr": corr_val,
-            "corr_samples": corr_samples,
-            "corr_neighbors": corr_neighbors,
+            "avg_fare": avg_fare,
+            "total_fare": total_fare,
+            "avg_incentive": avg_inc,
+            "total_incentive": total_inc,
             "color": color_ha,        # Default to HA30
             "color_ha": color_ha,     # Color by HA30%
             "color_mean": color_mean, # Color by Mean duration
             "color_share": color_share, # Color by Share of citywide HA orders
-            "color_corr": color_corr,   # Color by 10-min neighbor accept time correlation
+            "color_fare": color_fare,   # Color by average final biker fare
             "reliable": reliable,
             "status": status,
             "vol_tier": vol_tier,
@@ -478,6 +432,7 @@ def analyze_city_orders(
         vmin, vmax = compute_ha_scale([tbl_src, tbl_dest], low_q, high_q)
         mmin, mmax = compute_mean_scale([tbl_src, tbl_dest], low_q, high_q)
         smin, smax = compute_share_scale([tbl_src, tbl_dest], total_slow, high_q)
+        fmin, fmax = compute_fare_scale([tbl_src, tbl_dest], low_q, high_q)
 
         scale_info = {
             "vmin": vmin,
@@ -486,25 +441,22 @@ def analyze_city_orders(
             "mmax": mmax,
             "smin": smin,
             "smax": smax,
-            "cmin": 0.0,
-            "cmax": 1.0,
+            "fmin": fmin,
+            "fmax": fmax,
             "threshold": threshold,
             "min_orders": min_orders,
             "total_city_slow": total_slow,
         }
 
-        corr_src = compute_neighbor_time_correlations(df, "source_latitude", "source_longitude", r)
-        corr_dest = compute_neighbor_time_correlations(df, "destination_latitude", "destination_longitude", r)
-
         layers_dict["source"]["res"][str(r)] = {
             "scale": scale_info,
-            "hexes": hexes_to_dict(tbl_src, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax, corr_src),
+            "hexes": hexes_to_dict(tbl_src, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax, fmin, fmax),
             "count": len(tbl_src),
             "reliable_count": int(tbl_src["reliable"].sum()) if len(tbl_src) else 0,
         }
         layers_dict["destination"]["res"][str(r)] = {
             "scale": scale_info,
-            "hexes": hexes_to_dict(tbl_dest, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax, corr_dest),
+            "hexes": hexes_to_dict(tbl_dest, vmin, vmax, mmin, mmax, threshold, total_slow, smin, smax, fmin, fmax),
             "count": len(tbl_dest),
             "reliable_count": int(tbl_dest["reliable"].sum()) if len(tbl_dest) else 0,
         }
@@ -552,6 +504,30 @@ def analyze_city_orders(
     center_lng = float(df["source_longitude"].mean()) if len(df) else 51.6680
     avg_vendors_per_biker = compute_biker_active_vendors_avg(df)
 
+    fare_col = "final_biker_fare" if "final_biker_fare" in df.columns else None
+    if fare_col is None:
+        for c in ["biker_fare", "fare"]:
+            if c in df.columns:
+                fare_col = c
+                break
+    if fare_col:
+        fares_numeric = pd.to_numeric(df[fare_col], errors="coerce").dropna()
+        avg_city_fare = round(float(fares_numeric.mean()), 0) if len(fares_numeric) else 0.0
+    else:
+        avg_city_fare = 0.0
+
+    inc_col = "incentive" if "incentive" in df.columns else None
+    if inc_col is None:
+        for c in ["biker_incentive", "incentives", "bonus"]:
+            if c in df.columns:
+                inc_col = c
+                break
+    if inc_col:
+        inc_numeric = pd.to_numeric(df[inc_col], errors="coerce").dropna()
+        avg_city_inc = round(float(inc_numeric.mean()), 0) if len(inc_numeric) else 0.0
+    else:
+        avg_city_inc = 0.0
+
     return {
         "kpis": {
             "total_orders": total_orders,
@@ -566,6 +542,8 @@ def analyze_city_orders(
             "threshold": threshold,
             "min_orders": min_orders,
             "avg_vendors_per_biker": avg_vendors_per_biker,
+            "avg_biker_fare": avg_city_fare,
+            "avg_incentive": avg_city_inc,
         },
         "center": [round(center_lat, 5), round(center_lng, 5)],
         "res_min": res_min,
