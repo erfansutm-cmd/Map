@@ -356,7 +356,7 @@ def export_html(
 def export_kml_get(
     cells: str = Query(default="", description="Comma-separated list of H3 cell IDs"),
     filename: Optional[str] = Query(default=None, description="Custom filename for KML export"),
-    mode: str = Query(default="individual", description="Export mode: 'outer' for dissolved black outer boundary, 'individual' for per-cell"),
+    mode: str = Query(default="both", description="Export mode: 'both' (2 layers: per-cell and outer boundary), 'individual', or 'outer'"),
 ):
     """Export boundaries of selected H3 cells as an OGC KML 2.2 file."""
     cell_list = [c.strip() for c in cells.split(",") if c.strip()]
@@ -366,7 +366,7 @@ def export_kml_get(
     if mode == "outer":
         kml_content = build_kml_outer_boundary(cell_list)
     else:
-        kml_content = build_kml_boundaries(cell_list)
+        kml_content = build_kml_boundaries(cell_list, mode=mode)
 
     out_filename = filename or f"selected_{len(cell_list)}_cells_boundaries.kml"
     if not out_filename.endswith(".kml"):
@@ -383,7 +383,7 @@ def export_kml_get(
 def export_kml_post(payload: Dict[str, Any]):
     """Export boundaries of selected H3 cells as an OGC KML 2.2 file (POST with JSON)."""
     raw_cells = payload.get("cells", [])
-    mode = str(payload.get("mode") or "").strip().lower()
+    mode = str(payload.get("mode") or "both").strip().lower()
     if isinstance(raw_cells, str):
         cell_list = [c.strip() for c in raw_cells.split(",") if c.strip()]
     elif isinstance(raw_cells, list):
@@ -402,7 +402,7 @@ def export_kml_post(payload: Dict[str, Any]):
     if mode == "outer":
         kml_content = build_kml_outer_boundary(cell_list)
     else:
-        kml_content = build_kml_boundaries(cell_list)
+        kml_content = build_kml_boundaries(cell_list, mode=mode)
 
     out_filename = payload.get("filename") or f"selected_{len(cell_list)}_cells_boundaries.kml"
     if not out_filename.endswith(".kml"):
@@ -503,6 +503,72 @@ def export_biker_rides_csv_endpoint(payload: Dict[str, Any]):
             "X-Matched-Bikers-Count": str(count),
         },
     )
+
+
+@app.post("/api/biker-rides-preview")
+def preview_biker_rides_endpoint(payload: Dict[str, Any]):
+    """Calculate and return live preview and summary KPIs of filtered bikers within boundary cells."""
+    city = str(payload.get("city") or "isfahan").strip().lower()
+    start_date = str(payload.get("start_date") or settings.DEFAULT_START_DATE).strip()
+    end_date = str(payload.get("end_date") or settings.DEFAULT_END_DATE).strip()
+    status = str(payload.get("status") or "DELIVERED").strip()
+    customer_id = 2  # strictly customer_id = 2
+    min_rides = max(0, int(payload.get("min_rides") or 0))
+    toggle = str(payload.get("toggle") or "less").strip().lower()
+    percentage = float(payload.get("percentage") if payload.get("percentage") is not None else 20.0)
+    layer = str(payload.get("layer") or "source").strip().lower()
+    raw_cells = payload.get("cells", [])
+
+    if isinstance(raw_cells, str):
+        cell_list = [c.strip() for c in raw_cells.split(",") if c.strip()]
+    elif isinstance(raw_cells, list):
+        cell_list = [str(c.get("hex") if isinstance(c, dict) else c).strip() for c in raw_cells if str(c).strip()]
+    else:
+        cell_list = []
+
+    if not cell_list:
+        raise HTTPException(status_code=400, detail="No boundary cell IDs provided")
+
+    try:
+        df, _, _, _ = fetch_orders(
+            city=city,
+            status=status,
+            customer_id=customer_id,
+            start_date=start_date,
+            end_date=end_date,
+            threshold=settings.DEFAULT_THRESHOLD,
+        )
+    except RuntimeError:
+        df, _, _, _ = generate_fallback_orders(
+            city=city,
+            start_date=start_date,
+            end_date=end_date,
+            threshold=settings.DEFAULT_THRESHOLD,
+        )
+
+    biker_df = compute_biker_boundary_rides(
+        df=df,
+        cells=cell_list,
+        min_rides=min_rides,
+        toggle=toggle,
+        percentage=percentage,
+        layer=layer,
+    )
+
+    matching_count = len(biker_df)
+    total_period_rides = int(biker_df["total_rides_in_period"].sum()) if matching_count > 0 else 0
+    total_boundary_rides = int(biker_df["total_rides_in_boundary"].sum()) if matching_count > 0 else 0
+    avg_boundary_pct = round(float(biker_df["percentage_of_rides_in_boundary"].mean()), 2) if matching_count > 0 else 0.0
+
+    preview_records = biker_df.head(100).to_dict(orient="records")
+
+    return {
+        "matching_bikers_count": matching_count,
+        "total_period_rides": total_period_rides,
+        "total_boundary_rides": total_boundary_rides,
+        "avg_boundary_pct": avg_boundary_pct,
+        "bikers": preview_records,
+    }
 
 
 @app.get("/api/export-biker-rides-csv")

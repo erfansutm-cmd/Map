@@ -5,7 +5,7 @@
   <title>Fleet HexMap Analytics | H3 Fleet SLA Performance Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/css/app.css?v=2.5.5">
+  <link rel="stylesheet" href="/static/css/app.css?v=2.6.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -483,10 +483,6 @@
                   <button id="btnLabelHaOnly" class="pill-item" type="button" title="Show only metric in cell views">HA% Only</button>
                   <button id="btnLabelOrdersOnly" class="pill-item" type="button" title="Show only orders count in cell views">Orders Only</button>
                 </div>
-                <label class="checkbox-label" style="margin-top:8px;margin-bottom:0" title="Render black outer boundary of selected cells as an independent layer">
-                  <input type="checkbox" id="checkOuterBoundaryLayerCtrl" checked style="accent-color:#000">
-                  <span style="font-weight:600">Outer Boundary Layer (Black)</span>
-                </label>
               </div>
 
               <!-- Basemap Style -->
@@ -506,13 +502,13 @@
                   <span>Multi-Select Cells (or hold <kbd style="background:#e2e8f0;padding:1px 4px;border-radius:3px">Shift</kbd>)</span>
                 </label>
                 <div id="multiSelectControlsKml" style="display:none;margin-top:6px">
-                  <button id="btnExportKmlFromControls" class="btn-action btn-kml-export" style="width:100%;background:#000000;color:#fff;border-color:#000000;font-weight:600;justify-content:center;padding:5px 8px;font-size:11px" title="Output selected cells outer boundary as KML file" type="button">
+                  <button id="btnExportKmlFromControls" class="btn-action btn-kml-export" style="width:100%;background:#0f172a;color:#fff;border-color:#0f172a;font-weight:600;justify-content:center;padding:5px 8px;font-size:11px" title="Export 2-layer KML (Per-Cell and Outer Boundary)" type="button">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:4px">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                       <polyline points="7 10 12 15 17 10"></polyline>
                       <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
-                    Output Outer Boundary KML (<span id="multiKmlCountText">0</span> Selected)
+                    Export KML (2 Layers) (<span id="multiKmlCountText">0</span>)
                   </button>
                 </div>
               </div>
@@ -628,13 +624,6 @@
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <span id="mergedDeltaBadge" style="font-size:11px;font-weight:700;color:#0e7490">+0.0% vs City</span>
-          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#0f172a;cursor:pointer" title="Toggle Black Outer Boundary overlay layer">
-            <input type="checkbox" id="checkOuterBoundaryLayer" checked style="accent-color:#000;cursor:pointer">
-            <span style="display:inline-flex;align-items:center;gap:3px">
-              <span style="display:inline-block;width:7px;height:7px;border-radius:1px;background:#000"></span>
-              Outer Boundary Layer
-            </span>
-          </label>
         </div>
 
         <div class="stat-grid">
@@ -681,77 +670,90 @@
         <div id="mergedCellsList" class="merged-cells-chips"></div>
 
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
-          <button id="btnExportKmlSelection" class="btn-action btn-kml-export" style="width:100%;background:#000000;color:#fff;border-color:#000000;font-weight:700;justify-content:center;padding:7px 10px;font-size:12px" title="Output selected cells outer boundary as KML file">
+          <button id="btnExportKmlSelection" class="btn-action btn-kml-export" style="width:100%;background:#0f172a;color:#fff;border-color:#0f172a;font-weight:700;justify-content:center;padding:7px 10px;font-size:12px" title="Export 2-layer KML (Per-Cell and Outer Boundary)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Output Outer Boundary KML
+            Export KML (2 Layers)
           </button>
 
-          <!-- Collapsible Biker Boundary Analysis & CSV Export Panel -->
-          <div class="biker-boundary-card" style="margin-top:4px;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;background:#f8fafc">
-            <button type="button" id="btnToggleBikerExport" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#f1f5f9;border:none;font-size:11.5px;font-weight:700;color:#0f172a;cursor:pointer">
-              <span style="display:inline-flex;align-items:center;gap:6px">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>
-                Biker Boundary Ride Filter
-              </span>
-              <span id="iconBikerExportArrow" style="font-size:10px;color:#64748b;transition:transform 0.2s">&#9660;</span>
+          <!-- Polished Biker Boundary Analysis & CSV Export Section -->
+          <div class="biker-feature-card">
+            <button type="button" id="btnToggleBikerExport" class="biker-card-header">
+              <div class="biker-card-title-group">
+                <span class="biker-card-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <circle cx="18.5" cy="17.5" r="3.5"></circle>
+                    <circle cx="5.5" cy="17.5" r="3.5"></circle>
+                    <circle cx="15" cy="5" r="1"></circle>
+                    <path d="M12 17.5V14l-3-3 4-3 2 3h2"></path>
+                  </svg>
+                </span>
+                <div style="text-align:left">
+                  <div class="biker-card-title">Biker Boundary Filter</div>
+                  <div class="biker-card-subtitle">Filter riders by boundary ride share</div>
+                </div>
+              </div>
+              <span id="iconBikerExportArrow" class="biker-card-chevron">&#9660;</span>
             </button>
 
-            <div id="bikerExportBody" style="display:none;padding:9px;border-top:1px solid #e2e8f0;background:#ffffff">
-              <!-- Period Selection with calendar view -->
-              <div style="margin-bottom:8px">
-                <div style="font-size:10.5px;font-weight:700;color:#334155;margin-bottom:3px">Analysis Period:</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                  <div>
-                    <label for="bikerExportStartDate" style="font-size:9.5px;font-weight:600;color:#64748b;display:block;margin-bottom:2px">Start Date</label>
-                    <input type="date" id="bikerExportStartDate" class="form-input" style="padding:4px 6px;font-size:11px;width:100%">
+            <div id="bikerExportBody" class="biker-card-body" style="display:none">
+              <!-- Period with dates -->
+              <div class="biker-form-group">
+                <div class="biker-form-label-row">
+                  <span class="biker-form-label">Analysis Period</span>
+                  <span class="biker-label-hint">active range</span>
+                </div>
+                <div class="biker-date-grid">
+                  <div class="biker-date-item">
+                    <span class="biker-date-prefix">From</span>
+                    <input type="date" id="bikerExportStartDate" class="biker-date-input">
                   </div>
-                  <div>
-                    <label for="bikerExportEndDate" style="font-size:9.5px;font-weight:600;color:#64748b;display:block;margin-bottom:2px">End Date</label>
-                    <input type="date" id="bikerExportEndDate" class="form-input" style="padding:4px 6px;font-size:11px;width:100%">
+                  <div class="biker-date-item">
+                    <span class="biker-date-prefix">To</span>
+                    <input type="date" id="bikerExportEndDate" class="biker-date-input">
                   </div>
                 </div>
               </div>
 
-              <!-- Min rides per biker (>= 0) -->
-              <div style="margin-bottom:8px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-                  <label for="bikerExportMinRides" style="font-size:10.5px;font-weight:700;color:#334155">Min Total Rides / Biker:</label>
-                  <span style="font-size:9.5px;color:#64748b;font-weight:600">&ge; 0</span>
+              <!-- Min Rides Input -->
+              <div class="biker-form-group">
+                <div class="biker-form-label-row">
+                  <label for="bikerExportMinRides" class="biker-form-label">Min Rides in Period</label>
+                  <span class="biker-pill-tag">&ge; 0</span>
                 </div>
-                <input type="number" id="bikerExportMinRides" class="form-input" min="0" step="1" value="5" style="padding:4px 6px;font-size:11px;width:100%" title="Minimum total rides by biker in period (>= 0)">
+                <input type="number" id="bikerExportMinRides" class="biker-number-input" min="0" step="1" value="5" placeholder="5">
               </div>
 
-              <!-- Boundary Ride Percentage Filter: Toggle (more or less) + Percentage input -->
-              <div style="margin-bottom:10px">
-                <div style="font-size:10.5px;font-weight:700;color:#334155;margin-bottom:4px">Rides in Boundary %:</div>
-                <div style="display:flex;gap:6px;align-items:center">
-                  <!-- Toggle: More or Less (default on less) -->
-                  <div class="toggle-segmented" style="display:inline-flex;border:1px solid #cbd5e1;border-radius:4px;overflow:hidden;background:#fff">
-                    <button type="button" id="btnToggleLess" class="btn-segmented active" style="padding:4px 8px;font-size:10.5px;font-weight:700;border:none;background:#2563eb;color:#fff;cursor:pointer" title="Bikers with less than or equal to this % of rides in boundary">Less (&le;)</button>
-                    <button type="button" id="btnToggleMore" class="btn-segmented" style="padding:4px 8px;font-size:10.5px;font-weight:700;border:none;background:#f1f5f9;color:#475569;cursor:pointer" title="Bikers with more than or equal to this % of rides in boundary">More (&ge;)</button>
+              <!-- Boundary Ride Share % Rule -->
+              <div class="biker-form-group">
+                <span class="biker-form-label">Rides in Boundary %</span>
+                <div class="biker-rule-grid">
+                  <div class="biker-segmented">
+                    <button type="button" id="btnToggleLess" class="biker-seg-btn active" title="Bikers with less than or equal to this % of rides in boundary">&le; Less</button>
+                    <button type="button" id="btnToggleMore" class="biker-seg-btn" title="Bikers with more than or equal to this % of rides in boundary">&ge; More</button>
                   </div>
-                  <!-- Percentage input (0 to 100) -->
-                  <div style="display:flex;align-items:center;flex:1;position:relative">
-                    <input type="number" id="bikerExportPct" class="form-input" min="0" max="100" step="1" value="20" style="padding:4px 22px 4px 6px;font-size:11px;width:100%" title="Target boundary ride share percentage (0 to 100%)">
-                    <span style="position:absolute;right:6px;font-size:11px;font-weight:700;color:#64748b;pointer-events:none">%</span>
+                  <div class="biker-pct-wrap">
+                    <input type="number" id="bikerExportPct" class="biker-pct-input" min="0" max="100" step="1" value="20">
+                    <span class="biker-pct-badge">%</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Export as CSV button -->
-              <button type="button" id="btnExportBikersCsv" class="btn-action" style="width:100%;background:#059669;color:#fff;border-color:#047857;font-weight:700;justify-content:center;padding:7px 10px;font-size:11.5px" title="Export matching bikers and rides to CSV">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Export as CSV
-              </button>
-              <div id="bikerExportFeedback" style="font-size:10px;color:#64748b;text-align:center;margin-top:4px;display:none"></div>
+              <!-- Dual Action Buttons: Preview Table and Export CSV -->
+              <div class="biker-actions-container">
+                <button type="button" id="btnOpenBikerModal" class="btn-biker-preview" title="View live summary stats and biker preview table">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  Preview Bikers
+                </button>
+                <button type="button" id="btnExportBikersCsv" class="btn-biker-export" title="Export matching bikers to CSV">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Export CSV
+                </button>
+              </div>
+              <div id="bikerExportFeedback" class="biker-feedback-msg" style="display:none"></div>
             </div>
           </div>
           <div style="display:flex;gap:6px">
@@ -973,6 +975,127 @@
   </div>
 </div>
 
+<!-- Dedicated Biker Boundary Analysis & CSV Export Modal -->
+<div id="bikerModal" class="modal-overlay">
+  <div class="modal-dialog biker-modal-dialog">
+    <div class="biker-modal-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="biker-modal-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="18.5" cy="17.5" r="3.5"></circle>
+            <circle cx="5.5" cy="17.5" r="3.5"></circle>
+            <circle cx="15" cy="5" r="1"></circle>
+            <path d="M12 17.5V14l-3-3 4-3 2 3h2"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="modal-title" style="margin-bottom:2px">Biker Boundary Analysis &amp; CSV Export</div>
+          <div id="bikerModalSubtitle" class="modal-sub" style="margin-bottom:0">Filtering bikers operating inside vs outside selected cells (customer_id = 2)</div>
+        </div>
+      </div>
+      <button type="button" id="btnCloseBikerModal" class="btn-close-inspector">&times;</button>
+    </div>
+
+    <!-- Quick Filter Control Bar inside modal -->
+    <div class="biker-modal-filter-bar">
+      <div class="biker-modal-filter-field">
+        <label for="bikerModalStartDate" class="biker-mini-label">Start Date</label>
+        <input type="date" id="bikerModalStartDate" class="form-input" style="padding:4px 6px;font-size:11.5px">
+      </div>
+      <div class="biker-modal-filter-field">
+        <label for="bikerModalEndDate" class="biker-mini-label">End Date</label>
+        <input type="date" id="bikerModalEndDate" class="form-input" style="padding:4px 6px;font-size:11.5px">
+      </div>
+      <div class="biker-modal-filter-field" style="max-width:90px">
+        <label for="bikerModalMinRides" class="biker-mini-label">Min Rides</label>
+        <input type="number" id="bikerModalMinRides" class="form-input" min="0" step="1" value="5" style="padding:4px 6px;font-size:11.5px">
+      </div>
+      <div class="biker-modal-filter-field">
+        <label class="biker-mini-label">Target % Share</label>
+        <div style="display:flex;gap:4px;align-items:center">
+          <div class="biker-segmented">
+            <button type="button" id="bikerModalToggleLess" class="biker-seg-btn active" style="font-size:10px;padding:4px 7px">&le; Less</button>
+            <button type="button" id="bikerModalToggleMore" class="biker-seg-btn" style="font-size:10px;padding:4px 7px">&ge; More</button>
+          </div>
+          <div style="position:relative;width:65px">
+            <input type="number" id="bikerModalPct" class="form-input" min="0" max="100" step="1" value="20" style="padding:4px 18px 4px 6px;font-size:11.5px">
+            <span style="position:absolute;right:5px;top:4px;font-size:10px;color:#64748b;font-weight:700">%</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button type="button" id="btnBikerModalApply" class="btn-primary" style="padding:5px 12px;font-size:11.5px;height:29px;display:flex;align-items:center;gap:4px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          Update
+        </button>
+      </div>
+    </div>
+
+    <!-- Live KPI Summary Cards -->
+    <div class="biker-modal-kpi-grid">
+      <div class="stat-box">
+        <div class="stat-box-label">Matching Bikers</div>
+        <div id="bikerModalKpiCount" class="stat-box-val" style="color:#2563eb;font-size:18px">-</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Total Period Rides</div>
+        <div id="bikerModalKpiTotalRides" class="stat-box-val" style="font-size:18px">-</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Boundary Rides</div>
+        <div id="bikerModalKpiBoundaryRides" class="stat-box-val" style="color:#059669;font-size:18px">-</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-box-label">Avg Boundary Share</div>
+        <div id="bikerModalKpiAvgPct" class="stat-box-val" style="color:#0e7490;font-size:18px">-%</div>
+      </div>
+    </div>
+
+    <!-- Live Preview Table Section -->
+    <div style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:11.5px;font-weight:700;color:#334155">
+          <span>Matching Bikers Preview</span>
+          <span id="bikerModalTableSub" style="font-weight:400;color:#64748b;margin-left:4px"></span>
+        </div>
+        <div style="position:relative;width:160px">
+          <input type="text" id="bikerModalSearch" class="form-input" placeholder="Search biker ID..." style="padding:3px 8px;font-size:11px">
+        </div>
+      </div>
+
+      <div class="biker-modal-table-wrap">
+        <table class="biker-table">
+          <thead>
+            <tr>
+              <th style="width:25%">Biker ID</th>
+              <th style="width:25%;text-align:right">Total Period Rides</th>
+              <th style="width:25%;text-align:right">Boundary Rides</th>
+              <th style="width:25%;text-align:right">Boundary Share %</th>
+            </tr>
+          </thead>
+          <tbody id="bikerModalTableBody">
+            <tr><td colspan="4" style="text-align:center;padding:16px;color:#64748b">Loading biker records...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
+      <div style="font-size:10.5px;color:#64748b">
+        Enforced <b>customer_id = 2</b> &bull; Showing up to 100 preview rows
+      </div>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="btnBikerModalClose" class="btn-action" style="padding:6px 12px;font-size:11.5px">Close</button>
+        <button type="button" id="btnBikerModalExportCsv" class="btn-action" style="background:#059669;color:#fff;border-color:#047857;font-weight:700;padding:6px 14px;font-size:11.5px;display:flex;align-items:center;gap:5px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download CSV
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Filter Settings Modal -->
 <div id="filterModal" class="modal-overlay">
   <div class="modal-dialog">
@@ -1034,6 +1157,6 @@
   window.MAP_API_KEY = "{{ map_api_key }}";
   window.CARTO_TILE_URL = "{{ carto_tile_url }}";
 </script>
-<script src="/static/js/app.js?v=2.5.5"></script>
+<script src="/static/js/app.js?v=2.6.0"></script>
 </body>
 </html>

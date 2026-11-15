@@ -35,9 +35,8 @@ const state = {
   polygons: [],
   selectedHexes: new Map(),   // Multi-selected cells: hexId -> { h, polygon }
   singleSelectedHex: null,    // Single selected cell
-  showOuterBoundaryLayer: true, // Show dissolved black outer boundary layer
-  outerBoundaryGeo: null,     // Dissolved outer boundary GeoJSON
   bikerExportToggle: 'less',  // 'less' or 'more' (default on less)
+  bikerPreviewRecords: [],    // Live cached records for biker preview table
 };
 
 // Helpers for Currency & Fare Formatting
@@ -84,7 +83,6 @@ const BASEMAP_PROVIDERS = {
 let map;
 let tileLayer;
 let hexLayerGroup;
-let outerBoundaryLayerGroup;
 let labelLayerGroup;
 
 function createTileLayer(type) {
@@ -143,7 +141,6 @@ function initMap() {
   tileLayer = createTileLayer(state.activeBasemap).addTo(map);
 
   hexLayerGroup = L.layerGroup().addTo(map);
-  outerBoundaryLayerGroup = L.layerGroup().addTo(map);
   labelLayerGroup = L.layerGroup().addTo(map);
 
   map.on('zoomend', () => {
@@ -336,22 +333,6 @@ function setupEventListeners() {
     });
   }
 
-  // Outer boundary layer toggle (both merged panel & display tab)
-  const checkOuter = document.getElementById('checkOuterBoundaryLayer');
-  const checkOuterCtrl = document.getElementById('checkOuterBoundaryLayerCtrl');
-  function toggleOuterBoundary(show) {
-    state.showOuterBoundaryLayer = show;
-    if (checkOuter) checkOuter.checked = show;
-    if (checkOuterCtrl) checkOuterCtrl.checked = show;
-    updateMergedOuterBoundaryLayer();
-  }
-  if (checkOuter) {
-    checkOuter.addEventListener('change', (e) => toggleOuterBoundary(e.target.checked));
-  }
-  if (checkOuterCtrl) {
-    checkOuterCtrl.addEventListener('change', (e) => toggleOuterBoundary(e.target.checked));
-  }
-
   // Calendar / Period Trigger & Popover
   const btnTrigger = document.getElementById('btnCalendarTrigger');
   const popover = document.getElementById('calendarPopover');
@@ -495,32 +476,85 @@ function setupEventListeners() {
     });
   }
 
-  const btnToggleLess = document.getElementById('btnToggleLess');
-  const btnToggleMore = document.getElementById('btnToggleMore');
-  if (btnToggleLess && btnToggleMore) {
-    btnToggleLess.addEventListener('click', () => {
-      state.bikerExportToggle = 'less';
-      btnToggleLess.classList.add('active');
-      btnToggleMore.classList.remove('active');
-      btnToggleLess.style.background = '#2563eb';
-      btnToggleLess.style.color = '#ffffff';
-      btnToggleMore.style.background = '#f1f5f9';
-      btnToggleMore.style.color = '#475569';
+  function setBikerToggle(mode) {
+    state.bikerExportToggle = mode;
+    const btnLess = document.getElementById('btnToggleLess');
+    const btnMore = document.getElementById('btnToggleMore');
+    const modalLess = document.getElementById('bikerModalToggleLess');
+    const modalMore = document.getElementById('bikerModalToggleMore');
+
+    [btnLess, modalLess].forEach(btn => {
+      if (!btn) return;
+      if (mode === 'less') {
+        btn.classList.add('active');
+        btn.style.background = '#2563eb';
+        btn.style.color = '#ffffff';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = '#f8fafc';
+        btn.style.color = '#475569';
+      }
     });
-    btnToggleMore.addEventListener('click', () => {
-      state.bikerExportToggle = 'more';
-      btnToggleMore.classList.add('active');
-      btnToggleLess.classList.remove('active');
-      btnToggleMore.style.background = '#2563eb';
-      btnToggleMore.style.color = '#ffffff';
-      btnToggleLess.style.background = '#f1f5f9';
-      btnToggleLess.style.color = '#475569';
+
+    [btnMore, modalMore].forEach(btn => {
+      if (!btn) return;
+      if (mode === 'more') {
+        btn.classList.add('active');
+        btn.style.background = '#2563eb';
+        btn.style.color = '#ffffff';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = '#f8fafc';
+        btn.style.color = '#475569';
+      }
     });
   }
+
+  const btnToggleLess = document.getElementById('btnToggleLess');
+  const btnToggleMore = document.getElementById('btnToggleMore');
+  if (btnToggleLess) btnToggleLess.addEventListener('click', () => setBikerToggle('less'));
+  if (btnToggleMore) btnToggleMore.addEventListener('click', () => setBikerToggle('more'));
+
+  const bikerModalToggleLess = document.getElementById('bikerModalToggleLess');
+  const bikerModalToggleMore = document.getElementById('bikerModalToggleMore');
+  if (bikerModalToggleLess) bikerModalToggleLess.addEventListener('click', () => setBikerToggle('less'));
+  if (bikerModalToggleMore) bikerModalToggleMore.addEventListener('click', () => setBikerToggle('more'));
 
   const btnExportBikersCsv = document.getElementById('btnExportBikersCsv');
   if (btnExportBikersCsv) {
     btnExportBikersCsv.addEventListener('click', () => exportBikersBoundaryCsv());
+  }
+
+  const btnOpenBikerModal = document.getElementById('btnOpenBikerModal');
+  if (btnOpenBikerModal) {
+    btnOpenBikerModal.addEventListener('click', openBikerModal);
+  }
+
+  const btnCloseBikerModal = document.getElementById('btnCloseBikerModal');
+  const btnBikerModalClose = document.getElementById('btnBikerModalClose');
+  if (btnCloseBikerModal) btnCloseBikerModal.addEventListener('click', closeBikerModal);
+  if (btnBikerModalClose) btnBikerModalClose.addEventListener('click', closeBikerModal);
+
+  const btnBikerModalApply = document.getElementById('btnBikerModalApply');
+  if (btnBikerModalApply) {
+    btnBikerModalApply.addEventListener('click', () => loadBikerModalPreview());
+  }
+
+  const btnBikerModalExportCsv = document.getElementById('btnBikerModalExportCsv');
+  if (btnBikerModalExportCsv) {
+    btnBikerModalExportCsv.addEventListener('click', () => exportBikersBoundaryCsv());
+  }
+
+  const bikerModalSearch = document.getElementById('bikerModalSearch');
+  if (bikerModalSearch) {
+    bikerModalSearch.addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!state.bikerPreviewRecords || state.bikerPreviewRecords.length === 0) return;
+      const filtered = q
+        ? state.bikerPreviewRecords.filter(r => String(r.biker_id).toLowerCase().includes(q))
+        : state.bikerPreviewRecords;
+      renderBikerModalTable(filtered);
+    });
   }
 
   // Citywide Report Modal
@@ -1999,7 +2033,7 @@ function renderMapHexagons() {
     const fillColor = getHexFillColor(h);
 
     const polygon = L.polygon(h.ring, {
-      color: isSelected ? '#06b6d4' : '#ffffff',
+      color: isSelected ? '#000000' : '#ffffff',
       weight: isVisible ? (isSelected ? 2.5 : 1.2) : 0,
       fillColor: fillColor,
       fillOpacity: isVisible ? state.opacity : 0,
@@ -2014,10 +2048,12 @@ function renderMapHexagons() {
     });
 
     polygon.on('mouseover', () => {
-      if (!state.selectedHexes.has(h.hex)) {
-        polygon.setStyle({ weight: 2.8, color: '#0f172a' });
-        polygon.bringToFront();
-      }
+      const selected = state.selectedHexes.has(h.hex);
+      polygon.setStyle({
+        weight: selected ? 3.5 : 2.8,
+        color: selected ? '#000000' : '#0f172a'
+      });
+      polygon.bringToFront();
     });
 
     polygon.on('mouseout', () => {
@@ -2025,7 +2061,7 @@ function renderMapHexagons() {
       const singleSel = state.singleSelectedHex && state.singleSelectedHex.hex === h.hex;
       polygon.setStyle({
         weight: selected ? 2.5 : (singleSel ? 3.0 : 1.2),
-        color: selected ? '#06b6d4' : (singleSel ? '#2563eb' : '#ffffff'),
+        color: selected ? '#000000' : (singleSel ? '#2563eb' : '#ffffff'),
         opacity: 1,
       });
     });
@@ -2223,7 +2259,7 @@ function toggleMultiSelectHex(h, polygon) {
     polygon.setStyle({ weight: 1.2, color: '#ffffff', opacity: 1, fillOpacity: state.opacity });
   } else {
     state.selectedHexes.set(h.hex, { h, polygon });
-    polygon.setStyle({ weight: 2.5, color: '#06b6d4', opacity: 1, fillOpacity: state.opacity });
+    polygon.setStyle({ weight: 2.5, color: '#000000', opacity: 1, fillOpacity: state.opacity });
     polygon.bringToFront();
   }
 
@@ -2238,8 +2274,6 @@ function renderMergedSelection() {
   if (state.selectedHexes.size === 0) {
     panel.classList.remove('active');
     if (ctrlKml) ctrlKml.style.display = 'none';
-    if (outerBoundaryLayerGroup) outerBoundaryLayerGroup.clearLayers();
-    state.outerBoundaryGeo = null;
     return;
   }
 
@@ -2332,74 +2366,7 @@ function renderMergedSelection() {
     inputEndDate.value = state.endDate;
   }
 
-  updateMergedOuterBoundaryLayer();
   panel.classList.add('active');
-}
-
-function updateMergedOuterBoundaryLayer() {
-  if (!outerBoundaryLayerGroup) return;
-  outerBoundaryLayerGroup.clearLayers();
-
-  if (state.selectedHexes.size === 0) {
-    state.outerBoundaryGeo = null;
-    return;
-  }
-
-  // Ensure all selected polygons in hexLayerGroup retain their per-cell selection borders
-  state.selectedHexes.forEach(item => {
-    if (item.polygon) {
-      item.polygon.setStyle({
-        weight: 2.5,
-        color: '#06b6d4',
-        opacity: 1,
-        fillOpacity: state.opacity,
-      });
-    }
-  });
-
-  if (!state.showOuterBoundaryLayer) {
-    return;
-  }
-
-  const cellIds = Array.from(state.selectedHexes.keys());
-
-  fetch('/api/cells/outer-boundary', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cells: cellIds })
-  })
-  .then(res => {
-    if (!res.ok) throw new Error('Failed to compute outer boundary');
-    return res.json();
-  })
-  .then(geo => {
-    state.outerBoundaryGeo = geo;
-    if (state.showOuterBoundaryLayer) {
-      renderOuterBoundaryGeo(geo);
-    }
-  })
-  .catch(err => {
-    console.warn('Outer boundary calculation error:', err);
-  });
-}
-
-function renderOuterBoundaryGeo(geo) {
-  if (!outerBoundaryLayerGroup) return;
-  outerBoundaryLayerGroup.clearLayers();
-  if (!geo || !geo.coordinates || geo.coordinates.length === 0) return;
-
-  const boundaryLayer = L.geoJSON(geo, {
-    style: {
-      color: '#000000',
-      weight: 3.5,
-      opacity: 1,
-      fill: false,
-      lineCap: 'round',
-      lineJoin: 'round',
-      interactive: false,
-    }
-  });
-  outerBoundaryLayerGroup.addLayer(boundaryLayer);
 }
 
 window.removeSingleSelectedHex = function(hexId) {
@@ -2418,8 +2385,6 @@ function clearHexSelection() {
     }
   });
   state.selectedHexes.clear();
-  if (outerBoundaryLayerGroup) outerBoundaryLayerGroup.clearLayers();
-  state.outerBoundaryGeo = null;
   document.getElementById('mergedSelectionPanel').classList.remove('active');
 
   const ctrlKml = document.getElementById('multiSelectControlsKml');
@@ -2432,7 +2397,7 @@ function zoomToSelection() {
   map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
 }
 
-// Export Selected Cell Boundaries as KML (Outer boundaries in solid black)
+// Export Selected Cell Boundaries as KML (2 Layers: Per-Cell and Outer Boundary)
 async function exportSelectedCellsKml() {
   let hexItems = [];
   if (state.selectedHexes && state.selectedHexes.size > 0) {
@@ -2448,8 +2413,8 @@ async function exportSelectedCellsKml() {
 
   const cityName = state.city ? state.city.toLowerCase() : 'fleet';
   const count = hexItems.length;
-  const filename = `${cityName}_${count}_cells_outer_boundary.kml`;
-  const docTitle = `${state.city ? state.city.toUpperCase() : 'Fleet'} Merged Region Outer Boundary (${count} cell${count > 1 ? 's' : ''})`;
+  const filename = `${cityName}_${count}_cells_2layers.kml`;
+  const docTitle = `${state.city ? state.city.toUpperCase() : 'Fleet'} Selected Cells (${count} cell${count > 1 ? 's' : ''})`;
 
   try {
     const res = await fetch('/api/export-kml', {
@@ -2458,13 +2423,13 @@ async function exportSelectedCellsKml() {
       body: JSON.stringify({
         cells: hexItems.map(item => item.h),
         filename: filename,
-        mode: 'outer'
+        mode: 'both'
       })
     });
     if (res.ok) {
       const blob = await res.blob();
       downloadKmlBlob(blob, filename);
-      showKmlToast(`Exported outer boundary of ${count} cell${count > 1 ? 's' : ''} as KML (${filename})`);
+      showKmlToast(`Exported 2-layer KML (Per-cell & Outer boundary) for ${count} cell${count > 1 ? 's' : ''}`);
       return;
     }
   } catch (err) {
@@ -2472,114 +2437,152 @@ async function exportSelectedCellsKml() {
   }
 
   // Client-side fallback if network error
-  if (state.outerBoundaryGeo) {
-    const kmlContent = generateKmlForOuterGeo(state.outerBoundaryGeo, docTitle, hexItems);
-    downloadKmlFile(kmlContent, filename);
-    showKmlToast(`Exported outer boundary of ${count} cell${count > 1 ? 's' : ''} as KML (${filename})`);
-  } else {
-    const kmlContent = generateKmlForHexes(hexItems, docTitle);
-    downloadKmlFile(kmlContent, filename);
-    showKmlToast(`Exported ${count} cell boundary as KML (${filename})`);
+  const kmlContent = generateKmlTwoLayers(hexItems, docTitle);
+  downloadKmlFile(kmlContent, filename);
+  showKmlToast(`Exported 2-layer KML for ${count} cell${count > 1 ? 's' : ''}`);
+}
+
+function openBikerModal() {
+  if (state.selectedHexes.size === 0) {
+    alert('Please select one or more boundary cells first.');
+    return;
+  }
+
+  const inputStartDate = document.getElementById('bikerExportStartDate');
+  const inputEndDate = document.getElementById('bikerExportEndDate');
+  const inputMinRides = document.getElementById('bikerExportMinRides');
+  const inputPct = document.getElementById('bikerExportPct');
+
+  const modalStartDate = document.getElementById('bikerModalStartDate');
+  const modalEndDate = document.getElementById('bikerModalEndDate');
+  const modalMinRides = document.getElementById('bikerModalMinRides');
+  const modalPct = document.getElementById('bikerModalPct');
+
+  if (modalStartDate) modalStartDate.value = (inputStartDate && inputStartDate.value) || state.startDate;
+  if (modalEndDate) modalEndDate.value = (inputEndDate && inputEndDate.value) || state.endDate;
+  if (modalMinRides) modalMinRides.value = (inputMinRides && inputMinRides.value) || '5';
+  if (modalPct) modalPct.value = (inputPct && inputPct.value) || '20';
+
+  const subEl = document.getElementById('bikerModalSubtitle');
+  if (subEl) {
+    subEl.textContent = `Analyzing ${state.city.toUpperCase()} • ${state.selectedHexes.size} boundary cells selected (customer_id = 2)`;
+  }
+
+  document.getElementById('bikerModal').classList.add('open');
+  loadBikerModalPreview();
+}
+
+function closeBikerModal() {
+  const modal = document.getElementById('bikerModal');
+  if (modal) modal.classList.remove('open');
+}
+
+async function loadBikerModalPreview() {
+  const cellIds = Array.from(state.selectedHexes.keys());
+  if (cellIds.length === 0) return;
+
+  const modalStartDate = document.getElementById('bikerModalStartDate');
+  const modalEndDate = document.getElementById('bikerModalEndDate');
+  const modalMinRides = document.getElementById('bikerModalMinRides');
+  const modalPct = document.getElementById('bikerModalPct');
+  const tbody = document.getElementById('bikerModalTableBody');
+
+  const startDate = modalStartDate ? modalStartDate.value || state.startDate : state.startDate;
+  const endDate = modalEndDate ? modalEndDate.value || state.endDate : state.endDate;
+  const minRides = modalMinRides ? Math.max(0, parseInt(modalMinRides.value, 10) || 0) : 0;
+  const pct = modalPct ? Math.max(0, Math.min(100, parseFloat(modalPct.value) || 0)) : 20;
+  const toggle = state.bikerExportToggle || 'less';
+
+  // Sync back to card
+  const inputStartDate = document.getElementById('bikerExportStartDate');
+  const inputEndDate = document.getElementById('bikerExportEndDate');
+  const inputMinRides = document.getElementById('bikerExportMinRides');
+  const inputPct = document.getElementById('bikerExportPct');
+  if (inputStartDate) inputStartDate.value = startDate;
+  if (inputEndDate) inputEndDate.value = endDate;
+  if (inputMinRides) inputMinRides.value = minRides;
+  if (inputPct) inputPct.value = pct;
+
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#64748b">Analyzing biker rides in boundary...</td></tr>';
+  }
+
+  try {
+    const res = await fetch('/api/biker-rides-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        city: state.city,
+        start_date: startDate,
+        end_date: endDate,
+        cells: cellIds,
+        min_rides: minRides,
+        toggle: toggle,
+        percentage: pct,
+        layer: state.currentLayer,
+        status: state.status,
+        customer_id: state.customerId,
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to load biker preview');
+    }
+
+    const data = await res.json();
+    document.getElementById('bikerModalKpiCount').textContent = (data.matching_bikers_count || 0).toLocaleString();
+    document.getElementById('bikerModalKpiTotalRides').textContent = (data.total_period_rides || 0).toLocaleString();
+    document.getElementById('bikerModalKpiBoundaryRides').textContent = (data.total_boundary_rides || 0).toLocaleString();
+    document.getElementById('bikerModalKpiAvgPct').textContent = `${(data.avg_boundary_pct || 0).toFixed(1)}%`;
+
+    const sub = document.getElementById('bikerModalTableSub');
+    if (sub) sub.textContent = `(${data.matching_bikers_count || 0} matching)`;
+
+    const btnModalExport = document.getElementById('btnBikerModalExportCsv');
+    if (btnModalExport) {
+      btnModalExport.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download CSV (${data.matching_bikers_count || 0})
+      `;
+    }
+
+    state.bikerPreviewRecords = data.bikers || [];
+    renderBikerModalTable(state.bikerPreviewRecords);
+  } catch (err) {
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:18px;color:#dc2626">Error: ${escapeXml(err.message)}</td></tr>`;
+    }
   }
 }
 
-function generateKmlForOuterGeo(geo, docTitle, hexItems) {
-  const geomType = geo.type;
-  const coords = geo.coordinates || [];
-  const polyList = geomType === 'Polygon' ? [coords] : (geomType === 'MultiPolygon' ? coords : []);
+function renderBikerModalTable(bikers) {
+  const tbody = document.getElementById('bikerModalTableBody');
+  if (!tbody) return;
 
-  let totalOrders = 0;
-  let totalSlow = 0;
-  let vsum = 0;
-  hexItems.forEach(item => {
-    const h = item.h || item;
-    totalOrders += h.orders || 0;
-    totalSlow += (h.ha30_count != null ? h.ha30_count : h.slow) || 0;
-    vsum += (h.mean || 0) * (h.orders || 0);
-  });
-  const haPct = totalOrders > 0 ? (totalSlow / totalOrders * 100) : 0;
-  const meanDur = totalOrders > 0 ? (vsum / totalOrders) : 0;
+  if (!bikers || bikers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#94a3b8">No bikers match the selected criteria</td></tr>';
+    return;
+  }
 
-  const polygonsXml = polyList.map(poly => {
-    if (!poly || poly.length === 0) return '';
-    const outer = poly[0];
-    const coordPairs = outer.map(pt => `${Number(pt[0]).toFixed(6)},${Number(pt[1]).toFixed(6)},0`);
-    if (coordPairs.length > 0 && coordPairs[0] !== coordPairs[coordPairs.length - 1]) {
-      coordPairs.push(coordPairs[0]);
-    }
-    const outerStr = coordPairs.join(' ');
-
-    const holesXml = poly.slice(1).map(inner => {
-      const innerPairs = inner.map(pt => `${Number(pt[0]).toFixed(6)},${Number(pt[1]).toFixed(6)},0`);
-      if (innerPairs.length > 0 && innerPairs[0] !== innerPairs[innerPairs.length - 1]) {
-        innerPairs.push(innerPairs[0]);
-      }
-      return `        <innerBoundaryIs>
-          <LinearRing>
-            <coordinates>${innerPairs.join(' ')}</coordinates>
-          </LinearRing>
-        </innerBoundaryIs>`;
-    }).join('\n');
-
-    return `      <Polygon>
-        <outerBoundaryIs>
-          <LinearRing>
-            <coordinates>${outerStr}</coordinates>
-          </LinearRing>
-        </outerBoundaryIs>
-${holesXml}
-      </Polygon>`;
-  }).filter(Boolean).join('\n');
-
-  const geomXml = polyList.length === 1 ? polygonsXml : `      <MultiGeometry>\n${polygonsXml}\n      </MultiGeometry>`;
-
-  const descHtml = `<![CDATA[
-<div style="font-family:sans-serif;font-size:12px;line-height:1.5;">
-  <h4 style="margin:0 0 6px 0;color:#000000;">Merged Region Outer Boundary (${hexItems.length} Cells)</h4>
-  <table style="border-collapse:collapse;width:100%;font-size:12px;">
-    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Combined HA30% Breach:</b></td><td style="padding:2px 0;font-weight:700;color:${haPct > 25 ? '#dc2626' : '#16a34a'};">${haPct.toFixed(1)}%</td></tr>
-    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Total Orders:</b></td><td style="padding:2px 0;font-weight:700;">${totalOrders.toLocaleString()}</td></tr>
-    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>HA30 Orders Count:</b></td><td style="padding:2px 0;">${totalSlow.toLocaleString()}</td></tr>
-    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Weighted Mean Duration:</b></td><td style="padding:2px 0;">${meanDur.toFixed(1)} min</td></tr>
-    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Cell Count:</b></td><td style="padding:2px 0;">${hexItems.length}</td></tr>
-  </table>
-</div>
-]]>`;
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>${escapeXml(docTitle || 'Selected Region Outer Boundary')}</name>
-    <description>Black outer boundaries of selected H3 cells exported from Fleet HexMap</description>
-    <Style id="blackOuterBoundary">
-      <LineStyle>
-        <color>ff000000</color>
-        <width>3.0</width>
-      </LineStyle>
-      <PolyStyle>
-        <fill>0</fill>
-        <outline>1</outline>
-      </PolyStyle>
-    </Style>
-    <Placemark>
-      <name>${escapeXml(docTitle || 'Selected Region Outer Boundary')}</name>
-      <description>${descHtml}</description>
-      <styleUrl>#blackOuterBoundary</styleUrl>
-${geomXml}
-    </Placemark>
-  </Document>
-</kml>`;
-}
-
-function downloadKmlBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || 'selected_cells_outer_boundary.kml';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  tbody.innerHTML = bikers.map(b => {
+    const pct = typeof b.percentage_of_rides_in_boundary === 'number'
+      ? b.percentage_of_rides_in_boundary
+      : parseFloat(b.percentage_of_rides_in_boundary) || 0;
+    const isGood = state.bikerExportToggle === 'less' ? (pct <= 20) : (pct >= 50);
+    const pillClass = isGood ? 'good' : 'warn';
+    return `
+      <tr>
+        <td style="font-weight:700;color:#0f172a;font-family:monospace">${escapeXml(String(b.biker_id))}</td>
+        <td style="text-align:right;font-weight:600">${Number(b.total_rides_in_period || 0).toLocaleString()}</td>
+        <td style="text-align:right;font-weight:600;color:#0e7490">${Number(b.total_rides_in_boundary || 0).toLocaleString()}</td>
+        <td style="text-align:right">
+          <span class="biker-pct-pill ${pillClass}">
+            ${pct.toFixed(1)}%
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // Export Filtered Bikers in Boundary to CSV
@@ -2590,11 +2593,14 @@ async function exportBikersBoundaryCsv() {
     return;
   }
 
-  const startDateInput = document.getElementById('bikerExportStartDate');
-  const endDateInput = document.getElementById('bikerExportEndDate');
-  const minRidesInput = document.getElementById('bikerExportMinRides');
-  const pctInput = document.getElementById('bikerExportPct');
+  const isModalOpen = document.getElementById('bikerModal')?.classList.contains('open');
+
+  const startDateInput = document.getElementById(isModalOpen ? 'bikerModalStartDate' : 'bikerExportStartDate');
+  const endDateInput = document.getElementById(isModalOpen ? 'bikerModalEndDate' : 'bikerExportEndDate');
+  const minRidesInput = document.getElementById(isModalOpen ? 'bikerModalMinRides' : 'bikerExportMinRides');
+  const pctInput = document.getElementById(isModalOpen ? 'bikerModalPct' : 'bikerExportPct');
   const btnExport = document.getElementById('btnExportBikersCsv');
+  const btnModalExport = document.getElementById('btnBikerModalExportCsv');
   const feedbackEl = document.getElementById('bikerExportFeedback');
 
   const startDate = startDateInput ? startDateInput.value || state.startDate : state.startDate;
@@ -2603,17 +2609,20 @@ async function exportBikersBoundaryCsv() {
   const percentage = pctInput ? Math.max(0, Math.min(100, parseFloat(pctInput.value) || 0)) : 20;
   const toggle = state.bikerExportToggle || 'less';
 
-  const origBtnHtml = btnExport ? btnExport.innerHTML : 'Export as CSV';
+  const origBtnHtml = btnExport ? btnExport.innerHTML : 'Export CSV';
+  const origModalHtml = btnModalExport ? btnModalExport.innerHTML : 'Download CSV';
+
   if (btnExport) {
     btnExport.disabled = true;
-    btnExport.innerHTML = `
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-      Exporting CSV...
-    `;
+    btnExport.innerHTML = `Exporting...`;
+  }
+  if (btnModalExport) {
+    btnModalExport.disabled = true;
+    btnModalExport.innerHTML = `Exporting...`;
   }
   if (feedbackEl) {
     feedbackEl.style.display = 'block';
-    feedbackEl.textContent = 'Querying rides and filtering bikers...';
+    feedbackEl.textContent = 'Querying rides and filtering bikers (customer_id = 2)...';
   }
 
   try {
@@ -2667,7 +2676,157 @@ async function exportBikersBoundaryCsv() {
       btnExport.disabled = false;
       btnExport.innerHTML = origBtnHtml;
     }
+    if (btnModalExport) {
+      btnModalExport.disabled = false;
+      btnModalExport.innerHTML = origModalHtml;
+    }
   }
+}
+
+function generateKmlTwoLayers(hexItems, docTitle) {
+  let totalOrders = 0;
+  let totalSlow = 0;
+  let vsum = 0;
+  let totalFare = 0;
+  let totalInc = 0;
+
+  const placemarksXml = hexItems.map(item => {
+    const h = item.h || item;
+    const hexId = h.hex || 'unknown_cell';
+    const ring = h.ring;
+    if (!ring || ring.length < 3) return '';
+
+    const pct = typeof h.pct === 'number' ? h.pct : 0;
+    const orders = typeof h.orders === 'number' ? h.orders : 0;
+    const slow = typeof (h.ha30_count != null ? h.ha30_count : h.slow) === 'number'
+      ? (h.ha30_count != null ? h.ha30_count : h.slow)
+      : 0;
+    const mean = typeof h.mean === 'number' ? h.mean : 0;
+    const avgFare = h.avg_fare || 0;
+    const avgInc = h.avg_incentive || 0;
+
+    totalOrders += orders;
+    totalSlow += slow;
+    vsum += mean * orders;
+    totalFare += avgFare * orders;
+    totalInc += avgInc * orders;
+
+    const coordPairs = ring.map(pt => `${Number(pt[1]).toFixed(6)},${Number(pt[0]).toFixed(6)},0`);
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (Number(first[0]).toFixed(6) !== Number(last[0]).toFixed(6) ||
+        Number(first[1]).toFixed(6) !== Number(last[1]).toFixed(6)) {
+      coordPairs.push(`${Number(first[1]).toFixed(6)},${Number(first[0]).toFixed(6)},0`);
+    }
+
+    const coordsStr = coordPairs.join(' ');
+    const safeHex = escapeXml(hexId);
+    const placemarkName = `${safeHex} — HA30: ${pct.toFixed(1)}% (${orders.toLocaleString()} ord)`;
+
+    const fareRow = avgFare > 0 ? `
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Mean Biker Fare:</b></td><td style="padding:2px 0;font-weight:700;">${formatFareFull(avgFare)} Toman</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Mean Incentive:</b></td><td style="padding:2px 0;color:#059669;font-weight:700;">+${formatFareFull(avgInc)} Toman</td></tr>` : '';
+
+    const descHtml = `<![CDATA[
+<div style="font-family:sans-serif;font-size:12px;line-height:1.5;">
+  <h4 style="margin:0 0 6px 0;color:#0e7490;">H3 Cell: ${safeHex}</h4>
+  <table style="border-collapse:collapse;width:100%;font-size:12px;">
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>HA30 Breach Rate:</b></td><td style="padding:2px 0;font-weight:700;color:${pct > 25 ? '#dc2626' : '#16a34a'};">${pct.toFixed(1)}%</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Total Orders:</b></td><td style="padding:2px 0;font-weight:700;">${orders.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>HA30 Orders Count:</b></td><td style="padding:2px 0;">${slow.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Mean Duration:</b></td><td style="padding:2px 0;">${mean.toFixed(1)} min</td></tr>
+    ${fareRow}
+  </table>
+</div>
+]]>`;
+
+    return `      <Placemark>
+        <name>${placemarkName}</name>
+        <description>${descHtml}</description>
+        <styleUrl>#cellBoundary</styleUrl>
+        <ExtendedData>
+          <Data name="h3_index"><value>${safeHex}</value></Data>
+          <Data name="ha30_pct"><value>${pct.toFixed(1)}</value></Data>
+          <Data name="orders"><value>${orders}</value></Data>
+          <Data name="ha30_orders"><value>${slow}</value></Data>
+          <Data name="mean_duration_min"><value>${mean.toFixed(1)}</value></Data>
+        </ExtendedData>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>${coordsStr}</coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>`;
+  }).filter(Boolean).join('\n');
+
+  const haPct = totalOrders > 0 ? (totalSlow / totalOrders * 100) : 0;
+  const meanDur = totalOrders > 0 ? (vsum / totalOrders) : 0;
+  const meanFare = totalOrders > 0 ? (totalFare / totalOrders) : 0;
+  const meanInc = totalOrders > 0 ? (totalInc / totalOrders) : 0;
+
+  const fareRowAgg = meanFare > 0 ? `
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Mean Biker Fare:</b></td><td style="padding:2px 0;font-weight:700;">${formatFareFull(meanFare)} Toman</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Mean Incentive:</b></td><td style="padding:2px 0;color:#059669;font-weight:700;">+${formatFareFull(meanInc)} Toman</td></tr>` : '';
+
+  const outerDesc = `<![CDATA[
+<div style="font-family:sans-serif;font-size:12px;line-height:1.5;">
+  <h4 style="margin:0 0 6px 0;color:#000000;">Merged Region Outer Boundary (${hexItems.length} Cells)</h4>
+  <table style="border-collapse:collapse;width:100%;font-size:12px;">
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Combined HA30% Breach:</b></td><td style="padding:2px 0;font-weight:700;color:${haPct > 25 ? '#dc2626' : '#16a34a'};">${haPct.toFixed(1)}%</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Total Orders:</b></td><td style="padding:2px 0;font-weight:700;">${totalOrders.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>HA30 Orders Count:</b></td><td style="padding:2px 0;">${totalSlow.toLocaleString()}</td></tr>
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Weighted Mean Duration:</b></td><td style="padding:2px 0;">${meanDur.toFixed(1)} min</td></tr>
+    ${fareRowAgg}
+    <tr><td style="padding:2px 6px 2px 0;color:#64748b;"><b>Cell Count:</b></td><td style="padding:2px 0;">${hexItems.length}</td></tr>
+  </table>
+</div>
+]]>`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(docTitle || 'Selected Region Boundaries')}</name>
+    <description>Two-layer export: Per-cell boundaries and outer boundary from Fleet HexMap</description>
+    <Style id="cellBoundary">
+      <LineStyle>
+        <color>ffd4b606</color>
+        <width>2.5</width>
+      </LineStyle>
+      <PolyStyle>
+        <fill>0</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+    <Style id="blackOuterBoundary">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>3.5</width>
+      </LineStyle>
+      <PolyStyle>
+        <fill>0</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+    <Folder id="layer_per_cell">
+      <name>Per-Cell Boundaries</name>
+      <open>1</open>
+      <description>Individual H3 cell polygons with metrics</description>
+${placemarksXml}
+    </Folder>
+    <Folder id="layer_outer_boundary">
+      <name>Outer Boundary (Black)</name>
+      <open>1</open>
+      <description>Dissolved black outer perimeter</description>
+      <Placemark>
+        <name>${escapeXml(docTitle || 'Merged Region Outer Boundary')}</name>
+        <description>${outerDesc}</description>
+        <styleUrl>#blackOuterBoundary</styleUrl>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>`;
 }
 
 function generateKmlForHexes(hexItems, docTitle) {
@@ -2804,7 +2963,7 @@ function setColorMetric(metric) {
     const color = getHexFillColor(item.h);
     item.polygon.setStyle({
       fillColor: color,
-      color: isSelected ? '#06b6d4' : '#ffffff'
+      color: isSelected ? '#000000' : '#ffffff'
     });
   });
 
@@ -3030,7 +3189,7 @@ function filterHexagons() {
         fillOpacity: state.opacity,
         opacity: 1,
         weight: isSelected ? 2.5 : 1.2,
-        color: isSelected ? '#06b6d4' : '#ffffff'
+        color: isSelected ? '#000000' : '#ffffff'
       });
       const el = item.polygon.getElement();
       if (el) el.style.pointerEvents = 'auto';

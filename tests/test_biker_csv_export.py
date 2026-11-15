@@ -94,6 +94,24 @@ class TestBikerCsvExport(unittest.TestCase):
         lines = res.text.strip().split("\n")
         self.assertEqual(lines[0], "biker_id,total_rides_in_period,total_rides_in_boundary,percentage_of_rides_in_boundary")
 
+    def test_api_biker_rides_preview_endpoint(self):
+        res = self.client.post("/api/biker-rides-preview", json={
+            "city": "isfahan",
+            "start_date": "2026-10-22",
+            "end_date": "2026-10-24",
+            "cells": [self.cell_a],
+            "min_rides": 1,
+            "toggle": "less",
+            "percentage": 100.0
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("matching_bikers_count", data)
+        self.assertIn("total_period_rides", data)
+        self.assertIn("total_boundary_rides", data)
+        self.assertIn("bikers", data)
+        self.assertIsInstance(data["bikers"], list)
+
     def test_api_export_biker_rides_csv_empty_cells_error(self):
         res = self.client.post("/api/export-biker-rides-csv", json={
             "city": "isfahan",
