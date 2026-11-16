@@ -131,8 +131,9 @@ class TestExportHexagons(unittest.TestCase):
         res = client.get("/")
         self.assertEqual(res.status_code, 200)
         html = res.text
-        # Verify hexagon export card elements
-        self.assertIn('id="selectHexExportRes"', html)
+        # Verify hexagon export card elements (without unnecessary resolution selector)
+        self.assertNotIn('id="selectHexExportRes"', html)
+        self.assertNotIn('id="mergedCellsList"', html)
         self.assertIn('id="btnExportHexCsv"', html)
         self.assertIn('id="btnExportHexTxt"', html)
         self.assertIn('id="btnCopyHexList"', html)

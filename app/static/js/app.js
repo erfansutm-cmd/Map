@@ -2392,12 +2392,14 @@ function renderMergedSelection() {
   document.getElementById('mergedMeanDuration').textContent = `${mergedMean.toFixed(1)} min`;
 
   const chipsContainer = document.getElementById('mergedCellsList');
-  chipsContainer.innerHTML = hexItems.map(item => `
-    <span class="hex-cell-chip">
-      ${item.h.hex.substring(0, 9)}...
-      <span class="hex-cell-remove" onclick="removeSingleSelectedHex('${item.h.hex}')">&times;</span>
-    </span>
-  `).join('');
+  if (chipsContainer) {
+    chipsContainer.innerHTML = hexItems.map(item => `
+      <span class="hex-cell-chip">
+        ${item.h.hex.substring(0, 9)}...
+        <span class="hex-cell-remove" onclick="removeSingleSelectedHex('${item.h.hex}')">&times;</span>
+      </span>
+    `).join('');
+  }
 
   const totalCitySlow = getCityTotalSlow();
   const mergedSharePct = totalCitySlow > 0 ? (totalSlow / totalCitySlow * 100) : 0;
@@ -3353,7 +3355,7 @@ async function exportBikersBoundaryCsv() {
   }
 }
 
-// Export List of Selected Hexagons by Resolution
+// Export List of Selected Hexagons
 async function exportHexagonsByResolution(format) {
   let hexIds = Array.from(state.selectedHexes.keys());
   if (hexIds.length === 0 && state.singleSelectedHex && state.singleSelectedHex.h) {
@@ -3361,8 +3363,6 @@ async function exportHexagonsByResolution(format) {
   }
 
   const feedbackEl = document.getElementById('hexExportFeedback');
-  const selectResEl = document.getElementById('selectHexExportRes');
-  const targetResolution = selectResEl ? selectResEl.value : 'current';
 
   if (!hexIds || hexIds.length === 0) {
     if (feedbackEl) {
@@ -3382,6 +3382,40 @@ async function exportHexagonsByResolution(format) {
   const activeBtn = format === 'csv' ? btnCsv : (format === 'txt' ? btnTxt : btnCopy);
   const origBtnContent = activeBtn ? activeBtn.innerHTML : '';
 
+  // Copy selected hexagon IDs directly separated by comma!
+  if (format === 'copy') {
+    const commaSeparated = hexIds.join(',');
+    let copied = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(commaSeparated);
+        copied = true;
+      } catch (clipErr) {
+        console.warn('navigator.clipboard write failed, using textarea fallback', clipErr);
+      }
+    }
+    if (!copied) {
+      const ta = document.createElement('textarea');
+      ta.value = commaSeparated;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+
+    if (feedbackEl) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.color = '#15803d';
+      feedbackEl.textContent = `Copied ${hexIds.length} hexagons (separated by comma) to clipboard!`;
+      setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+    }
+    showKmlToast(`Copied ${hexIds.length} hexagons (separated by comma) to clipboard!`);
+    return;
+  }
+
   if (activeBtn) {
     activeBtn.disabled = true;
     activeBtn.innerHTML = `<span>Loading...</span>`;
@@ -3389,18 +3423,17 @@ async function exportHexagonsByResolution(format) {
   if (feedbackEl) {
     feedbackEl.style.display = 'block';
     feedbackEl.style.color = '#15803d';
-    feedbackEl.textContent = `Resolving hexagons (${targetResolution === 'all' ? 'All Resolutions' : 'Res ' + targetResolution})...`;
+    feedbackEl.textContent = `Preparing hexagon export...`;
   }
 
   try {
-    const payloadFormat = format === 'copy' ? 'txt' : format;
     const res = await fetch('/api/export-hexagons', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         hex_ids: hexIds,
-        target_resolution: targetResolution,
-        format: payloadFormat,
+        target_resolution: 'current',
+        format: format,
         city: state.city
       })
     });
@@ -3411,63 +3444,30 @@ async function exportHexagonsByResolution(format) {
     }
 
     const countHeader = res.headers.get('x-hexagons-count') || hexIds.length;
-
-    if (format === 'copy') {
-      const textContent = await res.text();
-      let copied = false;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(textContent.trim());
-          copied = true;
-        } catch (clipErr) {
-          console.warn('navigator.clipboard write failed, using textarea fallback', clipErr);
-        }
-      }
-      if (!copied) {
-        const ta = document.createElement('textarea');
-        ta.value = textContent.trim();
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-
-      if (feedbackEl) {
-        feedbackEl.style.display = 'block';
-        feedbackEl.style.color = '#15803d';
-        feedbackEl.textContent = `Copied ${countHeader} hexagons to clipboard!`;
-        setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
-      }
-      showKmlToast(`Copied ${countHeader} hexagons to clipboard!`);
-    } else {
-      const disposition = res.headers.get('content-disposition') || '';
-      let filename = `hexagons_${targetResolution}_${state.city}.${format}`;
-      const fnMatch = disposition.match(/filename="?([^";]+)"?/i);
-      if (fnMatch && fnMatch[1]) {
-        filename = fnMatch[1];
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-      if (feedbackEl) {
-        feedbackEl.style.display = 'block';
-        feedbackEl.style.color = '#15803d';
-        feedbackEl.textContent = `Downloaded ${countHeader} hexagons (${filename})`;
-        setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
-      }
-      showKmlToast(`Downloaded ${countHeader} hexagons (${filename})`);
+    const disposition = res.headers.get('content-disposition') || '';
+    let filename = `hexagons_${state.city}.${format}`;
+    const fnMatch = disposition.match(/filename="?([^";]+)"?/i);
+    if (fnMatch && fnMatch[1]) {
+      filename = fnMatch[1];
     }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    if (feedbackEl) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.color = '#15803d';
+      feedbackEl.textContent = `Downloaded ${countHeader} hexagons (${filename})`;
+      setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+    }
+    showKmlToast(`Downloaded ${countHeader} hexagons (${filename})`);
   } catch (err) {
     console.error('Hexagon export error:', err);
     if (feedbackEl) {

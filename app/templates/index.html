@@ -652,9 +652,6 @@
           </div>
         </div>
 
-        <div style="font-size:10px;font-weight:600;color:#64748b;margin:6px 0 2px">Selected Cells:</div>
-        <div id="mergedCellsList" class="merged-cells-chips"></div>
-
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
           <!-- Export 2-layer KML Button -->
           <button id="btnExportKmlSelection" class="btn-action btn-kml-export" style="width:100%;background:#0f172a;color:#fff;border-color:#0f172a;font-weight:700;justify-content:center;padding:6px 10px;font-size:11.5px" title="Export 2-layer KML (Per-Cell and Outer Boundary)">
@@ -666,42 +663,29 @@
             Export KML (2 Layers)
           </button>
 
-          <!-- Export Hexagons List by Resolution Section -->
+          <!-- Export Hexagons Section -->
           <div class="hex-export-card">
             <div class="hex-export-header">
               <div class="hex-export-title-group">
                 <span class="hex-export-icon">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 2 17 12 22 22 17 22 7 12 2"></polygon></svg>
                 </span>
-                <span class="hex-export-title">Export Hexagons by Resolution</span>
+                <span class="hex-export-title">Export Hexagons</span>
               </div>
               <span id="hexExportBadge" class="hex-export-badge">0 cells</span>
             </div>
 
             <div class="hex-export-body">
-              <div class="hex-export-row">
-                <label for="selectHexExportRes" class="hex-export-label">Resolution:</label>
-                <select id="selectHexExportRes" class="hex-export-select">
-                  <option value="current" selected>Current Res (Map Selection)</option>
-                  <option value="6">Res 6 (District ~36 km²)</option>
-                  <option value="7">Res 7 (Zone / Sector ~5.1 km²)</option>
-                  <option value="8">Res 8 (Neighborhood ~0.73 km²)</option>
-                  <option value="9">Res 9 (Block Cluster ~0.10 km²)</option>
-                  <option value="10">Res 10 (Street Block ~0.015 km²)</option>
-                  <option value="all">All Resolutions (Res 6 &ndash; 10)</option>
-                </select>
-              </div>
-
               <div class="hex-export-btns-row">
-                <button type="button" id="btnExportHexCsv" class="btn-hex-export-btn" title="Download CSV table of hexagons at chosen resolution">
+                <button type="button" id="btnExportHexCsv" class="btn-hex-export-btn" title="Download CSV table of selected hexagons">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                   <span>CSV Table</span>
                 </button>
-                <button type="button" id="btnExportHexTxt" class="btn-hex-export-btn" title="Download simple list of Hex IDs (one per line)">
+                <button type="button" id="btnExportHexTxt" class="btn-hex-export-btn" title="Download list of Hex IDs">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                   <span>Hex List</span>
                 </button>
-                <button type="button" id="btnCopyHexList" class="btn-hex-export-btn" title="Copy hexagon IDs to clipboard">
+                <button type="button" id="btnCopyHexList" class="btn-hex-export-btn" title="Copy hexagon IDs separated by comma">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                   <span>Copy</span>
                 </button>
