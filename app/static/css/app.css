@@ -2694,34 +2694,93 @@ body.map-only-mode .btn-exit-map-only {
 
 .biker-cal-popover-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
   border-top: 1px solid #f1f5f9;
-  padding-top: 8px;
+  padding-top: 10px;
+  margin-top: 6px;
+  background: #ffffff;
 }
 
-.biker-cal-footer-preview {
+.biker-cal-range-summary-card {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 10px;
 }
 
-.biker-cal-chip {
-  font-size: 10.5px;
+.biker-cal-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.biker-cal-summary-dates {
+  font-size: 11px;
   font-weight: 700;
   color: #0f172a;
-  background: #f1f5f9;
-  padding: 2px 6px;
-  border-radius: 4px;
+  letter-spacing: 0.2px;
 }
 
-.biker-cal-days-badge {
+.biker-cal-days-pill {
   font-size: 10px;
   font-weight: 700;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 2px 5px;
-  border-radius: 4px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  padding: 2px 7px;
+  border-radius: 12px;
+  border: 1px solid #bfdbfe;
+  white-space: nowrap;
+}
+
+.biker-cal-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-biker-cal-cancel {
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-biker-cal-cancel:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.btn-biker-cal-apply {
+  padding: 6px 16px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #2563eb;
+  border: 1px solid #1d4ed8;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+  transition: all 0.15s ease;
+}
+.btn-biker-cal-apply:hover {
+  background: #1d4ed8;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35);
+  transform: translateY(-0.5px);
+}
+.btn-biker-cal-apply:active {
+  transform: translateY(0);
 }
 .biker-pct-input:focus {
   border-color: #2563eb;

@@ -2565,6 +2565,39 @@ function updateBikerPeriodDisplay(startDate, endDate) {
   const modalEnd = document.getElementById('bikerModalEndDate');
   if (modalStart && s) modalStart.value = s;
   if (modalEnd && e) modalEnd.value = e;
+
+  // Sync active states on preset chips across card, modal and popover
+  let matchedPreset = null;
+  if (s === state.startDate && e === state.endDate) {
+    matchedPreset = 'active';
+  } else {
+    const yRng = getRelativeDateRange(1);
+    if (s === yRng.start && e === yRng.end) {
+      matchedPreset = 'yesterday';
+    } else {
+      const d3 = getRelativeDateRange(3);
+      if (s === d3.start && e === d3.end) {
+        matchedPreset = '3';
+      } else {
+        const d7 = getRelativeDateRange(7);
+        if (s === d7.start && e === d7.end) {
+          matchedPreset = '7';
+        } else {
+          const d14 = getRelativeDateRange(14);
+          if (s === d14.start && e === d14.end) {
+            matchedPreset = '14';
+          }
+        }
+      }
+    }
+  }
+
+  document.querySelectorAll('[data-biker-preset]').forEach(chip => {
+    chip.classList.toggle('active', matchedPreset !== null && chip.dataset.bikerPreset === matchedPreset);
+  });
+  document.querySelectorAll('[data-bcal-preset]').forEach(chip => {
+    chip.classList.toggle('active', matchedPreset !== null && chip.dataset.bcalPreset === matchedPreset);
+  });
 }
 
 const bikerCalState = {
@@ -2576,6 +2609,45 @@ const bikerCalState = {
   hoverDate: null,
   activeSource: 'card',
 };
+
+function syncBikerCalPresetActive() {
+  const popover = document.getElementById('bikerCalendarPopover');
+  const s = bikerCalState.startDate;
+  const e = bikerCalState.endDate;
+
+  let matchedPreset = null;
+  if (s && e) {
+    if (s === state.startDate && e === state.endDate) {
+      matchedPreset = 'active';
+    } else {
+      const yRng = getRelativeDateRange(1);
+      if (s === yRng.start && e === yRng.end) {
+        matchedPreset = 'yesterday';
+      } else {
+        const d3 = getRelativeDateRange(3);
+        if (s === d3.start && e === d3.end) {
+          matchedPreset = '3';
+        } else {
+          const d7 = getRelativeDateRange(7);
+          if (s === d7.start && e === d7.end) {
+            matchedPreset = '7';
+          } else {
+            const d14 = getRelativeDateRange(14);
+            if (s === d14.start && e === d14.end) {
+              matchedPreset = '14';
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (popover) {
+    popover.querySelectorAll('[data-bcal-preset]').forEach(b => {
+      b.classList.toggle('active', matchedPreset !== null && b.dataset.bcalPreset === matchedPreset);
+    });
+  }
+}
 
 function initBikerCalendarUI() {
   const popover = document.getElementById('bikerCalendarPopover');
@@ -2762,6 +2834,7 @@ function openBikerCalendarPopover(source, anchorEl) {
     popover.style.left = `${left}px`;
   }
 
+  syncBikerCalPresetActive();
   renderBikerCalendarGrid();
   popover.classList.add('open');
 }
@@ -2866,6 +2939,7 @@ function createBikerCalDayCell(dayNum, dateStr, isOtherMonth) {
       bikerCalState.endDate = null;
       bikerCalState.pickingState = 'picking_end';
       bikerCalState.hoverDate = null;
+      syncBikerCalPresetActive();
       renderBikerCalendarGrid();
     } else {
       if (dateStr < bikerCalState.startDate) {
@@ -2876,6 +2950,7 @@ function createBikerCalDayCell(dayNum, dateStr, isOtherMonth) {
       }
       bikerCalState.pickingState = 'none';
       bikerCalState.hoverDate = null;
+      syncBikerCalPresetActive();
       renderBikerCalendarGrid();
     }
   });
@@ -3162,30 +3237,25 @@ async function loadBikerModalPreview() {
     }
 
     const data = await res.json();
-    const countDisplay = (data.sample_size && data.sampled_count < data.matching_bikers_count)
-      ? `${data.sampled_count} (sample of ${data.matching_bikers_count.toLocaleString()})`
-      : (data.matching_bikers_count || 0).toLocaleString();
+    const finalCount = (data.sample_size && data.sampled_count < data.matching_bikers_count)
+      ? data.sampled_count
+      : (data.matching_bikers_count || 0);
 
-    document.getElementById('bikerModalKpiCount').textContent = countDisplay;
+    document.getElementById('bikerModalKpiCount').textContent = Number(finalCount).toLocaleString();
     document.getElementById('bikerModalKpiTotalRides').textContent = (data.total_period_rides || 0).toLocaleString();
     document.getElementById('bikerModalKpiBoundaryRides').textContent = (data.total_boundary_rides || 0).toLocaleString();
     document.getElementById('bikerModalKpiAvgPct').textContent = `${(data.avg_boundary_pct || 0).toFixed(1)}%`;
 
     const sub = document.getElementById('bikerModalTableSub');
     if (sub) {
-      sub.textContent = (data.sample_size && data.sampled_count < data.matching_bikers_count)
-        ? `(${data.sampled_count} random sample of ${data.matching_bikers_count} matching)`
-        : `(${data.matching_bikers_count || 0} matching)`;
+      sub.textContent = `(${Number(finalCount).toLocaleString()} matching bikers)`;
     }
 
     const btnModalExport = document.getElementById('btnBikerModalExportCsv');
     if (btnModalExport) {
-      const exportCount = (data.sample_size && data.sampled_count < data.matching_bikers_count)
-        ? data.sampled_count
-        : (data.matching_bikers_count || 0);
       btnModalExport.innerHTML = `
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        Download CSV (${exportCount})
+        Download CSV (${Number(finalCount).toLocaleString()})
       `;
     }
 

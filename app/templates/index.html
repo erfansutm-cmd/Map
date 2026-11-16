@@ -1308,13 +1308,19 @@
   </div>
 
   <div class="biker-cal-popover-footer">
-    <div class="biker-cal-footer-preview">
-      <span id="bikerCalRangePreviewText" class="biker-cal-chip">2026-10-22 &rarr; 2026-11-05</span>
-      <span id="bikerCalRangeDaysText" class="biker-cal-days-badge">15 days</span>
+    <div class="biker-cal-range-summary-card">
+      <div class="biker-cal-summary-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <span id="bikerCalRangePreviewText" class="biker-cal-summary-dates">2026-10-22 &rarr; 2026-11-05</span>
+      </div>
+      <span id="bikerCalRangeDaysText" class="biker-cal-days-pill">15 days</span>
     </div>
-    <div style="display:flex;gap:6px">
-      <button type="button" id="btnCancelBikerCalendar" class="btn-action" style="padding:4px 10px;font-size:11px">Cancel</button>
-      <button type="button" id="btnApplyBikerCalendar" class="btn-primary" style="padding:4px 14px;font-size:11.5px;font-weight:700">Apply Period</button>
+    <div class="biker-cal-footer-actions">
+      <button type="button" id="btnCancelBikerCalendar" class="btn-biker-cal-cancel">Cancel</button>
+      <button type="button" id="btnApplyBikerCalendar" class="btn-biker-cal-apply">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>Apply Period</span>
+      </button>
     </div>
   </div>
 </div>
