@@ -138,12 +138,11 @@ class TestExportHexagons(unittest.TestCase):
         self.assertIn('id="btnCopyHexList"', html)
         # Verify compact merged KPI grid
         self.assertIn('class="merged-kpi-grid"', html)
-        # Verify prominent top biker buttons
+        # Verify prominent top biker buttons (and only one set of buttons)
         self.assertIn('id="btnOpenBikerModal"', html)
         self.assertIn('id="btnExportBikersCsv"', html)
-        # Verify bottom biker buttons for convenience
-        self.assertIn('id="btnOpenBikerModalBottom"', html)
-        self.assertIn('id="btnExportBikersCsvBottom"', html)
+        self.assertNotIn('id="btnOpenBikerModalBottom"', html)
+        self.assertNotIn('id="btnExportBikersCsvBottom"', html)
         # Verify sticky modal footer class
         self.assertIn('class="biker-modal-footer"', html)
 

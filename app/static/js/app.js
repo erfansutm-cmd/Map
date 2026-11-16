@@ -516,19 +516,9 @@ function setupEventListeners() {
     btnExportBikersCsv.addEventListener('click', () => exportBikersBoundaryCsv());
   }
 
-  const btnExportBikersCsvBottom = document.getElementById('btnExportBikersCsvBottom');
-  if (btnExportBikersCsvBottom) {
-    btnExportBikersCsvBottom.addEventListener('click', () => exportBikersBoundaryCsv());
-  }
-
   const btnOpenBikerModal = document.getElementById('btnOpenBikerModal');
   if (btnOpenBikerModal) {
     btnOpenBikerModal.addEventListener('click', openBikerModal);
-  }
-
-  const btnOpenBikerModalBottom = document.getElementById('btnOpenBikerModalBottom');
-  if (btnOpenBikerModalBottom) {
-    btnOpenBikerModalBottom.addEventListener('click', openBikerModal);
   }
 
   // Hexagon Resolution Export buttons & select listener

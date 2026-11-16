@@ -1312,8 +1312,8 @@ body.map-only-mode .btn-exit-map-only {
 /* Legend Card */
 .map-legend-card {
   position: absolute;
-  bottom: 20px;
-  right: 14px;
+  bottom: 34px;
+  right: 12px;
   z-index: 900;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(10px);
@@ -1362,6 +1362,10 @@ body.map-only-mode .btn-exit-map-only {
   right: 12px;
   z-index: 980;
   width: 290px;
+  max-height: calc(100% - 46px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
   padding: 14px;
@@ -1439,7 +1443,7 @@ body.map-only-mode .btn-exit-map-only {
   right: 12px;
   z-index: 985;
   width: 340px;
-  max-height: calc(100vh - 24px);
+  max-height: calc(100% - 46px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -3271,12 +3275,31 @@ body.map-only-mode .btn-exit-map-only {
   background: inherit;
 }
 
+/* Leaflet Attribution Styling & Placement */
+.leaflet-container .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(4px);
+  border-radius: 4px 0 0 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: #64748b;
+  margin: 0 !important;
+  line-height: 1.4;
+}
+.leaflet-container .leaflet-control-attribution a {
+  color: #475569;
+}
+
 /* Small Screen and Low Viewport Height Adjustments */
 @media (max-height: 820px) {
+  .map-legend-card {
+    bottom: 30px;
+    right: 10px;
+  }
   .merged-selection-panel {
     top: 8px;
     right: 8px;
-    max-height: calc(100vh - 16px);
+    max-height: calc(100% - 40px);
     padding: 10px 12px;
     width: 320px;
   }
@@ -3334,10 +3357,14 @@ body.map-only-mode .btn-exit-map-only {
 }
 
 @media (max-height: 680px) {
+  .map-legend-card {
+    bottom: 26px;
+    right: 8px;
+  }
   .merged-selection-panel {
     top: 4px;
     right: 4px;
-    max-height: calc(100vh - 8px);
+    max-height: calc(100% - 34px);
     padding: 8px 10px;
     width: 300px;
   }
