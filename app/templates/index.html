@@ -626,51 +626,38 @@
           <span id="mergedDeltaBadge" style="font-size:11px;font-weight:700;color:#0e7490">+0.0% vs City</span>
         </div>
 
-        <div class="stat-grid">
+        <div class="merged-kpi-grid">
           <div class="stat-box" id="boxMergedHa">
-            <div class="stat-box-label">Combined HA30%</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="stat-box-label">Combined HA30%</span>
+              <span id="mergedDeltaBadge" style="font-size:10px;font-weight:700;color:#0e7490">+0.0%</span>
+            </div>
             <div id="mergedHaPct" class="stat-box-val">0.0%</div>
+            <div id="mergedHaRatio" style="font-size:9.5px;color:#64748b">0 slow of 0 orders</div>
           </div>
           <div class="stat-box">
             <div class="stat-box-label">Combined Orders</div>
             <div id="mergedTotalOrders" class="stat-box-val">0</div>
+            <div style="font-size:9.5px;color:#64748b"><span id="mergedSlowOrders" style="font-weight:700;color:#dc2626">0</span> breach orders</div>
+          </div>
+          <div class="stat-box" id="boxMergedShare">
+            <div class="stat-box-label">City HA Share</div>
+            <div id="mergedSharePct" class="stat-box-val">0.0%</div>
+            <div style="font-size:9.5px;color:#94a3b8">of citywide hyperact</div>
+          </div>
+          <div class="stat-box" id="boxMergedMean">
+            <div class="stat-box-label">Duration &amp; Fare</div>
+            <div id="mergedMeanDuration" class="stat-box-val">0.0 min</div>
+            <div id="boxMergedFare" style="font-size:9.5px;color:#2563eb;font-weight:600"><span id="mergedFareVal">0</span> <span id="mergedIncentiveVal" style="color:#059669">+0 inc</span></div>
           </div>
         </div>
 
-        <div class="stat-box" style="margin-bottom:8px">
-          <div class="stat-box-label">HA30 Orders Count</div>
-          <div style="display:flex;align-items:baseline;justify-content:space-between">
-            <span id="mergedSlowOrders" class="stat-box-val">0</span>
-            <span id="mergedHaRatio" style="font-size:11px;color:#64748b">0 of 0</span>
-          </div>
-          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">create to accept time &ge; <span class="inspThresholdText">30</span> min</div>
-        </div>
-
-        <div class="stat-box" id="boxMergedShare" style="margin-bottom:8px">
-          <div class="stat-box-label">Combined Citywide HA Share</div>
-          <div id="mergedSharePct" class="stat-box-val">0.0%</div>
-          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">share of all hyper act orders in whole city</div>
-        </div>
-
-        <div class="stat-box" id="boxMergedMean" style="margin-bottom:8px">
-          <div class="stat-box-label">Weighted Mean Duration</div>
-          <div id="mergedMeanDuration" class="stat-box-val">0.0 min</div>
-        </div>
-
-        <div class="stat-box" id="boxMergedFare" style="margin-bottom:8px">
-          <div class="stat-box-label">Mean Fare &amp; Incentive</div>
-          <div style="display:flex;align-items:baseline;justify-content:space-between">
-            <span id="mergedFareVal" class="stat-box-val" style="color:#2563eb">0</span>
-            <span id="mergedIncentiveVal" style="font-size:11px;font-weight:700;color:#059669">+0 inc</span>
-          </div>
-          <div style="font-size:9.5px;color:#94a3b8;margin-top:2px">weighted mean per order</div>
-        </div>
-
-        <div style="font-size:10px;font-weight:600;color:#64748b;margin-bottom:2px">Selected Cells:</div>
+        <div style="font-size:10px;font-weight:600;color:#64748b;margin:6px 0 2px">Selected Cells:</div>
         <div id="mergedCellsList" class="merged-cells-chips"></div>
 
-        <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
-          <button id="btnExportKmlSelection" class="btn-action btn-kml-export" style="width:100%;background:#0f172a;color:#fff;border-color:#0f172a;font-weight:700;justify-content:center;padding:7px 10px;font-size:12px" title="Export 2-layer KML (Per-Cell and Outer Boundary)">
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+          <!-- Export 2-layer KML Button -->
+          <button id="btnExportKmlSelection" class="btn-action btn-kml-export" style="width:100%;background:#0f172a;color:#fff;border-color:#0f172a;font-weight:700;justify-content:center;padding:6px 10px;font-size:11.5px" title="Export 2-layer KML (Per-Cell and Outer Boundary)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -678,6 +665,50 @@
             </svg>
             Export KML (2 Layers)
           </button>
+
+          <!-- Export Hexagons List by Resolution Section -->
+          <div class="hex-export-card">
+            <div class="hex-export-header">
+              <div class="hex-export-title-group">
+                <span class="hex-export-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 2 17 12 22 22 17 22 7 12 2"></polygon></svg>
+                </span>
+                <span class="hex-export-title">Export Hexagons by Resolution</span>
+              </div>
+              <span id="hexExportBadge" class="hex-export-badge">0 cells</span>
+            </div>
+
+            <div class="hex-export-body">
+              <div class="hex-export-row">
+                <label for="selectHexExportRes" class="hex-export-label">Resolution:</label>
+                <select id="selectHexExportRes" class="hex-export-select">
+                  <option value="current" selected>Current Res (Map Selection)</option>
+                  <option value="6">Res 6 (District ~36 km²)</option>
+                  <option value="7">Res 7 (Zone / Sector ~5.1 km²)</option>
+                  <option value="8">Res 8 (Neighborhood ~0.73 km²)</option>
+                  <option value="9">Res 9 (Block Cluster ~0.10 km²)</option>
+                  <option value="10">Res 10 (Street Block ~0.015 km²)</option>
+                  <option value="all">All Resolutions (Res 6 &ndash; 10)</option>
+                </select>
+              </div>
+
+              <div class="hex-export-btns-row">
+                <button type="button" id="btnExportHexCsv" class="btn-hex-export-btn" title="Download CSV table of hexagons at chosen resolution">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>CSV Table</span>
+                </button>
+                <button type="button" id="btnExportHexTxt" class="btn-hex-export-btn" title="Download simple list of Hex IDs (one per line)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                  <span>Hex List</span>
+                </button>
+                <button type="button" id="btnCopyHexList" class="btn-hex-export-btn" title="Copy hexagon IDs to clipboard">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span>Copy</span>
+                </button>
+              </div>
+              <div id="hexExportFeedback" class="hex-export-feedback" style="display:none"></div>
+            </div>
+          </div>
 
           <!-- Polished Biker Boundary Analysis & CSV Export Section -->
           <div class="biker-feature-card">
@@ -700,6 +731,18 @@
             </button>
 
             <div id="bikerExportBody" class="biker-card-body" style="display:none">
+              <!-- Primary Biker Actions Row: Placed up top so ALWAYS visible on small screens! -->
+              <div class="biker-actions-container" style="margin-top:2px;margin-bottom:8px">
+                <button type="button" id="btnOpenBikerModal" class="btn-biker-preview-modern" title="View live summary stats and biker preview table">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <span>Preview Bikers</span>
+                </button>
+                <button type="button" id="btnExportBikersCsv" class="btn-biker-export-modern" title="Export matching bikers to CSV">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Export CSV</span>
+                </button>
+              </div>
+
               <!-- Period with Quick Presets and Interactive Calendar Button -->
               <div class="biker-form-group">
                 <div class="biker-form-label-row">
@@ -760,6 +803,20 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Bottom Duplicate Biker Actions for convenience -->
+              <div class="biker-actions-container" style="margin-top:8px">
+                <button type="button" id="btnOpenBikerModalBottom" class="btn-biker-preview-modern" title="View live summary stats and biker preview table">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <span>Preview Bikers</span>
+                </button>
+                <button type="button" id="btnExportBikersCsvBottom" class="btn-biker-export-modern" title="Export matching bikers to CSV">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Export CSV</span>
+                </button>
+              </div>
+              <div id="bikerExportFeedback" class="biker-feedback-msg" style="display:none"></div>
+            </div>
 
               <!-- Dual Action Buttons: Preview Table and Export CSV -->
               <div class="biker-actions-container">
@@ -1152,7 +1209,7 @@
     </div>
 
     <!-- Modal Footer Actions -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
+    <div class="biker-modal-footer">
       <div style="font-size:10.5px;color:#64748b">
         Enforced <b>customer_id = 2</b> &bull; Showing up to 100 preview rows
       </div>

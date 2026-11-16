@@ -516,9 +516,40 @@ function setupEventListeners() {
     btnExportBikersCsv.addEventListener('click', () => exportBikersBoundaryCsv());
   }
 
+  const btnExportBikersCsvBottom = document.getElementById('btnExportBikersCsvBottom');
+  if (btnExportBikersCsvBottom) {
+    btnExportBikersCsvBottom.addEventListener('click', () => exportBikersBoundaryCsv());
+  }
+
   const btnOpenBikerModal = document.getElementById('btnOpenBikerModal');
   if (btnOpenBikerModal) {
     btnOpenBikerModal.addEventListener('click', openBikerModal);
+  }
+
+  const btnOpenBikerModalBottom = document.getElementById('btnOpenBikerModalBottom');
+  if (btnOpenBikerModalBottom) {
+    btnOpenBikerModalBottom.addEventListener('click', openBikerModal);
+  }
+
+  // Hexagon Resolution Export buttons & select listener
+  const btnExportHexCsv = document.getElementById('btnExportHexCsv');
+  if (btnExportHexCsv) {
+    btnExportHexCsv.addEventListener('click', () => exportHexagonsByResolution('csv'));
+  }
+
+  const btnExportHexTxt = document.getElementById('btnExportHexTxt');
+  if (btnExportHexTxt) {
+    btnExportHexTxt.addEventListener('click', () => exportHexagonsByResolution('txt'));
+  }
+
+  const btnCopyHexList = document.getElementById('btnCopyHexList');
+  if (btnCopyHexList) {
+    btnCopyHexList.addEventListener('click', () => exportHexagonsByResolution('copy'));
+  }
+
+  const selectHexExportRes = document.getElementById('selectHexExportRes');
+  if (selectHexExportRes) {
+    selectHexExportRes.addEventListener('change', updateHexExportBadge);
   }
 
   const btnCloseBikerModal = document.getElementById('btnCloseBikerModal');
@@ -2405,6 +2436,7 @@ function renderMergedSelection() {
     inputEndDate.value = state.endDate;
   }
   updateBikerPeriodDisplay(inputStartDate ? inputStartDate.value : null, inputEndDate ? inputEndDate.value : null);
+  updateHexExportBadge();
 
   panel.classList.add('active');
 }
@@ -3286,6 +3318,146 @@ async function exportBikersBoundaryCsv() {
       btnModalExport.innerHTML = origModalHtml;
     }
   }
+}
+
+// Export List of Selected Hexagons by Resolution
+async function exportHexagonsByResolution(format) {
+  let hexIds = Array.from(state.selectedHexes.keys());
+  if (hexIds.length === 0 && state.singleSelectedHex && state.singleSelectedHex.h) {
+    hexIds = [state.singleSelectedHex.h.hex];
+  }
+
+  const feedbackEl = document.getElementById('hexExportFeedback');
+  const selectResEl = document.getElementById('selectHexExportRes');
+  const targetResolution = selectResEl ? selectResEl.value : 'current';
+
+  if (!hexIds || hexIds.length === 0) {
+    if (feedbackEl) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.color = '#dc2626';
+      feedbackEl.textContent = 'Please select one or more hexagons on the map first.';
+      setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+    } else {
+      alert('Please select one or more hexagons on the map first.');
+    }
+    return;
+  }
+
+  const btnCsv = document.getElementById('btnExportHexCsv');
+  const btnTxt = document.getElementById('btnExportHexTxt');
+  const btnCopy = document.getElementById('btnCopyHexList');
+  const activeBtn = format === 'csv' ? btnCsv : (format === 'txt' ? btnTxt : btnCopy);
+  const origBtnContent = activeBtn ? activeBtn.innerHTML : '';
+
+  if (activeBtn) {
+    activeBtn.disabled = true;
+    activeBtn.innerHTML = `<span>Loading...</span>`;
+  }
+  if (feedbackEl) {
+    feedbackEl.style.display = 'block';
+    feedbackEl.style.color = '#15803d';
+    feedbackEl.textContent = `Resolving hexagons (${targetResolution === 'all' ? 'All Resolutions' : 'Res ' + targetResolution})...`;
+  }
+
+  try {
+    const payloadFormat = format === 'copy' ? 'txt' : format;
+    const res = await fetch('/api/export-hexagons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hex_ids: hexIds,
+        target_resolution: targetResolution,
+        format: payloadFormat,
+        city: state.city
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Hexagon export failed' }));
+      throw new Error(err.detail || 'Hexagon export failed');
+    }
+
+    const countHeader = res.headers.get('x-hexagons-count') || hexIds.length;
+
+    if (format === 'copy') {
+      const textContent = await res.text();
+      let copied = false;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(textContent.trim());
+          copied = true;
+        } catch (clipErr) {
+          console.warn('navigator.clipboard write failed, using textarea fallback', clipErr);
+        }
+      }
+      if (!copied) {
+        const ta = document.createElement('textarea');
+        ta.value = textContent.trim();
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+
+      if (feedbackEl) {
+        feedbackEl.style.display = 'block';
+        feedbackEl.style.color = '#15803d';
+        feedbackEl.textContent = `Copied ${countHeader} hexagons to clipboard!`;
+        setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+      }
+      showKmlToast(`Copied ${countHeader} hexagons to clipboard!`);
+    } else {
+      const disposition = res.headers.get('content-disposition') || '';
+      let filename = `hexagons_${targetResolution}_${state.city}.${format}`;
+      const fnMatch = disposition.match(/filename="?([^";]+)"?/i);
+      if (fnMatch && fnMatch[1]) {
+        filename = fnMatch[1];
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      if (feedbackEl) {
+        feedbackEl.style.display = 'block';
+        feedbackEl.style.color = '#15803d';
+        feedbackEl.textContent = `Downloaded ${countHeader} hexagons (${filename})`;
+        setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
+      }
+      showKmlToast(`Downloaded ${countHeader} hexagons (${filename})`);
+    }
+  } catch (err) {
+    console.error('Hexagon export error:', err);
+    if (feedbackEl) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.color = '#dc2626';
+      feedbackEl.textContent = `Error: ${err.message}`;
+      setTimeout(() => { feedbackEl.style.display = 'none'; }, 5000);
+    } else {
+      alert(`Hexagon Export Error: ${err.message}`);
+    }
+  } finally {
+    if (activeBtn) {
+      activeBtn.disabled = false;
+      activeBtn.innerHTML = origBtnContent;
+    }
+  }
+}
+
+function updateHexExportBadge() {
+  const badgeEl = document.getElementById('hexExportBadge');
+  if (!badgeEl) return;
+  const count = state.selectedHexes.size || (state.singleSelectedHex ? 1 : 0);
+  badgeEl.textContent = `${count} ${count === 1 ? 'cell' : 'cells'}`;
 }
 
 function generateKmlTwoLayers(hexItems, docTitle) {

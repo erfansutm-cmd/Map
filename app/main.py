@@ -19,6 +19,7 @@ from app.cities import get_popular_cities, get_city_info
 from app.data_source import fetch_orders, parse_csv_orders, get_dates_between, compute_daily_breakdown
 from app.engine import analyze_city_orders
 from app.export_biker_csv import generate_biker_rides_csv, compute_biker_boundary_rides
+from app.export_hexagons import generate_hexagons_csv, generate_hexagons_txt, resolve_hexagons_by_resolution
 from app.export_html import build_standalone_html
 from app.export_kml import build_kml_boundaries, build_kml_outer_boundary
 from app.file_cache import save_df_to_file, load_df_from_file, clear_file_cache
@@ -413,6 +414,71 @@ def export_kml_post(payload: Dict[str, Any]):
         media_type="application/vnd.google-earth.kml+xml; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{out_filename}"'},
     )
+
+
+@app.post("/api/export-hexagons")
+def export_hexagons_post(payload: Dict[str, Any]):
+    """Export list of selected hexagons by resolution as CSV, TXT or JSON."""
+    raw_cells = payload.get("cells") or payload.get("hex_ids") or payload.get("hexagons") or []
+    if isinstance(raw_cells, str):
+        cell_list = [c.strip() for c in raw_cells.split(",") if c.strip()]
+    elif isinstance(raw_cells, list):
+        cell_list = []
+        for c in raw_cells:
+            if isinstance(c, dict):
+                h = str(c.get("hex") or "").strip().lower()
+                if h:
+                    cell_list.append(h)
+            elif str(c).strip():
+                cell_list.append(str(c).strip().lower())
+    else:
+        cell_list = []
+
+    if not cell_list:
+        raise HTTPException(status_code=400, detail="No cell IDs provided")
+
+    city = str(payload.get("city") or "city").strip().lower()
+    target_res = str(
+        payload.get("target_res")
+        or payload.get("target_resolution")
+        or payload.get("resolution")
+        or "current"
+    ).strip().lower()
+    export_format = str(payload.get("format") or "csv").strip().lower()
+
+    res_suffix = f"res_{target_res}" if target_res != "current" else "selected_res"
+
+    if export_format == "txt":
+        txt_content, count = generate_hexagons_txt(cell_list, target_res=target_res)
+        filename = f"hexagons_{city}_{res_suffix}_{count}_cells.txt"
+        return Response(
+            content=txt_content,
+            media_type="text/plain; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Hexagons-Count": str(count),
+            },
+        )
+    elif export_format == "json":
+        items = resolve_hexagons_by_resolution(cell_list, target_res=target_res)
+        return {
+            "status": "success",
+            "city": city,
+            "target_resolution": target_res,
+            "count": len(items),
+            "hexagons": items,
+        }
+    else:  # default CSV
+        csv_content, count = generate_hexagons_csv(cell_list, target_res=target_res, city=city)
+        filename = f"hexagons_{city}_{res_suffix}_{count}_cells.csv"
+        return Response(
+            content=csv_content,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Hexagons-Count": str(count),
+            },
+        )
 
 
 @app.post("/api/cells/outer-boundary")
