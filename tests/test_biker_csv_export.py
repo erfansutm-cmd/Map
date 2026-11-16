@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.export_biker_csv import compute_biker_boundary_rides, generate_biker_rides_csv
 from app.main import app
+from unittest.mock import patch
 
 
 class TestBikerCsvExport(unittest.TestCase):
@@ -20,6 +21,15 @@ class TestBikerCsvExport(unittest.TestCase):
             "source_latitude": [32.65, 32.65, 35.70, 35.70, 35.70, 35.70],
             "source_longitude": [51.66, 51.66, 51.40, 51.40, 51.40, 51.40],
         })
+
+        self.patcher = patch(
+            "app.main.fetch_orders",
+            return_value=(self.df, "mock", [], [])
+        )
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
 
     def test_compute_biker_boundary_rides_more(self):
         # Cell A: B101 has 2 of 3 rides (66.7%), B102 has 0 of 3 (0%)
@@ -139,6 +149,67 @@ class TestBikerCsvExport(unittest.TestCase):
         # B201 should only have 2 rides counted (the ones with customer_id=2)
         self.assertEqual(res.iloc[0]["total_rides_in_period"], 2)
         self.assertEqual(res.iloc[0]["total_rides_in_boundary"], 2)
+
+
+    def test_generate_biker_rides_csv_random_sample(self):
+        # Create df with 5 bikers
+        sample_df = pd.DataFrame({
+            "order_id": [f"o{i}" for i in range(10)],
+            "biker_id": [f"B_{i % 5}" for i in range(10)],
+            "customer_id": [2] * 10,
+            "source_latitude": [32.65] * 10,
+            "source_longitude": [51.66] * 10,
+        })
+        csv_text, count = generate_biker_rides_csv(
+            sample_df,
+            cells=[self.cell_a],
+            min_rides=1,
+            toggle="more",
+            percentage=0.0,
+            sample_size=2,
+        )
+        self.assertEqual(count, 2)
+        lines = csv_text.strip().split("\n")
+        self.assertEqual(len(lines), 3)  # header + 2 rows
+
+    def test_api_export_biker_rides_csv_with_sample_size(self):
+        res = self.client.post("/api/export-biker-rides-csv", json={
+            "city": "isfahan",
+            "start_date": "2026-10-22",
+            "end_date": "2026-10-24",
+            "cells": [self.cell_a],
+            "min_rides": 1,
+            "toggle": "less",
+            "percentage": 100.0,
+            "sample_size": 1,
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/csv", res.headers.get("content-type"))
+        self.assertEqual(res.headers.get("x-sample-size"), "1")
+        self.assertEqual(int(res.headers.get("x-matched-bikers-count", 0)), 1)
+        self.assertIn("sample_1", res.headers.get("content-disposition", ""))
+
+    def test_api_biker_rides_preview_with_sample_size(self):
+        res = self.client.post("/api/biker-rides-preview", json={
+            "city": "isfahan",
+            "start_date": "2026-10-22",
+            "end_date": "2026-10-24",
+            "cells": [self.cell_a],
+            "min_rides": 1,
+            "toggle": "less",
+            "percentage": 100.0,
+            "sample_size": 1,
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["sample_size"], 1)
+        self.assertLessEqual(data["sampled_count"], 1)
+
+    def test_template_sample_inputs_present(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('id="bikerExportSample"', res.text)
+        self.assertIn('id="bikerModalSample"', res.text)
 
 
 if __name__ == "__main__":

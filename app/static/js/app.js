@@ -542,6 +542,18 @@ function setupEventListeners() {
     selectHexExportRes.addEventListener('change', updateHexExportBadge);
   }
 
+  // Sync random sample input between card and modal
+  const bikerExportSample = document.getElementById('bikerExportSample');
+  const bikerModalSample = document.getElementById('bikerModalSample');
+  if (bikerExportSample && bikerModalSample) {
+    bikerExportSample.addEventListener('input', () => {
+      bikerModalSample.value = bikerExportSample.value;
+    });
+    bikerModalSample.addEventListener('input', () => {
+      bikerExportSample.value = bikerModalSample.value;
+    });
+  }
+
   const btnCloseBikerModal = document.getElementById('btnCloseBikerModal');
   const btnBikerModalClose = document.getElementById('btnBikerModalClose');
   if (btnCloseBikerModal) btnCloseBikerModal.addEventListener('click', closeBikerModal);
@@ -3035,11 +3047,13 @@ function openBikerModal() {
   const inputEndDate = document.getElementById('bikerExportEndDate');
   const inputMinRides = document.getElementById('bikerExportMinRides');
   const inputPct = document.getElementById('bikerExportPct');
+  const inputSample = document.getElementById('bikerExportSample');
 
   const modalStartDate = document.getElementById('bikerModalStartDate');
   const modalEndDate = document.getElementById('bikerModalEndDate');
   const modalMinRides = document.getElementById('bikerModalMinRides');
   const modalPct = document.getElementById('bikerModalPct');
+  const modalSample = document.getElementById('bikerModalSample');
 
   const sVal = (inputStartDate && inputStartDate.value) || state.startDate;
   const eVal = (inputEndDate && inputEndDate.value) || state.endDate;
@@ -3048,6 +3062,7 @@ function openBikerModal() {
   if (modalEndDate) modalEndDate.value = eVal;
   if (modalMinRides) modalMinRides.value = (inputMinRides && inputMinRides.value) || '5';
   if (modalPct) modalPct.value = (inputPct && inputPct.value) || '20';
+  if (modalSample && inputSample) modalSample.value = inputSample.value || '';
 
   updateBikerPeriodDisplay(sVal, eVal);
 
@@ -3094,12 +3109,15 @@ async function loadBikerModalPreview() {
   const modalEndDate = document.getElementById('bikerModalEndDate');
   const modalMinRides = document.getElementById('bikerModalMinRides');
   const modalPct = document.getElementById('bikerModalPct');
+  const modalSample = document.getElementById('bikerModalSample');
   const tbody = document.getElementById('bikerModalTableBody');
 
   const startDate = modalStartDate ? modalStartDate.value || state.startDate : state.startDate;
   const endDate = modalEndDate ? modalEndDate.value || state.endDate : state.endDate;
   const minRides = modalMinRides ? Math.max(0, parseInt(modalMinRides.value, 10) || 0) : 0;
   const pct = modalPct ? Math.max(0, Math.min(100, parseFloat(modalPct.value) || 0)) : 20;
+  const sampleVal = modalSample && modalSample.value ? parseInt(modalSample.value, 10) : null;
+  const sampleSize = sampleVal && sampleVal > 0 ? sampleVal : null;
   const toggle = state.bikerExportToggle || 'less';
 
   // Sync back to card
@@ -3107,10 +3125,12 @@ async function loadBikerModalPreview() {
   const inputEndDate = document.getElementById('bikerExportEndDate');
   const inputMinRides = document.getElementById('bikerExportMinRides');
   const inputPct = document.getElementById('bikerExportPct');
+  const inputSample = document.getElementById('bikerExportSample');
   if (inputStartDate) inputStartDate.value = startDate;
   if (inputEndDate) inputEndDate.value = endDate;
   if (inputMinRides) inputMinRides.value = minRides;
   if (inputPct) inputPct.value = pct;
+  if (inputSample && modalSample) inputSample.value = modalSample.value;
 
   if (tbody) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#64748b">Analyzing biker rides in boundary...</td></tr>';
@@ -3128,6 +3148,7 @@ async function loadBikerModalPreview() {
         min_rides: minRides,
         toggle: toggle,
         percentage: pct,
+        sample_size: sampleSize,
         layer: state.currentLayer,
         status: state.status,
         customer_id: state.customerId,
@@ -3139,19 +3160,30 @@ async function loadBikerModalPreview() {
     }
 
     const data = await res.json();
-    document.getElementById('bikerModalKpiCount').textContent = (data.matching_bikers_count || 0).toLocaleString();
+    const countDisplay = (data.sample_size && data.sampled_count < data.matching_bikers_count)
+      ? `${data.sampled_count} (sample of ${data.matching_bikers_count.toLocaleString()})`
+      : (data.matching_bikers_count || 0).toLocaleString();
+
+    document.getElementById('bikerModalKpiCount').textContent = countDisplay;
     document.getElementById('bikerModalKpiTotalRides').textContent = (data.total_period_rides || 0).toLocaleString();
     document.getElementById('bikerModalKpiBoundaryRides').textContent = (data.total_boundary_rides || 0).toLocaleString();
     document.getElementById('bikerModalKpiAvgPct').textContent = `${(data.avg_boundary_pct || 0).toFixed(1)}%`;
 
     const sub = document.getElementById('bikerModalTableSub');
-    if (sub) sub.textContent = `(${data.matching_bikers_count || 0} matching)`;
+    if (sub) {
+      sub.textContent = (data.sample_size && data.sampled_count < data.matching_bikers_count)
+        ? `(${data.sampled_count} random sample of ${data.matching_bikers_count} matching)`
+        : `(${data.matching_bikers_count || 0} matching)`;
+    }
 
     const btnModalExport = document.getElementById('btnBikerModalExportCsv');
     if (btnModalExport) {
+      const exportCount = (data.sample_size && data.sampled_count < data.matching_bikers_count)
+        ? data.sampled_count
+        : (data.matching_bikers_count || 0);
       btnModalExport.innerHTML = `
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        Download CSV (${data.matching_bikers_count || 0})
+        Download CSV (${exportCount})
       `;
     }
 
@@ -3226,6 +3258,7 @@ async function exportBikersBoundaryCsv() {
   const endDateInput = document.getElementById(isModalOpen ? 'bikerModalEndDate' : 'bikerExportEndDate');
   const minRidesInput = document.getElementById(isModalOpen ? 'bikerModalMinRides' : 'bikerExportMinRides');
   const pctInput = document.getElementById(isModalOpen ? 'bikerModalPct' : 'bikerExportPct');
+  const sampleInput = document.getElementById(isModalOpen ? 'bikerModalSample' : 'bikerExportSample');
   const btnExport = document.getElementById('btnExportBikersCsv');
   const btnModalExport = document.getElementById('btnBikerModalExportCsv');
   const feedbackEl = document.getElementById('bikerExportFeedback');
@@ -3234,6 +3267,8 @@ async function exportBikersBoundaryCsv() {
   const endDate = endDateInput ? endDateInput.value || state.endDate : state.endDate;
   const minRides = minRidesInput ? Math.max(0, parseInt(minRidesInput.value, 10) || 0) : 0;
   const percentage = pctInput ? Math.max(0, Math.min(100, parseFloat(pctInput.value) || 0)) : 20;
+  const sampleVal = sampleInput && sampleInput.value ? parseInt(sampleInput.value, 10) : null;
+  const sampleSize = sampleVal && sampleVal > 0 ? sampleVal : null;
   const toggle = state.bikerExportToggle || 'less';
 
   const origBtnHtml = btnExport ? btnExport.innerHTML : 'Export CSV';
@@ -3249,7 +3284,8 @@ async function exportBikersBoundaryCsv() {
   }
   if (feedbackEl) {
     feedbackEl.style.display = 'block';
-    feedbackEl.textContent = 'Querying rides and filtering bikers (customer_id = 2)...';
+    const sampleText = sampleSize ? ` (random sample of ${sampleSize})` : '';
+    feedbackEl.textContent = `Querying rides and filtering bikers${sampleText} (customer_id = 2)...`;
   }
 
   try {
@@ -3264,6 +3300,7 @@ async function exportBikersBoundaryCsv() {
         min_rides: minRides,
         toggle: toggle,
         percentage: percentage,
+        sample_size: sampleSize,
         layer: state.currentLayer,
         status: state.status,
         customer_id: state.customerId,
@@ -3276,9 +3313,14 @@ async function exportBikersBoundaryCsv() {
     }
 
     const matchedCount = res.headers.get('x-matched-bikers-count') || '0';
-    const blob = await res.blob();
-    const filename = `${state.city}_bikers_boundary_${toggle}_${percentage}pct_${startDate}_to_${endDate}.csv`;
+    const disposition = res.headers.get('content-disposition') || '';
+    let filename = `${state.city}_bikers_boundary_${toggle}_${percentage}pct_${startDate}_to_${endDate}.csv`;
+    const fnMatch = disposition.match(/filename="?([^";]+)"?/i);
+    if (fnMatch && fnMatch[1]) {
+      filename = fnMatch[1];
+    }
 
+    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -3288,9 +3330,10 @@ async function exportBikersBoundaryCsv() {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-    showKmlToast(`Exported ${matchedCount} bikers to CSV (${filename})`);
+    const sampleMsg = sampleSize ? ` (random sample of ${sampleSize})` : '';
+    showKmlToast(`Exported ${matchedCount} bikers${sampleMsg} to CSV (${filename})`);
     if (feedbackEl) {
-      feedbackEl.textContent = `Done! ${matchedCount} bikers matched and exported.`;
+      feedbackEl.textContent = `Done! ${matchedCount} bikers matched${sampleMsg} and exported.`;
       setTimeout(() => { feedbackEl.style.display = 'none'; }, 4000);
     }
   } catch (err) {

@@ -804,20 +804,18 @@
                 </div>
               </div>
 
-              <div id="bikerExportFeedback" class="biker-feedback-msg" style="display:none"></div>
-            </div>
-
-              <!-- Dual Action Buttons: Preview Table and Export CSV -->
-              <div class="biker-actions-container">
-                <button type="button" id="btnOpenBikerModal" class="btn-biker-preview-modern" title="View live summary stats and biker preview table">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                  <span>Preview Bikers</span>
-                </button>
-                <button type="button" id="btnExportBikersCsv" class="btn-biker-export-modern" title="Export matching bikers to CSV">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  <span>Export CSV</span>
-                </button>
+              <!-- Random Sample / Limit Input (e.g. only 100 bikers) -->
+              <div class="biker-form-group" style="margin-bottom:4px">
+                <div class="biker-form-label-row">
+                  <label for="bikerExportSample" class="biker-form-label">Random Sample (Limit)</label>
+                  <span class="biker-hint-badge">Optional (e.g. 100)</span>
+                </div>
+                <div class="biker-input-stepper-wrap">
+                  <input type="number" id="bikerExportSample" class="biker-modern-input" min="1" step="1" placeholder="All matching (e.g. 100)">
+                  <span class="biker-input-unit-tag">random bikers</span>
+                </div>
               </div>
+
               <div id="bikerExportFeedback" class="biker-feedback-msg" style="display:none"></div>
             </div>
           </div>
@@ -1115,6 +1113,15 @@
               <input type="number" id="bikerModalPct" class="biker-modal-input" min="0" max="100" step="1" value="20">
               <span class="biker-pct-suffix">%</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Random Sample / Limit -->
+        <div class="biker-filter-group" style="width:130px">
+          <label for="bikerModalSample" class="biker-field-label">Random Sample:</label>
+          <div class="biker-input-with-addon">
+            <input type="number" id="bikerModalSample" class="biker-modal-input" min="1" step="1" placeholder="All (e.g. 100)">
+            <span class="biker-input-addon">bikers</span>
           </div>
         </div>
 

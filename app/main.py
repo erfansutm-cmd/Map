@@ -533,6 +533,22 @@ def export_biker_rides_csv_endpoint(payload: Dict[str, Any]):
     if not cell_list:
         raise HTTPException(status_code=400, detail="No boundary cell IDs provided")
 
+    raw_sample = (
+        payload.get("sample_size")
+        or payload.get("sample")
+        or payload.get("limit")
+        or payload.get("random_sample")
+        or payload.get("random_count")
+    )
+    sample_size = None
+    if raw_sample is not None and str(raw_sample).strip():
+        try:
+            val = int(raw_sample)
+            if val > 0:
+                sample_size = val
+        except (ValueError, TypeError):
+            pass
+
     try:
         df, _, _, _ = fetch_orders(
             city=city,
@@ -557,17 +573,25 @@ def export_biker_rides_csv_endpoint(payload: Dict[str, Any]):
         toggle=toggle,
         percentage=percentage,
         layer=layer,
+        sample_size=sample_size,
     )
 
-    out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_{start_date}_to_{end_date}.csv"
+    if sample_size and count <= sample_size:
+        out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_sample_{count}_{start_date}_to_{end_date}.csv"
+    else:
+        out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_{start_date}_to_{end_date}.csv"
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{out_filename}"',
+        "X-Matched-Bikers-Count": str(count),
+    }
+    if sample_size:
+        headers["X-Sample-Size"] = str(sample_size)
 
     return Response(
         content=csv_content,
         media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": f'attachment; filename="{out_filename}"',
-            "X-Matched-Bikers-Count": str(count),
-        },
+        headers=headers,
     )
 
 
@@ -612,6 +636,22 @@ def preview_biker_rides_endpoint(payload: Dict[str, Any]):
             threshold=settings.DEFAULT_THRESHOLD,
         )
 
+    raw_sample = (
+        payload.get("sample_size")
+        or payload.get("sample")
+        or payload.get("limit")
+        or payload.get("random_sample")
+        or payload.get("random_count")
+    )
+    sample_size = None
+    if raw_sample is not None and str(raw_sample).strip():
+        try:
+            val = int(raw_sample)
+            if val > 0:
+                sample_size = val
+        except (ValueError, TypeError):
+            pass
+
     biker_df = compute_biker_boundary_rides(
         df=df,
         cells=cell_list,
@@ -626,10 +666,17 @@ def preview_biker_rides_endpoint(payload: Dict[str, Any]):
     total_boundary_rides = int(biker_df["total_rides_in_boundary"].sum()) if matching_count > 0 else 0
     avg_boundary_pct = round(float(biker_df["percentage_of_rides_in_boundary"].mean()), 2) if matching_count > 0 else 0.0
 
-    preview_records = biker_df.head(100).to_dict(orient="records")
+    if sample_size is not None and sample_size > 0 and len(biker_df) > sample_size:
+        preview_df = biker_df.sample(n=sample_size).reset_index(drop=True)
+    else:
+        preview_df = biker_df
+
+    preview_records = preview_df.head(100).to_dict(orient="records")
 
     return {
         "matching_bikers_count": matching_count,
+        "sample_size": sample_size,
+        "sampled_count": len(preview_df),
         "total_period_rides": total_period_rides,
         "total_boundary_rides": total_boundary_rides,
         "avg_boundary_pct": avg_boundary_pct,
@@ -649,6 +696,7 @@ def export_biker_rides_csv_get(
     layer: str = Query(default="source"),
     status: str = Query(default="DELIVERED"),
     customer_id: int = Query(default=settings.DEFAULT_CUSTOMER_ID),
+    sample_size: Optional[int] = Query(default=None),
 ):
     """Filter bikers by ride count and boundary percentage (more or less) and export as CSV (GET)."""
     cell_list = [c.strip() for c in cells.split(",") if c.strip()]
@@ -679,9 +727,13 @@ def export_biker_rides_csv_get(
         toggle=toggle,
         percentage=percentage,
         layer=layer,
+        sample_size=sample_size,
     )
 
-    out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_{start_date}_to_{end_date}.csv"
+    if sample_size and count <= sample_size:
+        out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_sample_{count}_{start_date}_to_{end_date}.csv"
+    else:
+        out_filename = f"{city}_bikers_boundary_{toggle}_{int(percentage)}pct_{start_date}_to_{end_date}.csv"
 
     return Response(
         content=csv_content,

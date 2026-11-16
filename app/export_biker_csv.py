@@ -160,9 +160,11 @@ def generate_biker_rides_csv(
     toggle: str = "less",
     percentage: float = 20.0,
     layer: str = "source",
+    sample_size: Optional[int] = None,
 ) -> Tuple[str, int]:
     """
     Generate CSV content and matched row count for filtered bikers in boundary.
+    Supports random sampling (e.g. sample_size=100) from all matching bikers.
     Columns: biker_id, total_rides_in_period, total_rides_in_boundary, percentage_of_rides_in_boundary
     """
     filtered = compute_biker_boundary_rides(
@@ -173,6 +175,9 @@ def generate_biker_rides_csv(
         percentage=percentage,
         layer=layer,
     )
+
+    if sample_size is not None and sample_size > 0 and len(filtered) > sample_size:
+        filtered = filtered.sample(n=sample_size).reset_index(drop=True)
 
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\n")
